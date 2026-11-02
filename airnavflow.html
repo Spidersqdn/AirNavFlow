@@ -1142,6 +1142,12 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   transform:translate(-50%,-50%);
 }
 .actions{flex-wrap:wrap}
+#miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
+#miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+#miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
+#miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
+#miniMapModal img{display:block;width:100%;height:auto}
+#miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
 .actions button{
   flex:1 1 calc(33.333% - 8px);
   min-width:92px;
@@ -1635,6 +1641,7 @@ td .wp-delete{
   <button id="gpsBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; map is free to pan)">GPS TRACK</button>
   <button id="measureBtn" type="button">RULER</button>
   <button id="exportKmz" type="button">EXPORT KMZ</button>
+  <button id="exportMiniMap" type="button" title="Export a mini map (PNG) of the route">MINI MAP</button>
   <button id="wBtn" type="button">WINDY</button>
 </div>
 
@@ -3658,7 +3665,7 @@ var topo=L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png',{
 
 /* ---- Offline basemap: OpenStreetMap vector tiles in one PMTiles file (map/thailand.pmtiles) ---- */
 var OFFLINE_MAP_URL='map/thailand.pmtiles', OFFLINE_CACHE='fp-offline-map-v1';
-var offlineBase=L.layerGroup(), offlineInner=null;
+var offlineBase=L.layerGroup(), offlineInner=null, offlinePM=null, offlineMaxZ=12;
 var offlineState={stored:false,bytes:0,savedAt:0,onServer:null,busy:false};
 
 function setOfflineSource(source){
@@ -3666,6 +3673,7 @@ function setOfflineSource(source){
   var pm=new pmtiles.PMTiles(source);
   return pm.getHeader().then(function(h){
     if(offlineInner)offlineBase.removeLayer(offlineInner);
+    offlinePM=pm;offlineMaxZ=h.maxZoom||12;
     offlineInner=protomapsL.leafletLayer({url:pm,flavor:'dark',lang:'th',maxDataZoom:h.maxZoom||12});
     offlineBase.addLayer(offlineInner);
     return h;
@@ -6237,6 +6245,331 @@ function exportRouteKmz(){
   });
 }
 
+/* ---- MINI MAP export: one PNG strip chart of the route (title bar, AD info boxes, waypoint boxes, leg labels) ----
+   Background = the base map now on screen: offline PMTiles (drawn with protomaps Static, works offline)
+   or the online raster layer (tiles loaded with CORS). Falls back to offline PMTiles, then to a plain grid. */
+var AD_INFO={};   /* ICAO -> [[kind,text],...] from data/AD.txt */
+function loadAdInfoFile(){
+  fetchDataTxt('AD').then(function(t){
+    var got={};
+    parseDataTxt(t).forEach(function(f){
+      var id=(f[0]||'').toUpperCase();if(!/^[A-Z]{4}$/.test(id))return;
+      (got[id]=got[id]||[]).push([(f[1]||'').toUpperCase(),f.slice(2).join(' | ')]);
+    });
+    AD_INFO=got;
+  }).catch(function(){});
+}
+var MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',
+  '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.'};
+function morseOf(id){return String(id||'').toUpperCase().split('').map(function(c){return MORSE[c]||'';}).filter(Boolean).join(' / ');}
+
+function mmWorld(lat,lng,z){   /* Web Mercator world pixels at zoom z (256 px tiles) */
+  var s=256*Math.pow(2,z),sn=Math.sin(Math.max(-85,Math.min(85,lat))*rad);
+  return {x:(lng+180)/360*s,y:(0.5-Math.log((1+sn)/(1-sn))/(4*Math.PI))*s};
+}
+function mmDDM(v,isLat){   /* N 14 17.45 / E 100 48.31 */
+  var a=Math.abs(v),d=Math.floor(a),m=(a-d)*60;
+  if(m>=59.995){d++;m=0;}
+  return (isLat?(v<0?'S':'N'):(v<0?'W':'E'))+' '+d+' '+m.toFixed(2).padStart(5,'0');
+}
+function mmPad3(n){return String(Math.round(n)%360).padStart(3,'0');}
+function mmRadial(p){
+  var ap=(p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p);
+  if(!ap)return '';
+  var ref={lat:ap[4],lng:ap[5]},d=dist(ref,p);
+  return 'R-'+mmPad3(course(ref,p))+'/'+(d<10?d.toFixed(1):Math.round(d))+' '+ap[0];
+}
+function mmLoadImg(src,timeout){
+  return new Promise(function(res){
+    var im=new Image(),done=false;
+    im.crossOrigin='anonymous';
+    var t=setTimeout(function(){if(!done){done=true;res(null);}},timeout||8000);
+    im.onload=function(){if(!done){done=true;clearTimeout(t);res(im);}};
+    im.onerror=function(){if(!done){done=true;clearTimeout(t);res(null);}};
+    im.src=src;
+  });
+}
+/* Online raster base (Esri / OSM / OpenTopo): resolves false if most tiles failed (e.g. offline) */
+function mmDrawRaster(ctx,layer,W,H,cx,cy,z){
+  var maxZ=(layer.options&&layer.options.maxZoom)||17,tz=Math.max(0,Math.min(maxZ,Math.ceil(z))),sc=Math.pow(2,z-tz),ts=256*sc;
+  var x0=cx-W/2,y0=cy-H/2,n=Math.pow(2,tz);
+  var tx0=Math.floor(x0/ts),ty0=Math.floor(y0/ts),tx1=Math.floor((x0+W)/ts),ty1=Math.floor((y0+H)/ts),jobs=[];
+  for(var ty=ty0;ty<=ty1;ty++)for(var tx=tx0;tx<=tx1;tx++){
+    if(ty<0||ty>=n)continue;
+    (function(tx,ty){
+      var url=L.Util.template(layer._url,{z:tz,x:((tx%n)+n)%n,y:ty,s:'a',r:''});
+      jobs.push(mmLoadImg(url).then(function(im){
+        if(im)ctx.drawImage(im,Math.round(tx*ts-x0),Math.round(ty*ts-y0),Math.ceil(ts)+1,Math.ceil(ts)+1);
+        return !!im;
+      }));
+    })(tx,ty);
+  }
+  return Promise.all(jobs).then(function(r){var ok=r.filter(Boolean).length;return ok>0&&ok>=r.length*0.6;});
+}
+function mmDrawVector(ctx,W,H,center,z){
+  if(!offlinePM||typeof protomapsL==='undefined'||!protomapsL.Static)return Promise.resolve(false);
+  var st=new protomapsL.Static({url:offlinePM,flavor:'light',lang:'th',maxDataZoom:offlineMaxZ});
+  return st.drawContext(ctx,W,H,{x:center.lng,y:center.lat},z).then(function(){return true;},function(){return false;});
+}
+function mmDrawBase(ctx,W,H,cx,cy,z,center){
+  ctx.fillStyle='#e9eef2';ctx.fillRect(0,0,W,H);
+  var raster=[sat,osm,topo].filter(function(l){return map.hasLayer(l);})[0];
+  var first=(!raster||map.hasLayer(offlineBase))?mmDrawVector(ctx,W,H,center,z):mmDrawRaster(ctx,raster,W,H,cx,cy,z);
+  return first.then(function(ok){
+    if(ok)return true;
+    ctx.fillStyle='#e9eef2';ctx.fillRect(0,0,W,H);
+    return mmDrawVector(ctx,W,H,center,z);
+  }).then(function(ok){
+    if(!ok){   /* plain background + 10' graticule */
+      ctx.fillStyle='#eef1f4';ctx.fillRect(0,0,W,H);
+    }
+    return ok;
+  });
+}
+
+function mmRoundRect(ctx,x,y,w,h){ctx.beginPath();ctx.rect(x,y,w,h);}
+function mmBoxOverlap(a,b){return a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;}
+function mmSegHitsBox(p,q,b){   /* segment vs rectangle (sampled) */
+  for(var t=0;t<=1;t+=0.05){var x=p.x+(q.x-p.x)*t,y=p.y+(q.y-p.y)*t;if(x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h)return true;}
+  return false;
+}
+/* lines: [{t:text,f:font,c:color}] -> measured box */
+function mmMeasure(ctx,lines,pad){
+  var w=0,h=pad*2;
+  lines.forEach(function(l){ctx.font=l.f;w=Math.max(w,ctx.measureText(l.t).width);h+=l.lh;});
+  return {w:Math.ceil(w+pad*2),h:Math.ceil(h)};
+}
+function mmDrawBox(ctx,b,lines,pad,align,border){
+  ctx.fillStyle='rgba(255,255,255,.96)';ctx.fillRect(b.x,b.y,b.w,b.h);
+  ctx.lineWidth=border||2;ctx.strokeStyle='#111';ctx.strokeRect(b.x,b.y,b.w,b.h);
+  var y=b.y+pad;
+  lines.forEach(function(l){
+    ctx.font=l.f;ctx.fillStyle=l.c||'#111';ctx.textBaseline='top';
+    ctx.textAlign=align==='left'?'left':'center';
+    ctx.fillText(l.t,align==='left'?b.x+pad:b.x+b.w/2,y+(l.lh-l.sz)/2);
+    if(l.u){var tw=ctx.measureText(l.u).width;ctx.fillRect(b.x+pad,y+(l.lh+l.sz)/2,tw,2);}
+    y+=l.lh;
+  });
+}
+
+function buildMiniMap(){
+  var S=2,W=900*S,HEAD=118*S,FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
+  /* route + nearby off-route points in world px at z=0 */
+  var all=pts.map(function(p){return mmWorld(p.lat,p.lng,0);});
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
+  var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
+  var portrait=spanY>=spanX*0.8;
+  var H=(portrait?1270:640)*S,MH=H-HEAD;
+  var innerW=W*(portrait?0.42:0.5),innerH=MH*(portrait?0.78:0.62);
+  var z=Math.log2(Math.min(innerW/spanX,innerH/spanY));
+  z=Math.max(5,Math.min(z,13.5));
+  var sc=Math.pow(2,z);
+  var cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
+  /* nudge the route toward the side away from the AD boxes column (portrait: boxes left) */
+  if(portrait)cxW-=W*0.08;
+  var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
+  function px(p){var q=mmWorld(p.lat,p.lng,z);return {x:q.x-cxW+W/2,y:q.y-cyW+MH/2+HEAD};}
+
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var ctx=cv.getContext('2d');
+  var mapCv=document.createElement('canvas');mapCv.width=W;mapCv.height=MH;
+  var mctx=mapCv.getContext('2d');
+
+  return mmDrawBase(mctx,W,MH,cxW,cyW,z,center).then(function(){
+    ctx.drawImage(mapCv,0,HEAD);
+    ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);   /* fade like a printed strip chart */
+
+    /* ---- title bar ---- */
+    ctx.fillStyle='#6f2a93';ctx.fillRect(0,0,W,HEAD);
+    var dep=pts[0].name||'START',arr=pts[pts.length-1].name||'END';
+    ctx.fillStyle='#fff';ctx.textBaseline='alphabetic';ctx.textAlign='left';
+    ctx.font='600 '+(46*S)+'px '+FONT;ctx.fillText(dep+' - '+arr,24*S,62*S);
+    var now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    ctx.font='500 '+(17*S)+'px '+FONT;ctx.fillText('UPDATE  '+now.getDate()+' '+MON[now.getMonth()]+' '+now.getFullYear(),24*S,98*S);
+    ctx.textAlign='right';ctx.font='500 '+(13*S)+'px '+FONT;ctx.fillStyle='rgba(255,255,255,.8)';
+    ctx.fillText('AirNavFlow',W-24*S,98*S);
+
+    var P=pts.map(px),boxes=[],segs=[];
+    for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
+    function free(b,ignoreSegs){
+      if(b.x<4||b.y<HEAD+4||b.x+b.w>W-4||b.y+b.h>H-4)return false;
+      for(var k=0;k<boxes.length;k++)if(mmBoxOverlap(b,boxes[k]))return false;
+      if(!ignoreSegs)for(var s=0;s<segs.length;s++)if(mmSegHitsBox(segs[s][0],segs[s][1],b))return false;
+      for(var j=0;j<P.length;j++){var q=P[j];if(q.x>b.x-14*S&&q.x<b.x+b.w+14*S&&q.y>b.y-14*S&&q.y<b.y+b.h+14*S)return false;}
+      return true;
+    }
+
+    /* ---- AD info boxes (corners), for route points that are airports ---- */
+    var adIdx={};
+    pts.forEach(function(p,i){var id=(p.name||'').toUpperCase();if(APX[id]&&!(id in adIdx))adIdx[id]=i;});
+    var corners=['tl','bl','tr','br'];
+    Object.keys(adIdx).forEach(function(id){
+      var a=APX[id],i=adIdx[id],q=P[i],sz=15*S,lh=21*S,pad=9*S;
+      var lines=[{t:id+' '+a[2]+(a[6]!==''&&a[6]!=null?' (ELEV '+a[6]+')':''),f:'600 '+sz+'px '+FONT,lh:lh+2*S,sz:sz,u:id},
+                 {t:mmDDM(a[4],true)+'  '+mmDDM(a[5],false),f:sz+'px '+FONT,lh:lh,sz:sz}];
+      (AD_INFO[id]||[]).forEach(function(r){
+        if(r[0]==='MORSE'){
+          r[1].split(/[ ,]+/).filter(Boolean).forEach(function(nid){lines.push({t:morseOf(nid)+'  ['+nid.toUpperCase()+']',f:'600 '+sz+'px '+FONT,lh:lh+4*S,sz:sz});});
+        }else lines.push({t:r[1]?(r[0]?r[0]+' '+r[1]:r[1]):r[0],f:sz+'px '+FONT,lh:lh,sz:sz});
+      });
+      var m=mmMeasure(ctx,lines,pad);m.w=Math.max(m.w,230*S);
+      var order=corners.slice().sort(function(c1,c2){
+        function d(c){var cx=c[1]==='l'?0:W,cy=c[0]==='t'?HEAD:H;return Math.hypot(cx-q.x,cy-q.y);}
+        return d(c1)-d(c2);
+      });
+      var placed=null;
+      for(var k=0;k<order.length&&!placed;k++){
+        var c=order[k],b={x:c[1]==='l'?8*S:W-8*S-m.w,y:c[0]==='t'?HEAD+8*S:H-8*S-m.h,w:m.w,h:m.h};
+        if(free(b,false)){placed=b;corners.splice(corners.indexOf(c),1);}
+      }
+      if(!placed){   /* overlap the route if every corner is busy */
+        var c0=order[0];placed={x:c0[1]==='l'?8*S:W-8*S-m.w,y:c0[0]==='t'?HEAD+8*S:H-8*S-m.h,w:m.w,h:m.h};
+        if(corners.indexOf(c0)>=0)corners.splice(corners.indexOf(c0),1);
+      }
+      placed.ad=true;placed.lines=lines;placed.pad=pad;
+      boxes.push(placed);
+    });
+
+    /* reserve a corner for the north arrow */
+    var NA=null;
+    [[W-52*S,HEAD+6*S],[W-52*S,H-62*S],[8*S,HEAD+6*S],[8*S,H-62*S]].forEach(function(c){
+      if(NA)return;var b={x:c[0],y:c[1],w:44*S,h:56*S};if(free(b,false))NA=b;
+    });
+    if(!NA)NA={x:W-52*S,y:HEAD+6*S,w:44*S,h:56*S};
+    boxes.push(NA);
+
+    /* ---- route line ---- */
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle='#111';ctx.lineWidth=4*S;
+    ctx.beginPath();P.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();
+
+    /* ---- off-route waypoints inside the frame ---- */
+    var offs=(offRoutePts||[]).map(function(p){return {p:p,q:px(p)};}).filter(function(o){return o.q.x>20*S&&o.q.x<W-20*S&&o.q.y>HEAD+20*S&&o.q.y<H-20*S;});
+
+    /* ---- leg labels: blue bar along each leg "<- 341° 31.8 NM 161° ->" ---- */
+    for(var li=1;li<pts.length;li++){
+      var A=P[li-1],B=P[li],len=Math.hypot(B.x-A.x,B.y-A.y);
+      var crs=course(pts[li-1],pts[li]),d=dist(pts[li-1],pts[li]),rec=(crs+180)%360;
+      var ang=Math.atan2(B.y-A.y,B.x-A.x),fwd=true;
+      if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
+      var txt='<- '+mmPad3(fwd?rec:crs)+'°  '+(d<100?d.toFixed(1):Math.round(d))+' NM  '+mmPad3(fwd?crs:rec)+'° ->';
+      var fs=16*S;ctx.font='600 '+fs+'px '+FONT;
+      var tw=ctx.measureText(txt).width+18*S;
+      if(len<tw+40*S){fs=Math.max(10*S,fs*(len-40*S)/tw);ctx.font='600 '+fs+'px '+FONT;tw=ctx.measureText(txt).width+14*S;}
+      if(len<60*S)continue;
+      var mx=(A.x+B.x)/2,my=(A.y+B.y)/2,off=fs*0.8+14*S;
+      /* put the bar beside the line, on the side with fewer boxes */
+      var nx=-Math.sin(ang),ny=Math.cos(ang),side=1;
+      var bb1={x:mx+nx*off-tw/2,y:my+ny*off-fs,w:tw,h:fs*2},bb2={x:mx-nx*off-tw/2,y:my-ny*off-fs,w:tw,h:fs*2};
+      if(!free(bb1,true)&&free(bb2,true))side=-1;
+      ctx.save();ctx.translate(mx+nx*off*side,my+ny*off*side);ctx.rotate(ang);
+      ctx.fillStyle='#1f2fd6';ctx.fillRect(-tw/2,-fs*0.8,tw,fs*1.6);
+      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,fs*0.05);
+      ctx.restore();
+      var rb=Math.max(tw,fs*1.6);boxes.push({x:mx+nx*off*side-rb/2,y:my+ny*off*side-rb/2,w:rb,h:rb,leg:true});
+    }
+
+    /* ---- waypoint circles ---- */
+    function ring(q,r){ctx.beginPath();ctx.arc(q.x,q.y,r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();ctx.lineWidth=4*S;ctx.strokeStyle='#111';ctx.stroke();}
+    P.forEach(function(q){ring(q,11*S);});
+    offs.forEach(function(o){ring(o.q,10*S);});
+
+    /* ---- waypoint info boxes (route + off-route) ---- */
+    function wpBox(p,q,i,small){
+      var id=(p.name||'').toUpperCase();
+      var sz=(small?12:15)*S,lh=(small?16:20)*S,pad=(small?5:7)*S,lines=[];
+      if(p.place)lines.push({t:p.place,f:(sz-2*S)+'px '+FONT,lh:lh-2*S,sz:sz-2*S,c:'#1f2fd6'});
+      lines.push({t:p.name||('WP'+(i+1)),f:'600 '+sz+'px '+FONT,lh:lh,sz:sz,c:'#1f2fd6'});
+      lines.push({t:mmDDM(p.lat,true),f:sz+'px '+FONT,lh:lh,sz:sz});
+      lines.push({t:mmDDM(p.lng,false),f:sz+'px '+FONT,lh:lh,sz:sz});
+      var rr=mmRadial(p);if(rr)lines.push({t:rr,f:(sz-1*S)+'px '+FONT,lh:lh,sz:sz-1*S});
+      var m=mmMeasure(ctx,lines,pad),gap=22*S,placed=null;
+      var cands=[[1,-1],[1,0],[-1,-1],[-1,0],[1,1],[-1,1],[0,-1],[0,1]];
+      for(var g=1;g<=4&&!placed;g++)for(var k=0;k<cands.length&&!placed;k++){
+        var c=cands[k],dx=c[0]*gap*g,dy=c[1]*gap*g;
+        var b={x:c[0]>0?q.x+dx:c[0]<0?q.x+dx-m.w:q.x-m.w/2,y:c[1]<0?q.y+dy-m.h:c[1]>0?q.y+dy:q.y-m.h/2,w:m.w,h:m.h};
+        if(free(b,false))placed=b;
+      }
+      if(!placed)for(var g2=1;g2<=4&&!placed;g2++)for(var k2=0;k2<cands.length&&!placed;k2++){
+        var c2=cands[k2],b2={x:c2[0]>0?q.x+gap*g2:c2[0]<0?q.x-gap*g2-m.w:q.x-m.w/2,y:c2[1]<0?q.y-gap*g2-m.h:c2[1]>0?q.y+gap*g2:q.y-m.h/2,w:m.w,h:m.h};
+        if(free(b2,true))placed=b2;
+      }
+      if(!placed)placed={x:Math.min(W-m.w-4,Math.max(4,q.x+gap)),y:Math.min(H-m.h-4,Math.max(HEAD+4,q.y-m.h-gap)),w:m.w,h:m.h};
+      boxes.push(placed);
+      /* leader line when the box ended up far from its point */
+      var bx=Math.max(placed.x,Math.min(q.x,placed.x+placed.w)),by=Math.max(placed.y,Math.min(q.y,placed.y+placed.h));
+      if(Math.hypot(bx-q.x,by-q.y)>(small?16:30)*S){ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
+      mmDrawBox(ctx,placed,lines,pad,'center',(small?1.5:2)*S);
+    }
+    /* small ident tag next to airport points (AD details are in the corner box) */
+    function adTag(p,q){
+      var t=(p.name||'').toUpperCase(),sz=14*S;ctx.font='600 '+sz+'px '+FONT;
+      var w=ctx.measureText(t).width+12*S,h=22*S,placed=null;
+      [[16,8],[-16-w/S,8],[16,-30],[-16-w/S,-30]].forEach(function(o){
+        if(placed)return;var b={x:q.x+o[0]*S,y:q.y+o[1]*S,w:w,h:h};if(free(b,false))placed=b;
+      });
+      if(!placed)placed={x:q.x+16*S,y:q.y+8*S,w:w,h:h};
+      boxes.push(placed);
+      ctx.fillStyle='#fff';ctx.fillRect(placed.x,placed.y,w,h);ctx.strokeStyle='#1f2fd6';ctx.lineWidth=1.5*S;ctx.strokeRect(placed.x,placed.y,w,h);
+      ctx.fillStyle='#1f2fd6';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,placed.x+w/2,placed.y+h/2+1);
+    }
+    pts.forEach(function(p,i){
+      if(APX[(p.name||'').toUpperCase()])adTag(p,P[i]);
+      else wpBox(p,P[i],i,false);
+    });
+    offs.forEach(function(o,i){wpBox(o.p,o.q,i,true);});
+
+    /* AD boxes last so they sit on top */
+    boxes.forEach(function(b){if(b.ad)mmDrawBox(ctx,b,b.lines,b.pad,'left',3*S);});
+
+    /* north arrow in a free corner */
+    ctx.save();ctx.translate(NA.x+NA.w/2,NA.y+30*S);
+    ctx.fillStyle='#111';ctx.beginPath();ctx.moveTo(0,-22*S);ctx.lineTo(9*S,8*S);ctx.lineTo(0,2*S);ctx.lineTo(-9*S,8*S);ctx.closePath();ctx.fill();
+    ctx.font='700 '+(13*S)+'px '+FONT;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('N',0,10*S);
+    ctx.restore();
+    ctx.strokeStyle='#111';ctx.lineWidth=3*S;ctx.strokeRect(0,0,W,H);
+    return cv;
+  });
+}
+
+function showMiniMap(cv){
+  var old=document.getElementById('miniMapModal');if(old)old.remove();
+  var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
+  var fname='MiniMap_'+dep+'_'+arr+'.png';
+  var url=cv.toDataURL('image/png');
+  var d=document.createElement('div');d.id='miniMapModal';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MINI MAP</b><span>'+
+    '<button type="button" id="mmSave">บันทึก PNG</button> '+
+    (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
+    '<button type="button" id="mmClose">✕</button></span></div>'+
+    '<div class="mm-img"><img alt="Mini map" src="'+url+'"></div>'+
+    '<p class="mm-note">iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้</p></div>';
+  document.body.appendChild(d);
+  document.getElementById('mmClose').onclick=function(){d.remove();};
+  d.addEventListener('click',function(e){if(e.target===d)d.remove();});
+  document.getElementById('mmSave').onclick=function(){
+    var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  };
+  var sh=document.getElementById('mmShare');
+  if(sh)sh.onclick=function(){
+    cv.toBlob(function(blob){
+      var f=new File([blob],fname,{type:'image/png'});
+      if(navigator.canShare({files:[f]}))navigator.share({files:[f],title:fname}).catch(function(){});
+      else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
+    },'image/png');
+  };
+}
+
+function exportMiniMap(){
+  if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อน export MINI MAP');return;}
+  var btn=document.getElementById('exportMiniMap');
+  btn.disabled=true;var lbl=btn.textContent;btn.textContent='กำลังสร้าง…';
+  buildMiniMap().then(showMiniMap).catch(function(err){
+    alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');
+  }).then(function(){btn.disabled=false;btn.textContent=lbl;});
+}
+
 map.on('click',function(e){
   var ll=e.latlng.wrap();
 
@@ -6393,6 +6726,7 @@ document.getElementById('measureBtn').onclick=function(){
 };
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
+document.getElementById('exportMiniMap').onclick=exportMiniMap;
 
 document.getElementById('undo').onclick=function(){
   if(!pts.length)return;
@@ -6931,6 +7265,8 @@ function loadMtbFile(){
     if(n)MTB_CONTACT=got;
   }).catch(function(){});
 }
+
+loadAdInfoFile();
 
 /* RTAF POC layer: data/ผบ.ฝูง.txt + data/CSAR.txt, one pin per base (ICAO) */
 function loadRtafPoc(){

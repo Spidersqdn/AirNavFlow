@@ -1,0 +1,24 @@
+# AD.txt : ข้อมูลสนามบินสำหรับกล่อง AD ใน MINI MAP (แอป AirNavFlow ปุ่ม MINI MAP)
+# แก้ไขบน GitHub แล้วกด Commit ข้อมูลในแอปจะเปลี่ยนตามเมื่อเปิดแอปครั้งถัดไป
+# 1 บรรทัด = 1 แถวในกล่อง   คั่นช่องด้วย |   บรรทัดที่ขึ้นต้นด้วย # จะไม่ถูกอ่าน
+# ICAO | หัวข้อ | ค่า          (ชื่อสนาม, ELEV, พิกัด แอปใส่ให้เอง)
+# ICAO | MORSE | LB LOB       -> แอปแปลงเป็นรหัสมอร์ส  .-.. / -...  [LB]
+# ค่าตั้งต้นคัดจากภาพตัวอย่าง (UPDATE 5 OCT 2023) ตรวจกับ AIP ปัจจุบันก่อนใช้งาน
+VTBL | TWR | 122.6 / 238.6
+VTBL | NDB | 280 [LB]
+VTBL | ILS | 108.3
+VTBL | TAC | 115X [LOB]
+VTBL | ศูนย์ปืนฯ | 612 MHz
+VTBL | CTZ | 12 NM
+VTBL | VTBH | 122.1
+VTBL | MORSE | LB LOB
+VTBD | GND | 121.9 / 257.8
+VTBD | TWR | 118.1 / 236.6
+VTBD | APP | 125.8 / 262.5
+VTBD | NDB | 293 [BK]
+VTBD | VOR | 117.7 (CH 124X) [BKK]
+VTBD | ILS | 109.3 (21R) [IBKK]
+VTBD | ILS | 110.3 (21L) (CH 40X) [IDMG]
+VTBD | ATIS | 126.4 / 344.6
+VTBD | CTZ | 35 NM
+VTBD | MORSE | IBKK IDMG
