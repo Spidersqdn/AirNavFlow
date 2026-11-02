@@ -254,7 +254,6 @@ svg.leaflet-zoom-animated {
 .radar-ctl .rd-time{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .radar-ctl.rd-err .rd-play,.radar-ctl.rd-err .rd-slider{display:none}
 .radar-ctl.rd-err .rd-time{color:var(--amber)}
-.windy-ctl a{font:700 15px var(--sans);color:#e8508a!important;text-decoration:none}
 /* marker & overlays interactivity */
 .leaflet-marker-icon,
 .leaflet-marker-shadow,
@@ -5175,23 +5174,6 @@ radarLayer.on('remove',function(){
 });
 window.addEventListener('online',function(){if(radarState.on){radarState.err='';radarLoad();}});
 window.addEventListener('offline',function(){if(radarState.on)radarLoad();});
-
-/* ---- "Open Windy" button: opens windy.com at the current map view (uses the user's own Windy login/Premium) ---- */
-var WindyCtl=L.Control.extend({
-  options:{position:'topleft'},
-  onAdd:function(){
-    var d=L.DomUtil.create('div','leaflet-bar windy-ctl');
-    var a=L.DomUtil.create('a','',d);
-    a.href='https://www.windy.com/';a.target='_blank';a.rel='noopener';
-    a.title='เปิด Windy ตรงตำแหน่งแผนที่นี้';a.setAttribute('aria-label',a.title);a.textContent='W';
-    var upd=function(){var c=map.getCenter().wrap(),z=Math.max(3,Math.min(18,Math.round(map.getZoom())));
-      a.href='https://www.windy.com/?'+c.lat.toFixed(3)+','+c.lng.toFixed(3)+','+z;};
-    upd();map.on('moveend zoomend',upd);
-    L.DomEvent.disableClickPropagation(d);
-    return d;
-  }
-});
-new WindyCtl().addTo(map);
 
 var layerCtl=L.control.layers(
  {'ภาพดาวเทียม':sat,'แผนที่ถนน':osm,'ภูมิประเทศ':topo,'แผนที่ออฟไลน์ (OSM)':offlineBase},
