@@ -6441,8 +6441,12 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
     ctx.font=l.f;ctx.fillStyle=l.c||'#111';ctx.textBaseline='alphabetic';
     var asc=l.asc!=null?l.asc:l.sz*0.8,desc=l.desc!=null?l.desc:l.sz*0.25,base=y+(l.lh-asc-desc)/2+asc;
     var left=align==='left'&&!(i===0&&l.center);
-    ctx.textAlign=left?'left':'center';
-    ctx.fillText(l.t,left?b.x+pad:b.x+b.w/2,base,mw);   /* maxWidth: squeeze rather than overflow */
+    /* Safari mis-centres Thai text with textAlign 'center' and with maxWidth: always draw left-aligned at a computed x,
+       and shrink horizontally by hand if a line is still wider than the box */
+    ctx.textAlign='left';
+    var tw=ctx.measureText(l.t).width,k=tw>mw?mw/tw:1,x0=left?b.x+pad:b.x+(b.w-tw*k)/2;
+    if(k<1){ctx.save();ctx.translate(x0,base);ctx.scale(k,1);ctx.fillText(l.t,0,0);ctx.restore();}
+    else ctx.fillText(l.t,x0,base);
     if(l.u){var tw=ctx.measureText(l.u).width;ctx.fillRect(b.x+pad,base+Math.max(2,desc*0.4),tw,2);}
     if(l.rule){ctx.fillStyle='#9aa3ad';ctx.fillRect(b.x+pad,y+l.lh-2,b.w-pad*2,1.5);}
     y+=l.lh;
@@ -6481,7 +6485,7 @@ function buildMiniMap(){
 
   var hasContour=false;
   var logo=null,elevFt=[];
-  var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun'),document.fonts.load('600 36px Sarabun')]).catch(function(){}):Promise.resolve();
+  var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun','Aก่ำ'),document.fonts.load('600 36px Sarabun','Aก่ำ')]).catch(function(){}):Promise.resolve();
   return fontsReady.then(function(){
     return mmDrawBase(mctx,W,MH,cxW,cyW,z,center);
   }).then(function(){
@@ -6786,7 +6790,7 @@ function buildMiniMap(){
       if(!placed)placed={x:q.x+16*S,y:q.y+8*S,w:w,h:h};
       boxes.push(placed);
       ctx.fillStyle='#fff';ctx.fillRect(placed.x,placed.y,w,h);ctx.strokeStyle='#1f2fd6';ctx.lineWidth=1.5*S;ctx.strokeRect(placed.x,placed.y,w,h);
-      ctx.fillStyle='#1f2fd6';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,placed.x+w/2,placed.y+h/2+1);
+      ctx.fillStyle='#1f2fd6';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,placed.x+(w-ctx.measureText(t).width)/2,placed.y+h/2+1);
     }
     /* route waypoints: boxes stacked along the left / right map edges, joined to their point by a leader line */
     function edgeBoxes(){
