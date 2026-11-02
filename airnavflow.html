@@ -7180,11 +7180,49 @@ function buildFlightLog(f){
   var PUR='#7f62a8',GRY='#e4e2ec',YEL='#eef2d9',INK='#1a2a9c';
   var X=[8,87,180,265,345,425,505,585,684,764,846,928,1007];
   var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=0;
-  /* fuel table sits at the bottom (ends with the right column, y=1570); the overview box above it stretches/shrinks.
-     Past ~13 rows the overview hits its minimum and the card grows taller instead. */
-  var nF=pts.length,RH=34.5;   /* one row per route point, no blank rows */
-  var FT=Math.max(1020,1570-70-nF*RH),FY=FT+70,NT=FT-170,DY=NT-985;
-  var BH=Math.max(1570,FY+nF*RH)+8+14;
+  var dep=pts[0],arr=pts[pts.length-1];
+  var ads=[];pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
+  function vhf(t){   /* keep VHF COM freqs only (118-137 MHz), drop UHF */
+    return String(t||'').split(/[\/,\s]+/).filter(function(x){var v=parseFloat(x);return v>=118&&v<137;}).join(' / ');
+  }
+  function adv(id,k){
+    var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
+    return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
+  }
+  /* white rows = every airport on the route (departure, destination first); green rows = 3 nearest airports off the route */
+  var onR=[],dI=(dep.name||'').toUpperCase(),aI=(arr.name||'').toUpperCase();
+  [dI,aI].concat(ads).forEach(function(id){if(APX[id]&&onR.indexOf(id)<0)onR.push(id);});
+  var near=AP.filter(function(a){return ads.indexOf(a[0])<0;}).map(function(a){
+    var q={lat:a[4],lng:a[5]},m=Infinity;
+    for(var i=1;i<pts.length;i++)m=Math.min(m,pDistToSegment(q,pts[i-1],pts[i]));
+    return [a[0],m];
+  }).sort(function(x,y){return x[1]-y[1];}).slice(0,3).map(function(x){return x[0];});
+  var adRows=onR.concat(near);
+  var ref=APX[(dep.name||'').toUpperCase()]||nearestAirportForPoint(dep);
+  var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
+  var swSeen={};sw=sw.filter(function(p){var k=(p.name||'')+p.lat+p.lng;if(swSeen[k])return false;swSeen[k]=1;return true;});
+  /* ---- nav aid ident list (morse): idents + frequency from data/AD.txt; rows like "NDB | 280 [LB]" give LB=280,
+     MORSE rows add idents without a frequency. Route airports first (departure, destination, then the rest) ---- */
+  var ids=[],frq={};
+  function addId(n,fq){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);if(fq&&!frq[n])frq[n]=fq;}
+  onR.concat(ads).forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){
+    if(r[0]==='MORSE'){r[1].split(/[ ,]+/).filter(Boolean).forEach(function(n){addId(n,'');});return;}
+    var m=/\[([A-Z0-9]{2,5})\]/i.exec(r[1]);
+    if(m)addId(m[1],r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim());
+  });});
+
+  /* ---- vertical layout. Priority: every airport row, every nav aid ident; what is left goes to OVERVIEW (left)
+     and SWING (right). Base card bottom y=1570; it grows only when something would not fit. ---- */
+  var nA=adRows.length,ARH=29,AY=138+nA*ARH;          /* AY = top of CALL SIGN header */
+  var OT=AY+293,SW0=AY+122,APH=725;                    /* OT = overview top, SW0 = first swing row, APH = approach block */
+  var nF=pts.length,RH=34.5,OVMIN=260,NVH=30,RHN=34.17;   /* one fuel row per route point */
+  var nS=sw.length,nN=Math.max(1,ids.length);
+  var B=Math.max(1570,OT+OVMIN+170+70+nF*RH,SW0+(nS+nN)*RHN+NVH+APH);
+  var AP0=B-APH,DA=AP0-845;                             /* approach block shift */
+  var avail=AP0-SW0-NVH,SLOTS=Math.max(nS+nN,Math.floor(avail/RHN+0.01)),RHs=avail/SLOTS;
+  var nvRows=nN,swRows=SLOTS-nvRows;                   /* spare rows go to SWING (blank for handwriting) */
+  var FT=B-70-nF*RH,FY=FT+70,NT=FT-170,DY=NT-985;
+  var BH=B+8+14;
   var cv=document.createElement('canvas');cv.width=BW*K;cv.height=Math.round(BH*K);
   var ctx=cv.getContext('2d');ctx.scale(K,K);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,BW,BH);
@@ -7220,7 +7258,6 @@ function buildFlightLog(f){
   function grid(y0,y1,cols,fill,labels,o){   /* cols = [[i0,i1],...] on X */
     cols.forEach(function(c,k){rect(X[c[0]],y0,X[c[1]],y1,fill);if(labels)txt(labels[k],X[c[0]],X[c[1]],y0,y1,o);});
   }
-  var dep=pts[0],arr=pts[pts.length-1];
   var routeTxt=pts.map(function(p,i){return p.name||('WP'+(i+1));}).join(' - ');
 
   /* ---- title, date, route ---- */
@@ -7238,67 +7275,34 @@ function buildFlightLog(f){
     head(X[0],X[12],82,108,'AIRPORT INFORMATION');
     var AC=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12]];
     grid(108,138,AC,GRY,['A/F','R/W','ELEV','ILS','VOR','ADF','TAC','GND','TWR','APP','DEP','ATIS'],{size:15});
-    var ads=[];pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
-    function vhf(t){   /* keep VHF COM freqs only (118-137 MHz), drop UHF */
-      return String(t||'').split(/[\/,\s]+/).filter(function(x){var v=parseFloat(x);return v>=118&&v<137;}).join(' / ');
-    }
-    function adv(id,k){
-      var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
-      return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
-    }
-    /* white rows = airports on the route (departure, destination first); green rows = 3 nearest airports off the route */
-    var onR=[],dI=(dep.name||'').toUpperCase(),aI=(arr.name||'').toUpperCase();
-    [dI,aI].concat(ads).forEach(function(id){if(APX[id]&&onR.indexOf(id)<0)onR.push(id);});
-    var near=AP.filter(function(a){return ads.indexOf(a[0])<0;}).map(function(a){
-      var q={lat:a[4],lng:a[5]},m=Infinity;
-      for(var i=1;i<pts.length;i++)m=Math.min(m,pDistToSegment(q,pts[i-1],pts[i]));
-      return [a[0],m];
-    }).sort(function(x,y){return x[1]-y[1];}).slice(0,3).map(function(x){return x[0];});
-    var adRows=[onR[0],onR[1]].concat(near);
-    for(var r=0;r<5;r++){
-      var y0=138+r*29,id=adRows[r];
+    for(var r=0;r<nA;r++){
+      var y0=138+r*ARH,id=adRows[r];
       var vals=id?[id,(RWY_INFO[id]||[]).map(function(w){return w[0].id+'/'+w[1].id;}).join(' '),APX[id][6]!=null&&APX[id][6]!==''?APX[id][6]:'',
         adv(id,'ILS'),adv(id,'VOR'),adv(id,'NDB')||adv(id,'ADF'),adv(id,'TAC'),vhf(adv(id,'GND')),vhf(adv(id,'TWR')),vhf(adv(id,'APP')),adv(id,'DEP'),adv(id,'ATIS')]:[];
-      grid(y0,y0+29,AC,r<2?'#fff':YEL,vals,{color:INK,size:19,weight:'600',pad:3,wrap:13});   /* shrinks only when the text would overflow */
+      grid(y0,y0+ARH,AC,r<onR.length?'#fff':YEL,vals,{color:INK,size:19,weight:'600',pad:3,wrap:13});   /* shrinks only when the text would overflow */
     }
 
     /* ---- call sign / mission rows ---- */
     var C1=[[0,2],[2,3],[3,5],[5,6],[6,8],[8,9],[9,10],[10,11],[11,12]];
-    grid(283,310,C1,PUR,null);
-    C1.forEach(function(c,k){txt(['CALL SIGN','TYPE','FLIGHT RULE','FROM','DEST.','STEP','START','T/O','L/D'][k],X[c[0]],X[c[1]],283,310,{color:'#fff',size:18});});
-    grid(310,340,C1,'#fff',[f.callsign,f.type,f.rule,dep.name||'',arr.name||'',f.step,f.start,f.to,f.ld],{color:INK,size:20,weight:'700'});
+    grid(AY,AY+27,C1,PUR,null);
+    C1.forEach(function(c,k){txt(['CALL SIGN','TYPE','FLIGHT RULE','FROM','DEST.','STEP','START','T/O','L/D'][k],X[c[0]],X[c[1]],AY,AY+27,{color:'#fff',size:18});});
+    grid(AY+27,AY+57,C1,'#fff',[f.callsign,f.type,f.rule,dep.name||'',arr.name||'',f.step,f.start,f.to,f.ld],{color:INK,size:20,weight:'700'});
     var C2=[[0,2],[2,3],[3,5],[5,6],[6,7],[7,8],[8,9]];
-    grid(340,370,C2,PUR,null);
-    C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],340,370,{color:'#fff',size:18});});
-    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,'',spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
+    grid(AY+57,AY+87,C2,PUR,null);
+    C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],AY+57,AY+87,{color:'#fff',size:18});});
+    grid(AY+87,AY+122,C2,'#fff',[f.mission,f.iff,f.alt,'',spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
 
     /* ---- crew table ---- */
     var C3=[[0,1],[1,2],[2,3],[3,5],[5,6],[6,8],[8,9]];
-    grid(405,438,C3,GRY,['NO','PILOT','COPILOT','CALL SIGN','A/C NO.','ROUTE / AREA','SQ.'],{size:16,weight:'700'});
-    for(var c=0;c<4;c++){var cy=438+c*34.5;grid(cy,cy+34.5,C3,c===0?YEL:'#fff',[String(c+1)],{color:INK,size:18,weight:c===0?'700':'400'});}
+    grid(AY+122,AY+155,C3,GRY,['NO','PILOT','COPILOT','CALL SIGN','A/C NO.','ROUTE / AREA','SQ.'],{size:16,weight:'700'});
+    for(var c=0;c<4;c++){var cy=AY+155+c*34.5;grid(cy,cy+34.5,C3,c===0?YEL:'#fff',[String(c+1)],{color:INK,size:18,weight:c===0?'700':'400'});}
 
     /* ---- swing: radial/DME of route points from the departure airport ---- */
-    head(X[9],X[12],340,370,'SWING');
-    var ref=APX[(dep.name||'').toUpperCase()]||nearestAirportForPoint(dep);
-    rect(X[9],370,X[10],405,GRY);rect(X[10],370,X[12],405,GRY);
-    txt('Cx.Pt.',X[9],X[10],370,405,{size:18});txt(ref?ref[0]:'',X[10],X[12],370,405,{size:20,color:INK});
-    var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
-    var swSeen={};sw=sw.filter(function(p){var k=(p.name||'')+p.lat+p.lng;if(swSeen[k])return false;swSeen[k]=1;return true;});
-    /* ---- nav aid ident list (morse): idents + frequency from data/AD.txt; rows like "NDB | 280 [LB]" give LB=280,
-       MORSE rows add idents without a frequency. Route airports first (departure, destination, then the rest) ---- */
-    var ids=[],frq={};
-    function addId(n,fq){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);if(fq&&!frq[n])frq[n]=fq;}
-    onR.concat(ads).forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){
-      if(r[0]==='MORSE'){r[1].split(/[ ,]+/).filter(Boolean).forEach(function(n){addId(n,'');});return;}
-      var m=/\[([A-Z0-9]{2,5})\]/i.exec(r[1]);
-      if(m)addId(m[1],r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim());
-    });});
-    /* SWING + Nav Aid share 12 rows between y=405 and the Approach header (845): Nav Aid gets at least 4,
-       and takes unused SWING rows when it has more idents */
-    var SLOTS=12,RHs=(845-405-30)/SLOTS;
-    var nvRows=Math.max(4,Math.min(ids.length,SLOTS-sw.length)),swRows=SLOTS-nvRows;
+    head(X[9],X[12],AY+57,AY+87,'SWING');
+    rect(X[9],AY+87,X[10],AY+122,GRY);rect(X[10],AY+87,X[12],AY+122,GRY);
+    txt('Cx.Pt.',X[9],X[10],AY+87,AY+122,{size:18});txt(ref?ref[0]:'',X[10],X[12],AY+87,AY+122,{size:20,color:INK});
     for(var s=0;s<swRows;s++){
-      var sy=405+s*RHs,p=sw[s];
+      var sy=SW0+s*RHs,p=sw[s];
       rect(X[9],sy,X[10],sy+RHs,s%2?'#fff':YEL);rect(X[10],sy,X[12],sy+RHs,s%2?'#fff':YEL);
       if(p&&ref){
         var rp={lat:ref[4],lng:ref[5]},dd=dist(rp,p);
@@ -7306,7 +7310,7 @@ function buildFlightLog(f){
         txt('R'+mmPad3(course(rp,p))+'/'+dd.toFixed(1),X[10],X[12],sy,sy+RHs,{size:22,color:INK});
       }
     }
-    var NH=405+swRows*RHs;
+    var NH=SW0+swRows*RHs;
     head(X[9],X[12],NH,NH+30,'Nav Aid IDENT');
     for(var n=0;n<nvRows;n++){
       var ny=NH+30+n*RHs;rect(X[9],ny,X[10],ny+RHs);rect(X[10],ny,X[12],ny+RHs);
@@ -7320,28 +7324,28 @@ function buildFlightLog(f){
     }
 
     /* ---- approach procedure / before landing (static memory aids) ---- */
-    head(X[9],X[12],845,880,'Approach Procedure');
+    head(X[9],X[12],(845+DA),(880+DA),'Approach Procedure');
     function block(y0,y1,lines){rect(X[9],y0,X[12],y1,null,2);var h=(y1-y0)/lines.length;lines.forEach(function(t,i){txt(t,X[9],X[12],y0+i*h,y0+(i+1)*h,{align:'left',size:19,pad:4});});}
-    block(880,1053,["W-eather Ceil MDA ____'",'H-old  I/B _ O/B _ ENTY','O-btain RWY,QNH,ALT','L-et down CHART','D-ESCENT CX.']);
-    block(1053,1263,['T-ime O/B','T-urn L/R','T-hrottle A/S  ____','T-wist course I/B  ____','T-rack HDG O/B  ____','T-alk report']);
-    block(1263,1365,['C-ourse Set I/B  ____','A-lt QNH set','T-urn Direction']);
-    rect(X[9],1365,X[12],1400,'#f6dede',2);txt('Before L/D Cx.',X[9],X[12],1365,1400,{size:21});
-    block(1400,1570,['M - FAF,MDA,CIRCL','A - ATF ,FAF Clock','R - I/B __, A/S,,RATE','M - MISS APP PRO.','S - SPEED L/D']);
+    block((880+DA),(1053+DA),["W-eather Ceil MDA ____'",'H-old  I/B _ O/B _ ENTY','O-btain RWY,QNH,ALT','L-et down CHART','D-ESCENT CX.']);
+    block((1053+DA),(1263+DA),['T-ime O/B','T-urn L/R','T-hrottle A/S  ____','T-wist course I/B  ____','T-rack HDG O/B  ____','T-alk report']);
+    block((1263+DA),(1365+DA),['C-ourse Set I/B  ____','A-lt QNH set','T-urn Direction']);
+    rect(X[9],(1365+DA),X[12],(1400+DA),'#f6dede',2);txt('Before L/D Cx.',X[9],X[12],(1365+DA),(1400+DA),{size:21});
+    block((1400+DA),(1570+DA),['M - FAF,MDA,CIRCL','A - ATF ,FAF Clock','R - I/B __, A/S,,RATE','M - MISS APP PRO.','S - SPEED L/D']);
 
     /* ---- overview ---- */
-    rect(X[0],576,X[9],NT,null,2);
-    rect(X[0],578,X[2],606,PUR,0);txt('OVERVIEW :',X[0],X[2],578,606,{align:'left',color:'#fff',size:19,weight:'700'});
-    var ty=625;
+    rect(X[0],OT,X[9],NT,null,2);
+    rect(X[0],OT+2,X[2],OT+30,PUR,0);txt('OVERVIEW :',X[0],X[2],OT+2,OT+30,{align:'left',color:'#fff',size:19,weight:'700'});
+    var ty=OT+49;
     txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('TAXI :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     /* PRI/SEC + start-up box: top-right corner of the overview */
-    var bx0=X[7],bxM=X[8],bx1=X[9],prT=576,prH=Math.min(35,(NT-40-prT)/7);
+    var bx0=X[7],bxM=X[8],bx1=X[9],prT=OT,prH=Math.min(35,(NT-40-prT)/7);
     rect(bx0,prT,bx1,prT+prH,'#fff',2);txt('PRI :',bx0,bx1,prT,prT+prH,{align:'left',size:19,weight:'700'});
     rect(bx0,prT+prH,bx1,prT+2*prH,'#fff',2);txt('SEC:',bx0,bx1,prT+prH,prT+2*prH,{align:'left',size:19,weight:'700'});
     ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=prT+(2+i)*prH;rect(bx0,y,bxM,y+prH);rect(bxM,y,bx1,y+prH);txt(t,bx0,bxM,y,y+prH,{size:17});});
-    var awX=X[0]+4,awS=Math.min(33.4,(NT-60-660)/5);
+    var awX=X[0]+4,aw0=OT+84,awS=Math.min(33.4,(NT-60-aw0)/5);
     [['AIRWORK',1],['NAV'],['COM'],['FMS'],['CONF'],['FAM']].forEach(function(a,i){
-      var ay=660+i*awS;txt(a[0],awX,X[4],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true,pad:0});
+      var ay=aw0+i*awS;txt(a[0],awX,X[4],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true,pad:0});
     });
     txt('TAXI :',X[0],X[2],NT-33,NT-5,{align:'left',size:19,weight:'700'});
     txt('SHUT DOWN :',X[2],X[5],NT-33,NT-5,{align:'left',size:19,weight:'700'});
