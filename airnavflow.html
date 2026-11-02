@@ -7073,20 +7073,27 @@ function buildFlightLog(f){
         var isAd=!!APX[(p2.name||'').toUpperCase()];
         if(k===0){
           var mins=spd>0?Math.round(total/spd*60):'';
-          v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins!==''?mins+(taxi?'':''):'','/',isFinite(fuel0)?String(fuel0):''];
+          v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins,'',isFinite(fuel0)?String(fuel0):''];
         }else{
           var d=dist(pts[k-1],p2),h=spd>0?d/spd:NaN,b=isFinite(h)?Math.round(h*burn):NaN;
           if(isFinite(rem)&&isFinite(b))rem-=b;
-          v=[flDM(p2.lat),flDM(p2.lng),p2.name||('WP'+(k+1)),mmPad3(course(pts[k-1],p2)),d<10?d.toFixed(1):Math.round(d),
-            isFinite(h)?Math.max(1,Math.round(h*60)):'','/',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
+          v=[flDM(p2.lat),flDM(p2.lng),p2.name||('WP'+(k+1)),mmPad3(course(pts[k-1],p2)),Math.max(1,Math.round(d)),
+            isFinite(h)?Math.max(1,Math.round(h*60)):'','',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
         }
       }
-      var fill=(p2&&APX[(p2.name||'').toUpperCase()])?YEL:'#fff';
+      var fill=(k%2===0)?YEL:'#fff';   /* alternate shading like the paper card */
       C4.forEach(function(c,j){
         rect(X[c[0]],y,X[c[1]],y+RH,fill);
         if(v[j]==null||v[j]==='')return;
-        var big=(j===3||j===4||j===5),o={size:big?24:j===2?21:j<2?16:18,color:(j>=3&&j!==6)?INK:'#000',weight:(j===2&&fill===YEL)||(k===0&&j===7)?'700':'400'};
+        var big=(j===3||j===4||j===5),o={size:big?24:j===2?21:j<2?16:18,color:(j>=3&&j!==6)?INK:'#000',weight:(j===2&&p2&&APX[(p2.name||'').toUpperCase()])||(k===0&&j===7)?'700':'400'};
         if(k===0&&j===7)o.size=26;
+        if(j===7&&k>0&&String(v[j]).indexOf('/')>0){   /* burn (normal) / remaining (bold) */
+          var pr=String(v[j]).split('/'),a1=pr[0]+'/',sz2=19;
+          ctx.font='400 '+sz2+'px '+FONT;var w1=ctx.measureText(a1).width;ctx.font='700 '+sz2+'px '+FONT;var w2=ctx.measureText(pr[1]).width;
+          var sx=(X[c[0]]+X[c[1]]-w1-w2)/2;ctx.fillStyle=INK;ctx.textAlign='left';ctx.textBaseline='middle';
+          ctx.font='400 '+sz2+'px '+FONT;ctx.fillText(a1,sx,y+RH/2+1);ctx.font='700 '+sz2+'px '+FONT;ctx.fillText(pr[1],sx+w1,y+RH/2+1);
+          return;
+        }
         txt(v[j],X[c[0]],X[c[1]],y,y+RH,o);
       });
     }
