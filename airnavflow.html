@@ -7183,11 +7183,12 @@ function buildFlightLog(f){
       }
       rows.forEach(function(t,i){ctx.fillText(t,lx0,ly+i*24);});
     }
-    rect(X[0],(1053+DY),X[3]+160,(1088+DY),null,2);rect(X[0],(1053+DY),X[2],(1088+DY),PUR,2);
+    ctx.fillStyle='#000';ctx.fillRect(X[0],(1053+DY)-1,X[8]-X[0],2);   /* line closes the NOTAM area above WEATHER */
+    rect(X[0],(1053+DY),X[7]-20,(1088+DY),null,2);rect(X[0],(1053+DY),X[2],(1088+DY),PUR,2);
     txt('WEATHER :',X[0],X[2],(1053+DY),(1088+DY),{align:'left',color:'#fff',size:19,weight:'700'});
     rect(X[8],(985+DY),X[9],(1120+DY),GRY,2);
-    ['__BRIEF','__FPL','__RISK','__SIGN'].forEach(function(t,i){txt(t,X[8],X[9],(985+DY)+i*33.75,(985+DY)+(i+1)*33.75,{size:15,color:'#2b3fb0',align:'right'});});
-    rect(X[7],(1120+DY),X[9],(1155+DY),GRY,2);txt('___AREA ทอ.',X[7],X[9],(1120+DY),(1155+DY),{size:16,color:'#2b3fb0'});
+    ['___BRIEF','___FPL','___RISK','___SIGN'].forEach(function(t,i){txt(t,X[8],X[9],(985+DY)+i*33.75,(985+DY)+(i+1)*33.75,{size:17,color:'#1f2a6b',align:'left',pad:3});});
+    rect(X[7],(1120+DY),X[9],(1155+DY),GRY,2);txt('___AREA ทอ.',X[7],X[9],(1120+DY),(1155+DY),{size:17,color:'#1f2a6b',align:'left',pad:6});
 
     /* ---- fuel management ---- */
     head(X[0],X[9],FT,FT+35,'FUEL MANAGEMENT');
