@@ -1148,6 +1148,17 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
 #miniMapModal img{display:block;width:100%;height:auto}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
+#flightLogModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
+#flightLogModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+#flightLogModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
+#flightLogModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
+#flightLogModal img{display:block;width:100%;height:auto}
+#flightLogModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
+#flightLogModal .fl-form{padding:0 10px 8px;color:var(--text,#fff);font-size:12px}
+#flightLogModal .fl-form summary{cursor:pointer;padding:4px 0}
+#flightLogModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+#flightLogModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
+#flightLogModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
 .actions button{
   flex:1 1 calc(33.333% - 8px);
   min-width:92px;
@@ -1642,6 +1653,7 @@ td .wp-delete{
   <button id="measureBtn" type="button">RULER</button>
   <button id="exportKmz" type="button">EXPORT KMZ</button>
   <button id="exportMiniMap" type="button" title="Export a mini map (PNG) of the route">MINI MAP</button>
+  <button id="flightLogBtn" type="button" title="Pilot mission data card (PNG)">MSN CARD</button>
   <button id="wBtn" type="button">WINDY</button>
 </div>
 
@@ -6863,6 +6875,262 @@ function exportMiniMap(){
   }).then(function(){btn.disabled=false;btn.textContent=lbl;});
 }
 
+/* ---- FLIGHT LOG: Pilot Mission Data Card (PNG), layout after the squadron's paper card.
+   Auto-filled: date, route, airport info (AIRPORT DB + data/AD.txt + data/RWY.txt), FROM/DEST, IAS, swing radials,
+   nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
+   Typed fields (call sign, type, mission ...) come from the form and are remembered on this device. ---- */
+var FL_KEY='fp-flightlog-v1';
+var FL_FIELDS=[['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],['mission','MISSION'],['iff','IFF'],
+  ['alt','ALTITUDE'],['qnh','QNH'],['fuel','FUEL เริ่มต้น'],['bingo','BINGO'],['pax','PAX'],['taxi','TAXI (เชื้อเพลิง)']];
+function flLoad(){
+  var o={};try{o=JSON.parse(localStorage.getItem(FL_KEY)||'{}')||{};}catch(e){}
+  if(!o.type)o.type='S-70i';
+  if(!o.rule)o.rule='VFR';
+  var now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  o.date=now.getDate()+' '+MON[now.getMonth()]+' '+String(now.getFullYear()).slice(2);   /* always today when the card opens */
+  return o;
+}
+function flSave(o){try{localStorage.setItem(FL_KEY,JSON.stringify(o));}catch(e){}}
+function flDM(v){   /* 14.8747 -> "14 52 48" (deg, min, hundredths of a minute) */
+  var a=Math.abs(v),d=Math.floor(a),m=(a-d)*60,mi=Math.floor(m),h=Math.round((m-mi)*100);
+  if(h>=100){mi++;h=0;}if(mi>=60){d++;mi=0;}
+  return d+' '+String(mi).padStart(2,'0')+' '+String(h).padStart(2,'0');
+}
+function flRouteNotamIds(){
+  if(pts.length<2||typeof NOTAM_DB==='undefined')return [];
+  return NOTAM_DB.filter(function(n){
+    if(notamExpired(n))return false;
+    for(var i=1;i<pts.length;i++)if(pDistToSegment(n,pts[i-1],pts[i])<=30+(n.radiusNM||0))return true;
+    return false;
+  }).map(function(n){return n.id;});
+}
+
+function buildFlightLog(f){
+  var BW=1015,K=2,FONT='Arial,"Helvetica Neue","Sarabun",Tahoma,sans-serif';
+  var PUR='#7f62a8',GRY='#e4e2ec',YEL='#eef2d9',INK='#1a2a9c';
+  var X=[8,87,180,265,345,425,505,585,684,764,846,928,1007];
+  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(f.fuel),taxi=parseFloat(f.taxi)||0;
+  var nF=Math.max(pts.length,10),FY=1225,RH=34.5;
+  var BH=Math.max(1578,FY+nF*RH+8)+14;
+  var cv=document.createElement('canvas');cv.width=BW*K;cv.height=Math.round(BH*K);
+  var ctx=cv.getContext('2d');ctx.scale(K,K);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,BW,BH);
+
+  function rect(x0,y0,x1,y1,fill,lw){
+    if(fill){ctx.fillStyle=fill;ctx.fillRect(x0,y0,x1-x0,y1-y0);}
+    if(lw!==0){ctx.strokeStyle='#000';ctx.lineWidth=lw||1;ctx.strokeRect(x0,y0,x1-x0,y1-y0);}
+  }
+  function txt(s,x0,x1,y0,y1,o){
+    s=String(s==null?'':s);if(!s)return;o=o||{};
+    var sz=o.size||15,w=o.weight||'400',pad=o.pad==null?4:o.pad,room=x1-x0-pad*2;
+    ctx.font=w+' '+sz+'px '+FONT;
+    while(ctx.measureText(s).width>room&&sz>8){sz-=0.5;ctx.font=w+' '+sz+'px '+FONT;}
+    ctx.fillStyle=o.color||'#000';ctx.textBaseline='middle';
+    var al=o.align||'center';ctx.textAlign=al;
+    var x=al==='left'?x0+pad:al==='right'?x1-pad:(x0+x1)/2;
+    ctx.fillText(s,x,(y0+y1)/2+1);
+    if(o.underline){var tw=ctx.measureText(s).width,ux=al==='left'?x:x-tw/2;ctx.fillRect(ux,(y0+y1)/2+sz*0.55,tw,1.3);}
+  }
+  function head(x0,x1,y0,y1,s,o){rect(x0,y0,x1,y1,PUR);txt(s,x0,x1,y0,y1,Object.assign({color:'#fff',size:19,weight:'600'},o||{}));}
+  function grid(y0,y1,cols,fill,labels,o){   /* cols = [[i0,i1],...] on X */
+    cols.forEach(function(c,k){rect(X[c[0]],y0,X[c[1]],y1,fill);if(labels)txt(labels[k],X[c[0]],X[c[1]],y0,y1,o);});
+  }
+  var dep=pts[0],arr=pts[pts.length-1];
+  var routeTxt=pts.map(function(p,i){return p.name||('WP'+(i+1));}).join(' - ');
+
+  /* ---- title, date, route ---- */
+  return mmLoadImg('icons/sqn201.png',4000).then(function(logo){
+    head(X[0],X[11],8,45,'PILOT MISSION DATA CARD',{size:30,weight:'700'});
+    rect(X[0],45,X[2],80);rect(X[2],45,X[11],80);
+    txt('DATE :',X[0],X[2],45,80,{align:'left',weight:'700',size:15});
+    txt(f.date,X[0]+68,X[2],45,80,{align:'left',color:INK,size:16,weight:'600'});
+    txt('ROUTE :',X[2],X[11],45,80,{align:'left',weight:'700',size:15});
+    txt(routeTxt,X[2]+70,X[11],45,80,{align:'left',color:INK,size:16,weight:'600'});
+    rect(X[11],8,X[12],80);
+    if(logo){var lh=66,lw=logo.width*lh/logo.height;ctx.drawImage(logo,(X[11]+X[12]-lw)/2,11,lw,lh);}
+
+    /* ---- airport information ---- */
+    head(X[0],X[12],82,108,'AIRPORT INFORMATION');
+    var AC=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12]];
+    grid(108,138,AC,GRY,['A/F','R/W','ELEV','ILS','VOR','ADF','TAC','GND','TWR','APP','DEP','ATIS'],{size:15});
+    var ads=[];pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
+    function adv(id,k){
+      var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
+      return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
+    }
+    for(var r=0;r<5;r++){
+      var y0=138+r*29,id=ads[r];
+      var vals=id?[id,(RWY_INFO[id]||[]).map(function(w){return w[0].id+'/'+w[1].id;}).join(' '),APX[id][6]!=null&&APX[id][6]!==''?APX[id][6]:'',
+        adv(id,'ILS'),adv(id,'VOR'),adv(id,'NDB')||adv(id,'ADF'),adv(id,'TAC'),adv(id,'GND'),adv(id,'TWR'),adv(id,'APP'),adv(id,'DEP'),adv(id,'ATIS')]:[];
+      grid(y0,y0+29,AC,r<2?'#fff':YEL,vals,{color:INK,size:14,weight:'600'});
+    }
+
+    /* ---- call sign / mission rows ---- */
+    var C1=[[0,2],[2,3],[3,5],[5,6],[6,8],[8,9],[9,10],[10,11],[11,12]];
+    grid(283,310,C1,PUR,null);
+    C1.forEach(function(c,k){txt(['CALL SIGN','TYPE','FLIGHT RULE','FROM','DEST.','STEP','START','T/O','L/D'][k],X[c[0]],X[c[1]],283,310,{color:'#fff',size:18});});
+    grid(310,340,C1,'#fff',[f.callsign,f.type,f.rule,dep.name||'',arr.name||'','','','',''],{color:INK,size:20,weight:'700'});
+    var C2=[[0,2],[2,3],[3,5],[5,6],[6,7],[7,8],[8,9]];
+    grid(340,370,C2,PUR,null);
+    C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],340,370,{color:'#fff',size:18});});
+    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,f.qnh,spd>0?String(spd):'',f.fuel,f.bingo],{color:INK,size:18,weight:'700'});
+
+    /* ---- crew table ---- */
+    var C3=[[0,1],[1,2],[2,3],[3,5],[5,6],[6,8],[8,9]];
+    grid(405,438,C3,GRY,['NO','PILOT','COPILOT','CALL SIGN','A/C NO.','ROUTE / AREA','SQ.'],{size:16,weight:'700'});
+    for(var c=0;c<4;c++){var cy=438+c*34.5;grid(cy,cy+34.5,C3,c===0?YEL:'#fff',[String(c+1)],{color:INK,size:18,weight:c===0?'700':'400'});}
+
+    /* ---- swing: radial/DME of route points from the departure airport ---- */
+    head(X[9],X[12],340,370,'SWING');
+    var ref=APX[(dep.name||'').toUpperCase()]||nearestAirportForPoint(dep);
+    rect(X[9],370,X[10],405,GRY);rect(X[10],370,X[12],405,GRY);
+    txt('Cx.Pt.',X[9],X[10],370,405,{size:18});txt(ref?ref[0]:'',X[10],X[12],370,405,{size:20,color:INK});
+    var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
+    var swSeen={};sw=sw.filter(function(p){var k=(p.name||'')+p.lat+p.lng;if(swSeen[k])return false;swSeen[k]=1;return true;});
+    for(var s=0;s<8;s++){
+      var sy=405+s*33.875,p=sw[s];
+      rect(X[9],sy,X[10],sy+33.875,s%2?'#fff':YEL);rect(X[10],sy,X[12],sy+33.875,s%2?'#fff':YEL);
+      if(p&&ref){
+        var rp={lat:ref[4],lng:ref[5]},dd=dist(rp,p);
+        txt(p.name||('WP'+(pts.indexOf(p)+1)),X[9],X[10],sy,sy+33.875,{size:18,weight:'700'});
+        txt('R'+mmPad3(course(rp,p))+'/'+dd.toFixed(1),X[10],X[12],sy,sy+33.875,{size:22,color:INK});
+      }
+    }
+
+    /* ---- nav aid ident (morse) ---- */
+    head(X[9],X[12],676,706,'Nav Aid IDENT');
+    var ids=[];ads.forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){if(r[0]==='MORSE')r[1].split(/[ ,]+/).filter(Boolean).forEach(function(n){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);});});});
+    for(var n=0;n<4;n++){
+      var ny=706+n*34.75;rect(X[9],ny,X[10],ny+34.75);rect(X[10],ny,X[12],ny+34.75);
+      if(ids[n]){txt('['+ids[n]+']',X[9],X[10],ny,ny+34.75,{size:17});txt(morseOf(ids[n]),X[10],X[12],ny,ny+34.75,{size:20,weight:'700'});}
+    }
+
+    /* ---- approach procedure / before landing (static memory aids) ---- */
+    head(X[9],X[12],845,880,'Approach Procedure');
+    function block(y0,y1,lines){rect(X[9],y0,X[12],y1,null,2);var h=(y1-y0)/lines.length;lines.forEach(function(t,i){txt(t,X[9],X[12],y0+i*h,y0+(i+1)*h,{align:'left',size:19,pad:4});});}
+    block(880,1053,["W-eather Ceil MDA ____'",'H-old  I/B _ O/B _ ENTY','O-btain RWY,QNH,ALT','L-et down CHART','D-ESCENT CX.']);
+    block(1053,1263,['T-ime O/B','T-urn L/R','T-hrottle A/S  ____','T-wist course I/B  ____','T-rack HDG O/B  ____','T-alk report']);
+    block(1263,1365,['C-ourse Set I/B  ____','A-lt QNH set','T-urn Direction']);
+    rect(X[9],1365,X[12],1400,'#f6dede',2);txt('Before L/D Cx.',X[9],X[12],1365,1400,{size:21});
+    block(1400,1570,['M - FAF,MDA,CIRCL','A - ATF ,FAF Clock','R - I/B __, A/S,,RATE','M - MISS APP PRO.','S - SPEED L/D']);
+
+    /* ---- overview ---- */
+    rect(X[0],576,X[9],985,null,2);
+    rect(X[0],578,X[2],606,PUR,0);txt('OVERVIEW :',X[0],X[2],578,606,{align:'left',color:'#fff',size:19,weight:'700'});
+    var ty=625;
+    txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});txt(f.pax,X[0]+55,X[2],ty-14,ty+14,{align:'left',size:19,color:INK,weight:'700'});
+    txt('START :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
+    txt('TAXI :',X[4],X[6],ty-14,ty+14,{align:'left',size:19,weight:'700'});
+    txt('T/O :',X[7],X[9],ty-14,ty+14,{align:'left',size:19,weight:'700'});
+    [['AIRWORK',660,1],['NAV',691],['COM',722],['FMS',757],['CONF',792],['FAM',827]].forEach(function(a){
+      txt(a[0],X[0],X[3],a[1]-14,a[1]+14,{align:'left',size:a[2]?21:19,weight:a[2]?'700':'400',underline:true});
+    });
+    txt('TAXI :',X[0],X[2],952,980,{align:'left',size:19,weight:'700'});
+    txt('SHUT DOWN :',X[2],X[5],952,980,{align:'left',size:19,weight:'700'});
+    rect(X[7],740,X[9],775,'#fff',2);txt('PRI :',X[7],X[9],740,775,{align:'left',size:19,weight:'700'});
+    rect(X[7],775,X[9],810,'#fff',2);txt('SEC:',X[7],X[9],775,810,{align:'left',size:19,weight:'700'});
+    ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=810+i*35;rect(X[7],y,X[8],y+35);rect(X[8],y,X[9],y+35);txt(t,X[7],X[8],y,y+35,{size:17});});
+
+    /* ---- NOTAM / weather / briefing ticks ---- */
+    rect(X[0],985,X[8],1155,null,2);
+    rect(X[0],985,X[2],1018,PUR,2);txt('NOTAM :',X[0],X[2],985,1018,{align:'left',color:'#fff',size:19,weight:'700'});
+    var nIds=flRouteNotamIds(),nTxt=nIds.join(', ');
+    if(nTxt){
+      ctx.font='600 15px '+FONT;ctx.fillStyle=INK;ctx.textAlign='left';ctx.textBaseline='middle';
+      var words=nIds.slice(),line='',ly=1003,lx0=X[2]+6,maxW=X[8]-lx0-6,rows=[];
+      words.forEach(function(w,i){var t=line?line+', '+w:w;if(ctx.measureText(t).width>maxW&&line){rows.push(line+',');line=w;}else line=t;});
+      if(line)rows.push(line);
+      if(rows.length>2){   /* 2 lines fit: keep line 1, then a count of the rest */
+        var shown=rows[0].split(',').filter(function(x){return x.trim();}).length;
+        rows=[rows[0],'… และอีก '+(nIds.length-shown)+' รายการ (ดูในแอป)'];
+      }
+      rows.forEach(function(t,i){ctx.fillText(t,lx0,ly+i*24);});
+    }
+    rect(X[0],1053,X[3]+160,1088,null,2);rect(X[0],1053,X[2],1088,PUR,2);
+    txt('WEATHER :',X[0],X[2],1053,1088,{align:'left',color:'#fff',size:19,weight:'700'});
+    rect(X[8],985,X[9],1120,GRY,2);
+    ['__BRIEF','__FPL','__RISK','__SIGN'].forEach(function(t,i){txt(t,X[8],X[9],985+i*33.75,985+(i+1)*33.75,{size:15,color:'#2b3fb0',align:'right'});});
+    rect(X[7],1120,X[9],1155,GRY,2);txt('___AREA ทอ.',X[7],X[9],1120,1155,{size:16,color:'#2b3fb0'});
+
+    /* ---- fuel management ---- */
+    head(X[0],X[9],1155,1190,'FUEL MANAGEMENT');
+    var C4=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9]];
+    grid(1190,FY,C4,GRY,['LAT N','LONG E','Cx.Pt.','HDG','DIST','ETE','ETA/ATA','EFR','AFR'],{size:16});
+    var total=0;for(var i=1;i<pts.length;i++)total+=dist(pts[i-1],pts[i]);
+    var rem=isFinite(fuel0)?fuel0-taxi:NaN;
+    for(var k=0;k<nF;k++){
+      var y=FY+k*RH,p2=pts[k],v=[];
+      if(p2){
+        var isAd=!!APX[(p2.name||'').toUpperCase()];
+        if(k===0){
+          var mins=spd>0?Math.round(total/spd*60):'';
+          v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins!==''?mins+(taxi?'':''):'','/',isFinite(fuel0)?String(fuel0):''];
+        }else{
+          var d=dist(pts[k-1],p2),h=spd>0?d/spd:NaN,b=isFinite(h)?Math.round(h*burn):NaN;
+          if(isFinite(rem)&&isFinite(b))rem-=b;
+          v=[flDM(p2.lat),flDM(p2.lng),p2.name||('WP'+(k+1)),mmPad3(course(pts[k-1],p2)),d<10?d.toFixed(1):Math.round(d),
+            isFinite(h)?Math.max(1,Math.round(h*60)):'','/',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
+        }
+      }
+      var fill=(p2&&APX[(p2.name||'').toUpperCase()])?YEL:'#fff';
+      C4.forEach(function(c,j){
+        rect(X[c[0]],y,X[c[1]],y+RH,fill);
+        if(v[j]==null||v[j]==='')return;
+        var big=(j===3||j===4||j===5),o={size:big?24:j===2?21:j<2?16:18,color:(j>=3&&j!==6)?INK:'#000',weight:(j===2&&fill===YEL)||(k===0&&j===7)?'700':'400'};
+        if(k===0&&j===7)o.size=26;
+        txt(v[j],X[c[0]],X[c[1]],y,y+RH,o);
+      });
+    }
+    rect(X[0],8,X[12],BH-18,null,3);
+    ctx.font='400 11px '+FONT;ctx.fillStyle='#777';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.fillText('AirNavFlow · HDG = CRS(T) · ETE min @ '+spd+' kt · burn '+burn+'/hr'+(taxi?' · taxi '+taxi:''),X[0]+2,BH-4);
+    return cv;
+  });
+}
+
+function openFlightLog(){
+  if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อนทำ MSN CARD');return;}
+  var old=document.getElementById('flightLogModal');if(old)old.remove();
+  var f=flLoad(),cv=null;
+  var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
+  var fname='MsnCard_'+dep+'_'+arr+'.png';
+  var d=document.createElement('div');d.id='flightLogModal';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MSN CARD</b><span>'+
+    '<button type="button" id="flMake">อัปเดต</button> '+
+    '<button type="button" id="flSave">บันทึก PNG</button> '+
+    (navigator.canShare?'<button type="button" id="flShare">แชร์</button> ':'')+
+    '<button type="button" id="flClose">✕</button></span></div>'+
+    '<details class="fl-form" open><summary>ข้อมูลที่กรอกเอง (จำไว้ในเครื่องนี้)</summary><div class="fl-grid">'+
+    FL_FIELDS.map(function(x){return '<label>'+x[1]+'<input data-fl="'+x[0]+'" type="text" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
+    '</div></details>'+
+    '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
+    '<p class="mm-note">ข้อมูลเส้นทาง/สนามบิน/ความถี่ เติมให้อัตโนมัติ · HDG = CRS(T) · ETE ใช้ Airspeed, EFR ใช้ Fuel Consumption ในแอป · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos</p></div>';
+  document.body.appendChild(d);
+  var imgBox=d.querySelector('.mm-img');
+  function read(){d.querySelectorAll('[data-fl]').forEach(function(i){f[i.getAttribute('data-fl')]=i.value.trim();});var s=Object.assign({},f);delete s.date;flSave(s);}
+  function make(){
+    read();imgBox.innerHTML='<p class="mm-note">กำลังสร้าง…</p>';
+    buildFlightLog(f).then(function(c){cv=c;imgBox.innerHTML='<img alt="Flight log" src="'+c.toDataURL('image/png')+'">';})
+      .catch(function(err){imgBox.innerHTML='<p class="mm-note">สร้างไม่สำเร็จ ('+esc(err&&err.message||err)+')</p>';});
+  }
+  document.getElementById('flMake').onclick=make;
+  document.getElementById('flClose').onclick=function(){read();d.remove();};
+  d.addEventListener('click',function(e){if(e.target===d){read();d.remove();}});
+  document.getElementById('flSave').onclick=function(){
+    if(!cv)return;var a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  };
+  var sh=document.getElementById('flShare');
+  if(sh)sh.onclick=function(){
+    if(!cv)return;
+    cv.toBlob(function(blob){
+      var fl=new File([blob],fname,{type:'image/png'});
+      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl],title:fname}).catch(function(){});
+      else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
+    },'image/png');
+  };
+  make();
+}
+
 map.on('click',function(e){
   var ll=e.latlng.wrap();
 
@@ -7020,6 +7288,7 @@ document.getElementById('measureBtn').onclick=function(){
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('exportMiniMap').onclick=exportMiniMap;
+document.getElementById('flightLogBtn').onclick=openFlightLog;
 
 document.getElementById('undo').onclick=function(){
   if(!pts.length)return;
