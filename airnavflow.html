@@ -1149,8 +1149,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
 #miniMapModal img{display:block;width:100%;height:auto}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
-#flightLogModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
-#flightLogModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+#flightLogModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+#flightLogModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 #flightLogModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
 #flightLogModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
 #flightLogModal img{display:block;width:100%;height:auto}
@@ -6971,8 +6971,9 @@ function exportMiniMap(){
    nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
    Typed fields (call sign, type, mission ...) come from the form and are remembered on this device. ---- */
 var FL_KEY='fp-flightlog-v1';
-var FL_FIELDS=[['date','DATE'],['type','TYPE'],['rule','FLIGHT RULE'],['iff','IFF'],
-  ['alt','ALTITUDE'],['qnh','QNH'],['bingo','BINGO'],['pax','PAX'],['taxi','TAXI (เชื้อเพลิง)']];
+var FL_FIELDS=[['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],
+  ['step','STEP'],['start','START'],['to','T/O'],['ld','L/D'],
+  ['mission','MISSION'],['iff','IFF'],['alt','ALTITUDE'],['bingo','BINGO']];
 function flLoad(){
   var o={};try{o=JSON.parse(localStorage.getItem(FL_KEY)||'{}')||{};}catch(e){}
   if(!o.type)o.type='S-70i';
@@ -7000,7 +7001,7 @@ function buildFlightLog(f){
   var BW=1015,K=2,FONT='Arial,"Helvetica Neue","Sarabun",Tahoma,sans-serif';
   var PUR='#7f62a8',GRY='#e4e2ec',YEL='#eef2d9',INK='#1a2a9c';
   var X=[8,87,180,265,345,425,505,585,684,764,846,928,1007];
-  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=parseFloat(f.taxi)||0;
+  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=0;
   /* fuel table sits at the bottom (ends with the right column, y=1570); the overview box above it stretches/shrinks.
      Past ~13 rows the overview hits its minimum and the card grows taller instead. */
   var nF=Math.max(pts.length,10),RH=34.5;
@@ -7087,11 +7088,11 @@ function buildFlightLog(f){
     var C1=[[0,2],[2,3],[3,5],[5,6],[6,8],[8,9],[9,10],[10,11],[11,12]];
     grid(283,310,C1,PUR,null);
     C1.forEach(function(c,k){txt(['CALL SIGN','TYPE','FLIGHT RULE','FROM','DEST.','STEP','START','T/O','L/D'][k],X[c[0]],X[c[1]],283,310,{color:'#fff',size:18});});
-    grid(310,340,C1,'#fff',['',f.type,f.rule,dep.name||'',arr.name||'','','','',''],{color:INK,size:20,weight:'700'});
+    grid(310,340,C1,'#fff',[f.callsign,f.type,f.rule,dep.name||'',arr.name||'',f.step,f.start,f.to,f.ld],{color:INK,size:20,weight:'700'});
     var C2=[[0,2],[2,3],[3,5],[5,6],[6,7],[7,8],[8,9]];
     grid(340,370,C2,PUR,null);
     C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],340,370,{color:'#fff',size:18});});
-    grid(370,405,C2,'#fff',['',f.iff,f.alt,f.qnh,spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
+    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,'',spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
 
     /* ---- crew table ---- */
     var C3=[[0,1],[1,2],[2,3],[3,5],[5,6],[6,8],[8,9]];
@@ -7150,7 +7151,7 @@ function buildFlightLog(f){
     rect(X[0],576,X[9],NT,null,2);
     rect(X[0],578,X[2],606,PUR,0);txt('OVERVIEW :',X[0],X[2],578,606,{align:'left',color:'#fff',size:19,weight:'700'});
     var ty=625;
-    txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});txt(f.pax,X[0]+55,X[2],ty-14,ty+14,{align:'left',size:19,color:INK,weight:'700'});
+    txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('START :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('TAXI :',X[4],X[6],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('T/O :',X[7],X[9],ty-14,ty+14,{align:'left',size:19,weight:'700'});
