@@ -3,10 +3,10 @@
    - Pages: network-first, falls back to cached shell when offline
    - Province borders / fonts: stale-while-revalidate
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v26';
+var APP_CACHE='fp-app-v27';
 var RUNTIME_CACHE='fp-runtime-v1';
 var SHELL=['airnavflow.html'];
-var OPTIONAL=['./','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png'];
+var OPTIONAL=['./','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png'];
 var RUNTIME_HOSTS=['cdn.jsdelivr.net','raw.githubusercontent.com','fonts.googleapis.com','fonts.gstatic.com'];
 
 self.addEventListener('install',function(e){

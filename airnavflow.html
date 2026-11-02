@@ -6431,8 +6431,11 @@ function buildMiniMap(){
   var mctx=mapCv.getContext('2d');
 
   var hasContour=false;
+  var logo=null;
   return mmDrawBase(mctx,W,MH,cxW,cyW,z,center).then(function(){
     return mmDrawContours(mctx,W,MH,cxW,cyW,z,S).then(function(ok){hasContour=ok;});
+  }).then(function(){
+    return mmLoadImg('icons/sqn201.png',4000).then(function(im){logo=im;});
   }).then(function(){
     ctx.drawImage(mapCv,0,HEAD);
     ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);   /* fade like a printed strip chart */
@@ -6444,9 +6447,10 @@ function buildMiniMap(){
     ctx.font='600 '+(46*S)+'px '+FONT;ctx.fillText(dep+' - '+arr,24*S,62*S);
     var now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     ctx.font='500 '+(17*S)+'px '+FONT;ctx.fillText('UPDATE  '+now.getDate()+' '+MON[now.getMonth()]+' '+now.getFullYear(),24*S,98*S);
-    ctx.textAlign='right';ctx.font='500 '+(13*S)+'px '+FONT;ctx.fillStyle='rgba(255,255,255,.8)';
-    ctx.fillText('AirNavFlow',W-24*S,98*S);
-    if(hasContour)ctx.fillText('Contour ft',W-24*S,78*S);
+    if(logo){   /* squadron badge, top-right corner */
+      var lh2=HEAD-14*S,lw2=logo.width*lh2/logo.height;
+      ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
+    }
 
     var P=pts.map(px),boxes=[],segs=[];
     for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
