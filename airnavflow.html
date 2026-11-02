@@ -6958,8 +6958,17 @@ function buildFlightLog(f){
       var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
       return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
     }
+    /* white rows = airports on the route (departure, destination first); green rows = 3 nearest airports off the route */
+    var onR=[],dI=(dep.name||'').toUpperCase(),aI=(arr.name||'').toUpperCase();
+    [dI,aI].concat(ads).forEach(function(id){if(APX[id]&&onR.indexOf(id)<0)onR.push(id);});
+    var near=AP.filter(function(a){return ads.indexOf(a[0])<0;}).map(function(a){
+      var q={lat:a[4],lng:a[5]},m=Infinity;
+      for(var i=1;i<pts.length;i++)m=Math.min(m,pDistToSegment(q,pts[i-1],pts[i]));
+      return [a[0],m];
+    }).sort(function(x,y){return x[1]-y[1];}).slice(0,3).map(function(x){return x[0];});
+    var adRows=[onR[0],onR[1]].concat(near);
     for(var r=0;r<5;r++){
-      var y0=138+r*29,id=ads[r];
+      var y0=138+r*29,id=adRows[r];
       var vals=id?[id,(RWY_INFO[id]||[]).map(function(w){return w[0].id+'/'+w[1].id;}).join(' '),APX[id][6]!=null&&APX[id][6]!==''?APX[id][6]:'',
         adv(id,'ILS'),adv(id,'VOR'),adv(id,'NDB')||adv(id,'ADF'),adv(id,'TAC'),adv(id,'GND'),adv(id,'TWR'),adv(id,'APP'),adv(id,'DEP'),adv(id,'ATIS')]:[];
       grid(y0,y0+29,AC,r<2?'#fff':YEL,vals,{color:INK,size:14,weight:'600'});
