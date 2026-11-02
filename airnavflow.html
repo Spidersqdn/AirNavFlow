@@ -6598,22 +6598,39 @@ function buildMiniMap(){
     var adIdx={};
     pts.forEach(function(p,i){var id=(p.name||'').toUpperCase();if(APX[id]&&!(id in adIdx))adIdx[id]=i;});
     var corners=['tl','bl','tr','br'];
+    /* every airport symbol on the sheet (runway drawing + its numbers): AD boxes keep clear of it */
+    var adSym=[];
+    Object.keys(adIdx).forEach(function(id){adSym.push(P[adIdx[id]]);});
+    AP.forEach(function(a){if(a[0] in adIdx)return;var q=px({lat:a[4],lng:a[5]});if(q.x>0&&q.x<W&&q.y>HEAD&&q.y<H)adSym.push(q);});
+    function clearOfAD(b){
+      var r=85*S;   /* runway drawing (~64 px) plus its runway numbers */
+      return !adSym.some(function(q){var dx=Math.max(b.x-q.x,0,q.x-b.x-b.w),dy=Math.max(b.y-q.y,0,q.y-b.y-b.h);return Math.hypot(dx,dy)<r;});
+    }
     Object.keys(adIdx).forEach(function(id){
-      var a=APX[id],i=adIdx[id],q=P[i],pad=7*S;
-      var lines=adLines(id,PT12,false);
-      var m=mmMeasure(ctx,lines,pad);
+      var a=APX[id],i=adIdx[id],q=P[i],pad=7*S,placed=null,lines,m;
       var order=corners.slice().sort(function(c1,c2){
         function d(c){var cx=c[1]==='l'?0:W,cy=c[0]==='t'?HEAD:H;return Math.hypot(cx-q.x,cy-q.y);}
         return d(c1)-d(c2);
       });
-      var placed=null;
-      for(var k=0;k<order.length&&!placed;k++){
-        var c=order[k],b={x:c[1]==='l'?8*S:W-8*S-m.w,y:c[0]==='t'?HEAD+8*S:H-8*S-m.h,w:m.w,h:m.h};
-        if(free(b,false)){placed=b;corners.splice(corners.indexOf(c),1);}
-      }
-      if(!placed){   /* overlap the route if every corner is busy */
-        var c0=order[0];placed={x:c0[1]==='l'?8*S:W-8*S-m.w,y:c0[0]==='t'?HEAD+8*S:H-8*S-m.h,w:m.w,h:m.h};
-        if(corners.indexOf(c0)>=0)corners.splice(corners.indexOf(c0),1);
+      function cornerBox(c){return {x:c[1]==='l'?8*S:W-8*S-m.w,y:c[0]==='t'?HEAD+8*S:H-8*S-m.h,w:m.w,h:m.h};}
+      /* 1) a free corner, 2) slide along the sheet edges, 3) same with the short box; route crossing allowed last */
+      [[false,0],[true,0],[false,1],[true,1]].forEach(function(o){   /* full box, short box, then the same crossing the route */
+        if(placed)return;
+        var short=o[0],pass=o[1];
+        lines=adLines(id,PT12,short);m=mmMeasure(ctx,lines,pad);
+        {
+          for(var k=0;k<order.length&&!placed;k++){var b=cornerBox(order[k]);if(free(b,pass===1)&&clearOfAD(b)){placed=b;corners.splice(corners.indexOf(order[k]),1);}}
+          if(placed)return;
+          var cand=[],st=10*S;
+          for(var y=HEAD+8*S;y+m.h<=H-8*S;y+=st){cand.push({x:8*S,y:y,w:m.w,h:m.h});cand.push({x:W-8*S-m.w,y:y,w:m.w,h:m.h});}
+          for(var x=8*S;x+m.w<=W-8*S;x+=st){cand.push({x:x,y:HEAD+8*S,w:m.w,h:m.h});cand.push({x:x,y:H-8*S-m.h,w:m.w,h:m.h});}
+          cand.sort(function(b1,b2){return Math.hypot(b1.x+b1.w/2-q.x,b1.y+b1.h/2-q.y)-Math.hypot(b2.x+b2.w/2-q.x,b2.y+b2.h/2-q.y);});
+          for(var j=0;j<cand.length&&!placed;j++)if(free(cand[j],pass===1)&&clearOfAD(cand[j]))placed=cand[j];
+        }
+      });
+      if(!placed){   /* nothing free anywhere: preferred corner, short box */
+        placed=cornerBox(order[0]);
+        if(corners.indexOf(order[0])>=0)corners.splice(corners.indexOf(order[0]),1);
       }
       placed.ad=true;placed.lines=lines;placed.pad=pad;placed.align='left';
       boxes.push(placed);
@@ -6779,7 +6796,9 @@ function buildMiniMap(){
     }
     function leadOk(q,b){   /* a box's leader line may not run through another box */
       var bx=Math.max(b.x,Math.min(q.x,b.x+b.w)),by=Math.max(b.y,Math.min(q.y,b.y+b.h));
-      for(var k=0;k<boxes.length;k++){var o=boxes[k];if(mmSegHitsBox(q,{x:bx,y:by},{x:o.x+2,y:o.y+2,w:o.w-4,h:o.h-4}))return false;}
+      for(var k=0;k<boxes.length;k++){var o=boxes[k];
+        if(q.x>=o.x&&q.x<=o.x+o.w&&q.y>=o.y&&q.y<=o.y+o.h)continue;   /* the point's own symbol area */
+        if(mmSegHitsBox(q,{x:bx,y:by},{x:o.x+2,y:o.y+2,w:o.w-4,h:o.h-4}))return false;}
       return true;
     }
     function placeAndDraw(q,lines,pad,small,align){
