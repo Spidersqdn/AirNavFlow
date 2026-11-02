@@ -6377,12 +6377,46 @@ function readKmzFile(file){
     return new TextDecoder('utf-8').decode(buf);
   });
 }
+function askImportMode(r){
+  /* route already set: let the user keep it (append / off-route) or replace it */
+  return new Promise(function(res){
+    var bg=document.createElement('div');
+    bg.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#3a3f46;color:#fff;border:1px solid #666d76;border-radius:10px;padding:16px;max-width:340px;width:100%;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+    var t=document.createElement('div');
+    t.style.cssText='margin-bottom:12px';
+    t.textContent='ไฟล์มี '+r.route.length+' route waypoint'+(r.off.length?' + '+r.off.length+' off-route':'')+' / route ปัจจุบันมี '+pts.length+' จุด';
+    box.appendChild(t);
+    [['append','ต่อท้าย route เดิม'],['off','เก็บ route เดิม (ใส่เป็น Off-Route ทั้งหมด)'],['replace','แทนที่ route เดิม'],['cancel','ยกเลิก']].forEach(function(o){
+      var b=document.createElement('button');
+      b.type='button';b.textContent=o[1];
+      b.style.cssText='display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #666d76;background:'+(o[0]==='cancel'?'transparent':'#4a5058')+';color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer';
+      b.onclick=function(){document.body.removeChild(bg);res(o[0]);};
+      box.appendChild(b);
+    });
+    bg.onclick=function(e){if(e.target===bg){document.body.removeChild(bg);res('cancel');}};
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+  });
+}
 function importRouteKmz(file){
+  var r;
   readKmzFile(file).then(function(xml){
-    var r=parseKmlRoute(xml);
-    if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return;}
-    if(pts.length&&!confirm('นำเข้า '+r.route.length+' route waypoint'+(r.off.length?' + '+r.off.length+' off-route':'')+'\nแทนที่เส้นทางปัจจุบัน ('+pts.length+' จุด) ?'))return;
-    pts=r.route;elevCache={};pendingInsertIndex=null;routeMapEditIndex=null;routeMapEditDraft=null;
+    r=parseKmlRoute(xml);
+    if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return 'cancel';}
+    return (pts.length&&r.route.length)?askImportMode(r):'replace';
+  }).then(function(mode){
+    if(mode==='cancel')return;
+    if(mode==='off'){r.off=r.route.concat(r.off);r.route=[];}
+    else if(mode==='append'){
+      var last=pts[pts.length-1];
+      if(last&&r.route.length&&dist(last,r.route[0])<0.05)r.route.shift(); /* same joining point */
+      pts=pts.concat(r.route);
+    }else{
+      pts=r.route;elevCache={};
+    }
+    pendingInsertIndex=null;routeMapEditIndex=null;routeMapEditDraft=null;
     updateInsertModeBanner();
     offRoutePts=offRoutePts||[];
     r.off=r.off.filter(function(p){ /* skip off-route points already on the map */
@@ -6390,13 +6424,13 @@ function importRouteKmz(file){
     });
     if(r.off.length){offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
     refresh();
-    var all=r.route.concat(r.off);
-    map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
-    if(navigator.onLine&&all.length<=40){ /* fill district/province names, 1 request/s */
+    var all=pts.concat(r.off);
+    if(all.length)map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
+    if(navigator.onLine&&r.route.length+r.off.length<=40){ /* fill district/province names, 1 request/s */
       r.route.forEach(function(p,i){setTimeout(function(){geocode(p);},i*1100);});
       r.off.forEach(function(p,i){setTimeout(function(){geocodeOffRoute(p);},(r.route.length+i)*1100);});
     }
-    if(st)st.textContent='นำเข้า '+file.name+': route '+r.route.length+' จุด'+(r.off.length?', off-route '+r.off.length+' จุด':'');
+    if(st)st.textContent='นำเข้า '+file.name+': route +'+r.route.length+' จุด'+(r.off.length?', off-route +'+r.off.length+' จุด':'');
   }).catch(function(e){
     alert('นำเข้า KMZ ไม่สำเร็จ: '+(e&&e.message?e.message:e));
   });
