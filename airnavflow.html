@@ -720,7 +720,7 @@ button:hover{border-color:var(--cyan)}
 .units button:first-child{border-radius:6px 0 0 6px}
 .units button:last-child{border-radius:0 6px 6px 0}
 .units button[aria-pressed=true]{background:var(--cyan);border-color:var(--cyan);color:#04202a;font-weight:600}
-.params{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.params{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .params label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
 .params input{font-family:var(--mono);width:100%}
 .legs{padding:10px 18px;border-bottom:1px solid var(--line)}
@@ -1574,6 +1574,7 @@ td .wp-delete{
 
 <section class="params">
   <label>Airspeed (kt)<input id="speed" type="number" min="1" value="120"></label>
+  <label>FUEL<input id="fuel" type="number" min="0" value="2200"></label>
   <label>Fuel Consumption<input id="burn" type="number" min="0" value="900"></label>
 </section>
 <div id="insertModeBanner">
@@ -6881,7 +6882,7 @@ function exportMiniMap(){
    Typed fields (call sign, type, mission ...) come from the form and are remembered on this device. ---- */
 var FL_KEY='fp-flightlog-v1';
 var FL_FIELDS=[['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],['mission','MISSION'],['iff','IFF'],
-  ['alt','ALTITUDE'],['qnh','QNH'],['fuel','FUEL เริ่มต้น'],['bingo','BINGO'],['pax','PAX'],['taxi','TAXI (เชื้อเพลิง)']];
+  ['alt','ALTITUDE'],['qnh','QNH'],['bingo','BINGO'],['pax','PAX'],['taxi','TAXI (เชื้อเพลิง)']];
 function flLoad(){
   var o={};try{o=JSON.parse(localStorage.getItem(FL_KEY)||'{}')||{};}catch(e){}
   if(!o.type)o.type='S-70i';
@@ -6909,9 +6910,12 @@ function buildFlightLog(f){
   var BW=1015,K=2,FONT='Arial,"Helvetica Neue","Sarabun",Tahoma,sans-serif';
   var PUR='#7f62a8',GRY='#e4e2ec',YEL='#eef2d9',INK='#1a2a9c';
   var X=[8,87,180,265,345,425,505,585,684,764,846,928,1007];
-  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(f.fuel),taxi=parseFloat(f.taxi)||0;
-  var nF=Math.max(pts.length,10),FY=1225,RH=34.5;
-  var BH=Math.max(1578,FY+nF*RH+8)+14;
+  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=parseFloat(f.taxi)||0;
+  /* fuel table sits at the bottom (ends with the right column, y=1570); the overview box above it stretches/shrinks.
+     Past ~13 rows the overview hits its minimum and the card grows taller instead. */
+  var nF=Math.max(pts.length,10),RH=34.5;
+  var FT=Math.max(1020,1570-70-nF*RH),FY=FT+70,NT=FT-170,DY=NT-985;
+  var BH=Math.max(1570,FY+nF*RH)+8+14;
   var cv=document.createElement('canvas');cv.width=BW*K;cv.height=Math.round(BH*K);
   var ctx=cv.getContext('2d');ctx.scale(K,K);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,BW,BH);
@@ -6982,7 +6986,7 @@ function buildFlightLog(f){
     var C2=[[0,2],[2,3],[3,5],[5,6],[6,7],[7,8],[8,9]];
     grid(340,370,C2,PUR,null);
     C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],340,370,{color:'#fff',size:18});});
-    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,f.qnh,spd>0?String(spd):'',f.fuel,f.bingo],{color:INK,size:18,weight:'700'});
+    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,f.qnh,spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
 
     /* ---- crew table ---- */
     var C3=[[0,1],[1,2],[2,3],[3,5],[5,6],[6,8],[8,9]];
@@ -7024,29 +7028,31 @@ function buildFlightLog(f){
     block(1400,1570,['M - FAF,MDA,CIRCL','A - ATF ,FAF Clock','R - I/B __, A/S,,RATE','M - MISS APP PRO.','S - SPEED L/D']);
 
     /* ---- overview ---- */
-    rect(X[0],576,X[9],985,null,2);
+    rect(X[0],576,X[9],NT,null,2);
     rect(X[0],578,X[2],606,PUR,0);txt('OVERVIEW :',X[0],X[2],578,606,{align:'left',color:'#fff',size:19,weight:'700'});
     var ty=625;
     txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});txt(f.pax,X[0]+55,X[2],ty-14,ty+14,{align:'left',size:19,color:INK,weight:'700'});
     txt('START :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('TAXI :',X[4],X[6],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('T/O :',X[7],X[9],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    [['AIRWORK',660,1],['NAV',691],['COM',722],['FMS',757],['CONF',792],['FAM',827]].forEach(function(a){
-      txt(a[0],X[0],X[3],a[1]-14,a[1]+14,{align:'left',size:a[2]?21:19,weight:a[2]?'700':'400',underline:true});
+    var awS=Math.min(33.4,(NT-60-660)/5);
+    [['AIRWORK',1],['NAV'],['COM'],['FMS'],['CONF'],['FAM']].forEach(function(a,i){
+      var ay=660+i*awS;txt(a[0],X[0],X[3],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true});
     });
-    txt('TAXI :',X[0],X[2],952,980,{align:'left',size:19,weight:'700'});
-    txt('SHUT DOWN :',X[2],X[5],952,980,{align:'left',size:19,weight:'700'});
-    rect(X[7],740,X[9],775,'#fff',2);txt('PRI :',X[7],X[9],740,775,{align:'left',size:19,weight:'700'});
-    rect(X[7],775,X[9],810,'#fff',2);txt('SEC:',X[7],X[9],775,810,{align:'left',size:19,weight:'700'});
-    ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=810+i*35;rect(X[7],y,X[8],y+35);rect(X[8],y,X[9],y+35);txt(t,X[7],X[8],y,y+35,{size:17});});
+    txt('TAXI :',X[0],X[2],NT-33,NT-5,{align:'left',size:19,weight:'700'});
+    txt('SHUT DOWN :',X[2],X[5],NT-33,NT-5,{align:'left',size:19,weight:'700'});
+    var prH=Math.min(35,(NT-650)/7),prT=NT-7*prH;   /* PRI/SEC + start-up box hugs the bottom of the overview */
+    rect(X[7],prT,X[9],prT+prH,'#fff',2);txt('PRI :',X[7],X[9],prT,prT+prH,{align:'left',size:19,weight:'700'});
+    rect(X[7],prT+prH,X[9],prT+2*prH,'#fff',2);txt('SEC:',X[7],X[9],prT+prH,prT+2*prH,{align:'left',size:19,weight:'700'});
+    ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=prT+(2+i)*prH;rect(X[7],y,X[8],y+prH);rect(X[8],y,X[9],y+prH);txt(t,X[7],X[8],y,y+prH,{size:17});});
 
     /* ---- NOTAM / weather / briefing ticks ---- */
-    rect(X[0],985,X[8],1155,null,2);
-    rect(X[0],985,X[2],1018,PUR,2);txt('NOTAM :',X[0],X[2],985,1018,{align:'left',color:'#fff',size:19,weight:'700'});
+    rect(X[0],(985+DY),X[8],(1155+DY),null,2);
+    rect(X[0],(985+DY),X[2],(1018+DY),PUR,2);txt('NOTAM :',X[0],X[2],(985+DY),(1018+DY),{align:'left',color:'#fff',size:19,weight:'700'});
     var nIds=flRouteNotamIds(),nTxt=nIds.join(', ');
     if(nTxt){
       ctx.font='600 15px '+FONT;ctx.fillStyle=INK;ctx.textAlign='left';ctx.textBaseline='middle';
-      var words=nIds.slice(),line='',ly=1003,lx0=X[2]+6,maxW=X[8]-lx0-6,rows=[];
+      var words=nIds.slice(),line='',ly=(1003+DY),lx0=X[2]+6,maxW=X[8]-lx0-6,rows=[];
       words.forEach(function(w,i){var t=line?line+', '+w:w;if(ctx.measureText(t).width>maxW&&line){rows.push(line+',');line=w;}else line=t;});
       if(line)rows.push(line);
       if(rows.length>2){   /* 2 lines fit: keep line 1, then a count of the rest */
@@ -7055,16 +7061,16 @@ function buildFlightLog(f){
       }
       rows.forEach(function(t,i){ctx.fillText(t,lx0,ly+i*24);});
     }
-    rect(X[0],1053,X[3]+160,1088,null,2);rect(X[0],1053,X[2],1088,PUR,2);
-    txt('WEATHER :',X[0],X[2],1053,1088,{align:'left',color:'#fff',size:19,weight:'700'});
-    rect(X[8],985,X[9],1120,GRY,2);
-    ['__BRIEF','__FPL','__RISK','__SIGN'].forEach(function(t,i){txt(t,X[8],X[9],985+i*33.75,985+(i+1)*33.75,{size:15,color:'#2b3fb0',align:'right'});});
-    rect(X[7],1120,X[9],1155,GRY,2);txt('___AREA ทอ.',X[7],X[9],1120,1155,{size:16,color:'#2b3fb0'});
+    rect(X[0],(1053+DY),X[3]+160,(1088+DY),null,2);rect(X[0],(1053+DY),X[2],(1088+DY),PUR,2);
+    txt('WEATHER :',X[0],X[2],(1053+DY),(1088+DY),{align:'left',color:'#fff',size:19,weight:'700'});
+    rect(X[8],(985+DY),X[9],(1120+DY),GRY,2);
+    ['__BRIEF','__FPL','__RISK','__SIGN'].forEach(function(t,i){txt(t,X[8],X[9],(985+DY)+i*33.75,(985+DY)+(i+1)*33.75,{size:15,color:'#2b3fb0',align:'right'});});
+    rect(X[7],(1120+DY),X[9],(1155+DY),GRY,2);txt('___AREA ทอ.',X[7],X[9],(1120+DY),(1155+DY),{size:16,color:'#2b3fb0'});
 
     /* ---- fuel management ---- */
-    head(X[0],X[9],1155,1190,'FUEL MANAGEMENT');
+    head(X[0],X[9],FT,FT+35,'FUEL MANAGEMENT');
     var C4=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9]];
-    grid(1190,FY,C4,GRY,['LAT N','LONG E','Cx.Pt.','HDG','DIST','ETE','ETA/ATA','EFR','AFR'],{size:16});
+    grid(FT+35,FY,C4,GRY,['LAT N','LONG E','Cx.Pt.','HDG','DIST','ETE','ETA/ATA','EFR','AFR'],{size:16});
     var total=0;for(var i=1;i<pts.length;i++)total+=dist(pts[i-1],pts[i]);
     var rem=isFinite(fuel0)?fuel0-taxi:NaN;
     for(var k=0;k<nF;k++){
@@ -7073,12 +7079,12 @@ function buildFlightLog(f){
         var isAd=!!APX[(p2.name||'').toUpperCase()];
         if(k===0){
           var mins=spd>0?Math.round(total/spd*60):'';
-          v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins,'',isFinite(fuel0)?String(fuel0):''];
+          v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins,'/',isFinite(fuel0)?String(fuel0):''];
         }else{
           var d=dist(pts[k-1],p2),h=spd>0?d/spd:NaN,b=isFinite(h)?Math.round(h*burn):NaN;
           if(isFinite(rem)&&isFinite(b))rem-=b;
           v=[flDM(p2.lat),flDM(p2.lng),p2.name||('WP'+(k+1)),mmPad3(course(pts[k-1],p2)),Math.max(1,Math.round(d)),
-            isFinite(h)?Math.max(1,Math.round(h*60)):'','',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
+            isFinite(h)?Math.max(1,Math.round(h*60)):'','/',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
         }
       }
       var fill=(k%2===0)?YEL:'#fff';   /* alternate shading like the paper card */
@@ -7375,7 +7381,7 @@ document.querySelectorAll('.units button').forEach(function(b){
   };
 });
 
-['speed','burn'].forEach(function(id){
+['speed','fuel','burn'].forEach(function(id){
   document.getElementById(id).addEventListener('input',drawLines);
 });
 
@@ -7596,6 +7602,7 @@ function saveRoute(){
       pts:pts.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};}),
       speed:document.getElementById('speed').value,
       burn:document.getElementById('burn').value,
+      fuel:document.getElementById('fuel').value,
       unit:unit,elev:elev
     }));
   }catch(e){}
@@ -7610,6 +7617,7 @@ function loadRoute(){
     });
     if(d.speed)document.getElementById('speed').value=d.speed;
     if(d.burn)document.getElementById('burn').value=d.burn;
+    if(d.fuel)document.getElementById('fuel').value=d.fuel;
     if(d.unit&&UF[d.unit]){
       unit=d.unit;
       document.querySelectorAll('.units button').forEach(function(x){
