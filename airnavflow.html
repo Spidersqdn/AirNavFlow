@@ -6817,7 +6817,10 @@ function buildMiniMap(){
       var crs=course(pts[li-1],pts[li]),d=dist(pts[li-1],pts[li]),rec=(crs+180)%360;
       var ang=Math.atan2(B.y-A.y,B.x-A.x),fwd=true;
       if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
-      var txt='<- '+mmPad3(fwd?rec:crs)+'°  '+(d<100?d.toFixed(1):Math.round(d))+' NM  '+mmPad3(fwd?crs:rec)+'° ->';
+      var dTxt=(d<100?d.toFixed(1):Math.round(d))+' NM';
+      /* many waypoints (>7) or a short leg (<10 NM): outbound heading only, arrow in the direction of flight */
+      var txt=(pts.length>7||d<10)?(fwd?mmPad3(crs)+'°  '+dTxt+' ->':'<- '+mmPad3(crs)+'°  '+dTxt)
+        :'<- '+mmPad3(fwd?rec:crs)+'°  '+dTxt+'  '+mmPad3(fwd?crs:rec)+'° ->';
       var nx=-Math.sin(ang),ny=Math.cos(ang),ca=Math.abs(Math.cos(ang)),sa=Math.abs(Math.sin(ang)),got=null;
       [16*S,13*S,11*S].forEach(function(fs0){
         if(got)return;
