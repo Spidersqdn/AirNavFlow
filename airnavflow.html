@@ -7004,7 +7004,7 @@ function buildFlightLog(f){
   var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=0;
   /* fuel table sits at the bottom (ends with the right column, y=1570); the overview box above it stretches/shrinks.
      Past ~13 rows the overview hits its minimum and the card grows taller instead. */
-  var nF=Math.max(pts.length,10),RH=34.5;
+  var nF=pts.length,RH=34.5;   /* one row per route point, no blank rows */
   var FT=Math.max(1020,1570-70-nF*RH),FY=FT+70,NT=FT-170,DY=NT-985;
   var BH=Math.max(1570,FY+nF*RH)+8+14;
   var cv=document.createElement('canvas');cv.width=BW*K;cv.height=Math.round(BH*K);
@@ -7106,20 +7106,8 @@ function buildFlightLog(f){
     txt('Cx.Pt.',X[9],X[10],370,405,{size:18});txt(ref?ref[0]:'',X[10],X[12],370,405,{size:20,color:INK});
     var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
     var swSeen={};sw=sw.filter(function(p){var k=(p.name||'')+p.lat+p.lng;if(swSeen[k])return false;swSeen[k]=1;return true;});
-    for(var s=0;s<8;s++){
-      var sy=405+s*33.875,p=sw[s];
-      rect(X[9],sy,X[10],sy+33.875,s%2?'#fff':YEL);rect(X[10],sy,X[12],sy+33.875,s%2?'#fff':YEL);
-      if(p&&ref){
-        var rp={lat:ref[4],lng:ref[5]},dd=dist(rp,p);
-        txt(p.name||('WP'+(pts.indexOf(p)+1)),X[9],X[10],sy,sy+33.875,{size:18,weight:'700'});
-        txt('R'+mmPad3(course(rp,p))+'/'+dd.toFixed(1),X[10],X[12],sy,sy+33.875,{size:22,color:INK});
-      }
-    }
-
-    /* ---- nav aid ident (morse) ---- */
-    head(X[9],X[12],676,706,'Nav Aid IDENT');
-    /* idents + frequency from data/AD.txt: rows like "NDB | 280 [LB]" give LB=280; MORSE rows add idents without a frequency.
-       Route airports first (departure, destination, then the rest), up to 4 */
+    /* ---- nav aid ident list (morse): idents + frequency from data/AD.txt; rows like "NDB | 280 [LB]" give LB=280,
+       MORSE rows add idents without a frequency. Route airports first (departure, destination, then the rest) ---- */
     var ids=[],frq={};
     function addId(n,fq){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);if(fq&&!frq[n])frq[n]=fq;}
     onR.concat(ads).forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){
@@ -7127,14 +7115,29 @@ function buildFlightLog(f){
       var m=/\[([A-Z0-9]{2,5})\]/i.exec(r[1]);
       if(m)addId(m[1],r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim());
     });});
-    for(var n=0;n<4;n++){
-      var ny=706+n*34.75;rect(X[9],ny,X[10],ny+34.75);rect(X[10],ny,X[12],ny+34.75);
+    /* SWING + Nav Aid share 12 rows between y=405 and the Approach header (845): Nav Aid gets at least 4,
+       and takes unused SWING rows when it has more idents */
+    var SLOTS=12,RHs=(845-405-30)/SLOTS;
+    var nvRows=Math.max(4,Math.min(ids.length,SLOTS-sw.length)),swRows=SLOTS-nvRows;
+    for(var s=0;s<swRows;s++){
+      var sy=405+s*RHs,p=sw[s];
+      rect(X[9],sy,X[10],sy+RHs,s%2?'#fff':YEL);rect(X[10],sy,X[12],sy+RHs,s%2?'#fff':YEL);
+      if(p&&ref){
+        var rp={lat:ref[4],lng:ref[5]},dd=dist(rp,p);
+        txt(p.name||('WP'+(pts.indexOf(p)+1)),X[9],X[10],sy,sy+RHs,{size:18,weight:'700'});
+        txt('R'+mmPad3(course(rp,p))+'/'+dd.toFixed(1),X[10],X[12],sy,sy+RHs,{size:22,color:INK});
+      }
+    }
+    var NH=405+swRows*RHs;
+    head(X[9],X[12],NH,NH+30,'Nav Aid IDENT');
+    for(var n=0;n<nvRows;n++){
+      var ny=NH+30+n*RHs;rect(X[9],ny,X[10],ny+RHs);rect(X[10],ny,X[12],ny+RHs);
       if(ids[n]){
         if(frq[ids[n]]){   /* ident on top, frequency below */
-          txt('['+ids[n]+']',X[9],X[10],ny+1,ny+18,{size:15,weight:'700'});
-          txt(frq[ids[n]],X[9],X[10],ny+17,ny+34,{size:13,color:INK,weight:'600'});
-        }else txt('['+ids[n]+']',X[9],X[10],ny,ny+34.75,{size:17});
-        txt(morseOf(ids[n]),X[10],X[12],ny,ny+34.75,{size:20,weight:'700'});
+          txt('['+ids[n]+']',X[9],X[10],ny+1,ny+RHs/2+1,{size:15,weight:'700'});
+          txt(frq[ids[n]],X[9],X[10],ny+RHs/2-1,ny+RHs-1,{size:13,color:INK,weight:'600'});
+        }else txt('['+ids[n]+']',X[9],X[10],ny,ny+RHs,{size:17});
+        txt(morseOf(ids[n]),X[10],X[12],ny,ny+RHs,{size:20,weight:'700'});
       }
     }
 
@@ -7152,19 +7155,19 @@ function buildFlightLog(f){
     rect(X[0],578,X[2],606,PUR,0);txt('OVERVIEW :',X[0],X[2],578,606,{align:'left',color:'#fff',size:19,weight:'700'});
     var ty=625;
     txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    txt('START :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    txt('TAXI :',X[4],X[6],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    txt('T/O :',X[7],X[9],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    var awS=Math.min(33.4,(NT-60-660)/5);
+    txt('TAXI :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
+    /* PRI/SEC + start-up box: top-left of the overview, under the PAX line */
+    var bx0=X[0],bxM=X[0]+100,bx1=X[0]+180,prT=ty+18,prH=Math.min(35,(NT-40-prT)/7);
+    rect(bx0,prT,bx1,prT+prH,'#fff',2);txt('PRI :',bx0,bx1,prT,prT+prH,{align:'left',size:19,weight:'700'});
+    rect(bx0,prT+prH,bx1,prT+2*prH,'#fff',2);txt('SEC:',bx0,bx1,prT+prH,prT+2*prH,{align:'left',size:19,weight:'700'});
+    ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=prT+(2+i)*prH;rect(bx0,y,bxM,y+prH);rect(bxM,y,bx1,y+prH);txt(t,bx0,bxM,y,y+prH,{size:17});});
+    /* AIRWORK list to the right of the box */
+    var awX=bx1+14,awS=Math.min(33.4,(NT-60-660)/5);
     [['AIRWORK',1],['NAV'],['COM'],['FMS'],['CONF'],['FAM']].forEach(function(a,i){
-      var ay=660+i*awS;txt(a[0],X[0],X[3],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true});
+      var ay=660+i*awS;txt(a[0],awX,X[5],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true,pad:0});
     });
     txt('TAXI :',X[0],X[2],NT-33,NT-5,{align:'left',size:19,weight:'700'});
     txt('SHUT DOWN :',X[2],X[5],NT-33,NT-5,{align:'left',size:19,weight:'700'});
-    var prH=Math.min(35,(NT-650)/7),prT=NT-7*prH;   /* PRI/SEC + start-up box hugs the bottom of the overview */
-    rect(X[7],prT,X[9],prT+prH,'#fff',2);txt('PRI :',X[7],X[9],prT,prT+prH,{align:'left',size:19,weight:'700'});
-    rect(X[7],prT+prH,X[9],prT+2*prH,'#fff',2);txt('SEC:',X[7],X[9],prT+prH,prT+2*prH,{align:'left',size:19,weight:'700'});
-    ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=prT+(2+i)*prH;rect(X[7],y,X[8],y+prH);rect(X[8],y,X[9],y+prH);txt(t,X[7],X[8],y,y+prH,{size:17});});
 
     /* ---- NOTAM / weather / briefing ticks ---- */
     rect(X[0],(985+DY),X[8],(1155+DY),null,2);
