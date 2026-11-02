@@ -6327,6 +6327,60 @@ function mmDrawBase(ctx,W,H,cx,cy,z,center){
   });
 }
 
+/* Contour lines (ft) from the offline elevation file, drawn on the mini map base. Resolves false when there is no elevation data. */
+function mmDrawContours(ctx,W,H,cx,cy,z,S){
+  if(!elevPM)return Promise.resolve(false);
+  var step=z>=11?200:z>=9?500:1000,index=step===1000?2000:1000;
+  var ez=Math.min(elevMaxZ,Math.floor(z)),x0=cx-W/2,y0=cy-H/2,T,tx0,ty0,tx1,ty1;
+  for(;;){
+    T=256*Math.pow(2,z-ez);
+    tx0=Math.floor(x0/T);ty0=Math.floor(y0/T);tx1=Math.floor((x0+W)/T);ty1=Math.floor((y0+H)/T);
+    if((tx1-tx0+1)*(ty1-ty0+1)<=120||ez<=5)break;
+    ez--;
+  }
+  var n=1<<ez,jobs=[];
+  for(var ty=Math.max(0,ty0);ty<=Math.min(n-1,ty1);ty++)for(var tx=tx0;tx<=tx1;tx++){
+    (function(tx,ty){
+      jobs.push(contourSegs(ez,((tx%n)+n)%n,ty,step,index).then(function(r){return r?{tx:tx,ty:ty,r:r}:null;},function(){return null;}));
+    })(tx,ty);
+  }
+  return Promise.all(jobs).then(function(res){
+    res=res.filter(Boolean);if(!res.length)return false;
+    ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+    var taken=[];
+    res.forEach(function(o){
+      var r=o.r,sc=T/r.w,ox=o.tx*T-x0,oy=o.ty*T-y0;
+      r.levels.forEach(function(lv){
+        var s=lv.segs;ctx.beginPath();
+        for(var i=0;i<s.length;i+=4){ctx.moveTo(ox+s[i]*sc,oy+s[i+1]*sc);ctx.lineTo(ox+s[i+2]*sc,oy+s[i+3]*sc);}
+        ctx.strokeStyle=lv.idx?'rgba(150,75,20,0.85)':'rgba(170,95,35,0.55)';
+        ctx.lineWidth=(lv.idx?1.6:0.8)*S;ctx.stroke();
+      });
+      /* labels on index lines */
+      ctx.font='600 '+(10*S)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      r.levels.forEach(function(lv){
+        if(!lv.idx)return;
+        var txt=lv.ft.toLocaleString('en-US');
+        contourChains(lv.segs).forEach(function(line){
+          if(line.length<8)return;
+          var k=Math.floor(line.length/2),a=line[Math.max(0,k-3)],b=line[Math.min(line.length-1,k+3)];
+          var x=ox+line[k][0]*sc,y=oy+line[k][1]*sc;
+          if(x<20*S||y<20*S||x>W-20*S||y>H-20*S)return;
+          if(taken.some(function(t){return Math.abs(t[0]-x)<160*S&&Math.abs(t[1]-y)<90*S;}))return;
+          var ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+          if(ang>Math.PI/2)ang-=Math.PI;else if(ang<-Math.PI/2)ang+=Math.PI;
+          ctx.save();ctx.translate(x,y);ctx.rotate(ang);
+          ctx.lineWidth=3*S;ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.strokeText(txt,0,0);
+          ctx.fillStyle='rgb(120,55,10)';ctx.fillText(txt,0,0);
+          ctx.restore();taken.push([x,y]);
+        });
+      });
+    });
+    ctx.restore();
+    return true;
+  }).catch(function(){return false;});
+}
+
 function mmRoundRect(ctx,x,y,w,h){ctx.beginPath();ctx.rect(x,y,w,h);}
 function mmBoxOverlap(a,b){return a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;}
 function mmSegHitsBox(p,q,b){   /* segment vs rectangle (sampled) */
@@ -6359,15 +6413,15 @@ function buildMiniMap(){
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
-  var portrait=spanY>=spanX*0.8;
-  var H=(portrait?1270:640)*S,MH=H-HEAD;
-  var innerW=W*(portrait?0.42:0.5),innerH=MH*(portrait?0.78:0.62);
+  var portrait=true;   /* always A4 portrait (1 : 1.414) */
+  var H=Math.round(900*Math.SQRT2)*S,MH=H-HEAD;
+  var innerW=W*(spanX>spanY?0.62:0.45),innerH=MH*0.72;
   var z=Math.log2(Math.min(innerW/spanX,innerH/spanY));
   z=Math.max(5,Math.min(z,13.5));
   var sc=Math.pow(2,z);
   var cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
   /* nudge the route toward the side away from the AD boxes column (portrait: boxes left) */
-  if(portrait)cxW-=W*0.08;
+  if(spanY>=spanX)cxW-=W*0.06;
   var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
   function px(p){var q=mmWorld(p.lat,p.lng,z);return {x:q.x-cxW+W/2,y:q.y-cyW+MH/2+HEAD};}
 
@@ -6376,7 +6430,13 @@ function buildMiniMap(){
   var mapCv=document.createElement('canvas');mapCv.width=W;mapCv.height=MH;
   var mctx=mapCv.getContext('2d');
 
+  var hasContour=false;
+  var logo=null;
   return mmDrawBase(mctx,W,MH,cxW,cyW,z,center).then(function(){
+    return mmDrawContours(mctx,W,MH,cxW,cyW,z,S).then(function(ok){hasContour=ok;});
+  }).then(function(){
+    return mmLoadImg('icons/sqn201.png',4000).then(function(im){logo=im;});
+  }).then(function(){
     ctx.drawImage(mapCv,0,HEAD);
     ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);   /* fade like a printed strip chart */
 
@@ -6387,8 +6447,10 @@ function buildMiniMap(){
     ctx.font='600 '+(46*S)+'px '+FONT;ctx.fillText(dep+' - '+arr,24*S,62*S);
     var now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     ctx.font='500 '+(17*S)+'px '+FONT;ctx.fillText('UPDATE  '+now.getDate()+' '+MON[now.getMonth()]+' '+now.getFullYear(),24*S,98*S);
-    ctx.textAlign='right';ctx.font='500 '+(13*S)+'px '+FONT;ctx.fillStyle='rgba(255,255,255,.8)';
-    ctx.fillText('AirNavFlow',W-24*S,98*S);
+    if(logo){   /* squadron badge, top-right corner */
+      var lh2=HEAD-14*S,lw2=logo.width*lh2/logo.height;
+      ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
+    }
 
     var P=pts.map(px),boxes=[],segs=[];
     for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
@@ -6461,13 +6523,17 @@ function buildMiniMap(){
       var mx=(A.x+B.x)/2,my=(A.y+B.y)/2,off=fs*0.8+14*S;
       /* put the bar beside the line, on the side with fewer boxes */
       var nx=-Math.sin(ang),ny=Math.cos(ang),side=1;
-      var bb1={x:mx+nx*off-tw/2,y:my+ny*off-fs,w:tw,h:fs*2},bb2={x:mx-nx*off-tw/2,y:my-ny*off-fs,w:tw,h:fs*2};
-      if(!free(bb1,true)&&free(bb2,true))side=-1;
+      /* axis-aligned box around the rotated bar */
+      var ca=Math.abs(Math.cos(ang)),sa=Math.abs(Math.sin(ang)),bh=fs*1.6,aw=ca*tw+sa*bh,ah=sa*tw+ca*bh;
+      var bb1={x:mx+nx*off-aw/2,y:my+ny*off-ah/2,w:aw,h:ah},bb2={x:mx-nx*off-aw/2,y:my-ny*off-ah/2,w:aw,h:ah};
+      var f1=free(bb1,true),f2=free(bb2,true);
+      if(!f1&&f2)side=-1;
+      if(!f1&&!f2&&pts.length>8)continue;   /* many waypoints: drop a leg label that would sit on top of another */
       ctx.save();ctx.translate(mx+nx*off*side,my+ny*off*side);ctx.rotate(ang);
       ctx.fillStyle='#1f2fd6';ctx.fillRect(-tw/2,-fs*0.8,tw,fs*1.6);
       ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,fs*0.05);
       ctx.restore();
-      var rb=Math.max(tw,fs*1.6);boxes.push({x:mx+nx*off*side-rb/2,y:my+ny*off*side-rb/2,w:rb,h:rb,leg:true});
+      var lb=side>0?bb1:bb2;lb.leg=true;boxes.push(lb);
     }
 
     /* ---- waypoint circles ---- */
@@ -6478,6 +6544,7 @@ function buildMiniMap(){
     /* ---- waypoint info boxes (route + off-route) ---- */
     function wpBox(p,q,i,small){
       var id=(p.name||'').toUpperCase();
+      var many=pts.length+offs.length>8;if(many)small=true;
       var sz=(small?12:15)*S,lh=(small?16:20)*S,pad=(small?5:7)*S,lines=[];
       if(p.place)lines.push({t:p.place,f:(sz-2*S)+'px '+FONT,lh:lh-2*S,sz:sz-2*S,c:'#1f2fd6'});
       lines.push({t:p.name||('WP'+(i+1)),f:'600 '+sz+'px '+FONT,lh:lh,sz:sz,c:'#1f2fd6'});
@@ -6494,6 +6561,17 @@ function buildMiniMap(){
       if(!placed)for(var g2=1;g2<=4&&!placed;g2++)for(var k2=0;k2<cands.length&&!placed;k2++){
         var c2=cands[k2],b2={x:c2[0]>0?q.x+gap*g2:c2[0]<0?q.x-gap*g2-m.w:q.x-m.w/2,y:c2[1]<0?q.y-gap*g2-m.h:c2[1]>0?q.y+gap*g2:q.y-m.h/2,w:m.w,h:m.h};
         if(free(b2,true))placed=b2;
+      }
+      /* still no room: nearest free spot anywhere on the sheet (a leader line joins it to the point) */
+      if(!placed){
+        var best=null,bd=Infinity,st=8*S;
+        for(var gy=HEAD+6*S;gy+m.h<H-4;gy+=st)for(var gx=6*S;gx+m.w<W-4;gx+=st){
+          var cx2=gx+m.w/2,cy2=gy+m.h/2,dd=(cx2-q.x)*(cx2-q.x)+(cy2-q.y)*(cy2-q.y);
+          if(dd>=bd)continue;
+          var b3={x:gx,y:gy,w:m.w,h:m.h};
+          if(free(b3,true)){best=b3;bd=dd;}
+        }
+        placed=best;
       }
       if(!placed)placed={x:Math.min(W-m.w-4,Math.max(4,q.x+gap)),y:Math.min(H-m.h-4,Math.max(HEAD+4,q.y-m.h-gap)),w:m.w,h:m.h};
       boxes.push(placed);
@@ -6544,7 +6622,8 @@ function showMiniMap(cv){
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
     '<div class="mm-img"><img alt="Mini map" src="'+url+'"></div>'+
-    '<p class="mm-note">iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้</p></div>';
+    '<p class="mm-note">ขนาด A4 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
+    (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
   d.addEventListener('click',function(e){if(e.target===d)d.remove();});
