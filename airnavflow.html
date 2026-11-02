@@ -7095,10 +7095,10 @@ function buildFlightLog(f){
           var mins=spd>0?Math.round(total/spd*60):'';
           v=[flDM(p2.lat),flDM(p2.lng),p2.name||'WP1',isAd?'R/W':'',Math.round(total),mins,'/',isFinite(fuel0)?String(fuel0):''];
         }else{
-          var d=dist(pts[k-1],p2),h=spd>0?d/spd:NaN,b=isFinite(h)?Math.round(h*burn):NaN;
+          var d=dist(pts[k-1],p2),h=spd>0?d/spd:NaN,b=isFinite(h)?Math.ceil(h*burn/10-1e-9)*10:NaN;   /* leg fuel rounded UP to the next 10 */
           if(isFinite(rem)&&isFinite(b))rem-=b;
           v=[flDM(p2.lat),flDM(p2.lng),p2.name||('WP'+(k+1)),mmPad3(course(pts[k-1],p2)),Math.max(1,Math.round(d)),
-            isFinite(h)?Math.max(1,Math.round(h*60)):'','/',isFinite(b)?(isFinite(rem)?b+'/'+Math.round(rem):String(b)):''];
+            isFinite(h)?Math.max(1,Math.round(h*60)):'','/',isFinite(b)?(isFinite(rem)?b+'/'+Math.floor(rem/10+1e-9)*10:String(b)):''];
         }
       }
       var fill=(k%2===0)?YEL:'#fff';   /* alternate shading like the paper card */
