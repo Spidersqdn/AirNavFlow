@@ -1666,6 +1666,8 @@ td .wp-delete{
   <button id="exportKmz" type="button">EXPORT KMZ</button>
   <button id="measureBtn" type="button">RULER</button>
   <button id="wBtn" type="button">WINDY</button>
+  <button id="importKmz" type="button" title="Import route / waypoints from a KMZ or KML file (e.g. Google Earth)">IMPORT KMZ</button>
+  <input id="importKmzFile" type="file" hidden>
 </div>
 
 <section class="elevation-profile">
@@ -6226,14 +6228,17 @@ function buildRouteKml(){
     });
   }
 
-  var placemarks=pts.map(function(p,i){
-    var nm=p.name||('Waypoint '+(i+1));
+  function pointPm(p,nm){
     return '<Placemark>'+ 
       '<name>'+xmlEsc(nm)+'</name>'+ 
       '<description>'+xmlEsc((p.remark?p.remark+' • ':'')+formatDDM(p.lat,true)+' / '+formatDDM(p.lng,false))+'</description>'+ 
+      (p.remark?'<ExtendedData><Data name="remark"><value>'+xmlEsc(p.remark)+'</value></Data></ExtendedData>':'')+ 
       '<Point><coordinates>'+p.lng.toFixed(7)+','+p.lat.toFixed(7)+',0</coordinates></Point>'+ 
       '</Placemark>';
-  }).join('');
+  }
+  var placemarks=pts.map(function(p,i){return pointPm(p,p.name||('Waypoint '+(i+1)));}).join('');
+  var offs=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
+  var offFolder=offs.length?'<Folder><name>Off-Route</name>'+offs.map(function(p,i){return pointPm(p,p.name||('Off-Route '+(i+1)));}).join('')+'</Folder>':'';
 
   var routeName=(pts[0].name||'WP1')+' - '+(pts[pts.length-1].name||('WP'+pts.length));
 
@@ -6241,7 +6246,7 @@ function buildRouteKml(){
     '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'+ 
     '<name>'+xmlEsc(routeName)+'</name>'+ 
     '<Style id="routeStyle"><LineStyle><color>ff35b3f5</color><width>4</width></LineStyle></Style>'+ 
-    placemarks+
+    placemarks+offFolder+
     '<Placemark><name>Flight Route</name><styleUrl>#routeStyle</styleUrl>'+ 
     '<LineString><tessellate>1</tessellate><altitudeMode>clampToGround</altitudeMode>'+ 
     '<coordinates>'+lineCoords.join(' ')+'</coordinates></LineString></Placemark>'+ 
@@ -6274,6 +6279,126 @@ function exportRouteKmz(){
     setTimeout(function(){URL.revokeObjectURL(url);},1500);
   }).catch(function(){
     alert('Unable to export KMZ.');
+  });
+}
+
+/* ---- IMPORT KMZ / KML (e.g. from Google Earth); works offline (JSZip inlined) ----
+   - AirNavFlow's own export: route = Point placemarks in order; Folder "Off-Route" = off-route points.
+   - Google Earth: route = vertices of the longest path (LineString); Points on a vertex (<0.3 NM) name it,
+     other Points become off-route waypoints. No path: all Points become the route. */
+function kmlText(el,tag){
+  var n=el.getElementsByTagName(tag)[0];
+  return n?String(n.textContent||'').trim():'';
+}
+function kmlCoords(txt){
+  return String(txt||'').trim().split(/\s+/).map(function(t){
+    var c=t.split(',');
+    return {lng:parseFloat(c[0]),lat:parseFloat(c[1])};
+  }).filter(function(c){return isFinite(c.lat)&&isFinite(c.lng)&&Math.abs(c.lat)<=90&&Math.abs(c.lng)<=180;});
+}
+function kmlPlainDesc(txt){
+  var d=new DOMParser().parseFromString('<body>'+String(txt||'').replace(/<br\s*\/?>/gi,' ')+'</body>','text/html'); /* inert: no scripts/onerror */
+  var t=((d.body&&d.body.textContent)||'').replace(/\s+/g,' ').trim();
+  /* drop the coordinate tail written by EXPORT KMZ ("remark • N13 54.750 / E099 45.000") */
+  t=t.replace(/(^|\s*•\s*)\d{1,2}°\d{1,2}(\.\d+)?'[NS]\s*\/\s*\d{1,3}°\d{1,2}(\.\d+)?'[EW]\s*$/,'').trim();
+  return t.slice(0,120);
+}
+function kmlInFolder(pm,re){
+  for(var n=pm.parentNode;n&&n.nodeType===1;n=n.parentNode){
+    if(/^(Folder|Document)$/.test(n.localName||n.nodeName)){
+      var nm='';
+      for(var c=n.firstElementChild;c;c=c.nextElementSibling){if((c.localName||c.nodeName)==='name'){nm=c.textContent||'';break;}}
+      if(re.test(nm))return true;
+    }
+  }
+  return false;
+}
+function parseKmlRoute(xml){
+  var doc=new DOMParser().parseFromString(xml,'application/xml');
+  if(doc.getElementsByTagName('parsererror').length)throw new Error('KML อ่านไม่ได้');
+  var pms=Array.prototype.slice.call(doc.getElementsByTagName('Placemark'));
+  var points=[],lines=[],ownExport=false;
+  pms.forEach(function(pm){
+    var name=kmlText(pm,'name');
+    var remark='';
+    Array.prototype.forEach.call(pm.getElementsByTagName('Data'),function(d){
+      if(String(d.getAttribute('name')||'').toLowerCase()==='remark')remark=kmlText(d,'value');
+    });
+    if(!remark)remark=kmlPlainDesc(kmlText(pm,'description'));
+    var ls=pm.getElementsByTagName('LineString');
+    if(ls.length){
+      if(name==='Flight Route'&&/routeStyle/.test(kmlText(pm,'styleUrl')))ownExport=true;
+      Array.prototype.forEach.call(ls,function(l){
+        var c=kmlCoords(kmlText(l,'coordinates'));
+        if(c.length>=2)lines.push(c);
+      });
+      return;
+    }
+    var pt=pm.getElementsByTagName('Point')[0];
+    if(!pt)return;
+    var c=kmlCoords(kmlText(pt,'coordinates'))[0];
+    if(!c)return;
+    points.push({lat:c.lat,lng:c.lng,name:name.slice(0,40),remark:remark,off:kmlInFolder(pm,/off.?route/i)});
+  });
+  var route=[],off=[];
+  function mk(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:'',refIcao:''};}
+  if(ownExport||!lines.length){
+    points.forEach(function(p){(p.off?off:route).push(mk(p));});
+  }else{
+    var line=lines.reduce(function(a,b){return b.length>a.length?b:a;});
+    var used={};
+    line.forEach(function(v,i){
+      if(i&&dist(v,line[i-1])<0.01)return; /* duplicate vertex */
+      var best=-1,bd=0.3;
+      points.forEach(function(p,j){
+        if(used[j]||p.off)return;
+        var d=dist(v,p);
+        if(d<bd){bd=d;best=j;}
+      });
+      if(best>=0){used[best]=1;route.push(mk({lat:v.lat,lng:v.lng,name:points[best].name,remark:points[best].remark}));}
+      else route.push(mk({lat:v.lat,lng:v.lng,name:'WP'+(route.length+1),remark:''}));
+    });
+    points.forEach(function(p,j){if(!used[j])off.push(mk(p));});
+  }
+  return {route:route,off:off};
+}
+function readKmzFile(file){
+  return file.arrayBuffer().then(function(buf){
+    var b=new Uint8Array(buf,0,Math.min(4,buf.byteLength));
+    if(b[0]===0x50&&b[1]===0x4B){ /* "PK" = zip = KMZ */
+      if(typeof JSZip==='undefined')throw new Error('ไม่พบตัวแตกไฟล์ KMZ');
+      return JSZip.loadAsync(buf).then(function(zip){
+        var names=Object.keys(zip.files).filter(function(n){return /\.kml$/i.test(n)&&!zip.files[n].dir;});
+        if(!names.length)throw new Error('ไม่พบไฟล์ .kml ใน KMZ');
+        names.sort(function(a,b){return (/(^|\/)doc\.kml$/i.test(b)?1:0)-(/(^|\/)doc\.kml$/i.test(a)?1:0)||a.split('/').length-b.split('/').length;});
+        return zip.files[names[0]].async('string');
+      });
+    }
+    return new TextDecoder('utf-8').decode(buf);
+  });
+}
+function importRouteKmz(file){
+  readKmzFile(file).then(function(xml){
+    var r=parseKmlRoute(xml);
+    if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return;}
+    if(pts.length&&!confirm('นำเข้า '+r.route.length+' route waypoint'+(r.off.length?' + '+r.off.length+' off-route':'')+'\nแทนที่เส้นทางปัจจุบัน ('+pts.length+' จุด) ?'))return;
+    pts=r.route;elevCache={};pendingInsertIndex=null;routeMapEditIndex=null;routeMapEditDraft=null;
+    updateInsertModeBanner();
+    offRoutePts=offRoutePts||[];
+    r.off=r.off.filter(function(p){ /* skip off-route points already on the map */
+      return !offRoutePts.some(function(q){return dist(p,q)<0.05&&(q.name||'')===(p.name||'');});
+    });
+    if(r.off.length){offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
+    refresh();
+    var all=r.route.concat(r.off);
+    map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
+    if(navigator.onLine&&all.length<=40){ /* fill district/province names, 1 request/s */
+      r.route.forEach(function(p,i){setTimeout(function(){geocode(p);},i*1100);});
+      r.off.forEach(function(p,i){setTimeout(function(){geocodeOffRoute(p);},(r.route.length+i)*1100);});
+    }
+    if(st)st.textContent='นำเข้า '+file.name+': route '+r.route.length+' จุด'+(r.off.length?', off-route '+r.off.length+' จุด':'');
+  }).catch(function(e){
+    alert('นำเข้า KMZ ไม่สำเร็จ: '+(e&&e.message?e.message:e));
   });
 }
 
@@ -7478,6 +7603,12 @@ document.getElementById('measureBtn').onclick=function(){
 };
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
+document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
+document.getElementById('importKmzFile').onchange=function(){
+  var f=this.files&&this.files[0];
+  this.value='';
+  if(f)importRouteKmz(f);
+};
 document.getElementById('exportMiniMap').onclick=exportMiniMap;
 document.getElementById('flightLogBtn').onclick=openFlightLog;
 
