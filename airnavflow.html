@@ -1146,7 +1146,10 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 #miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
-#miniMapModal .mm-opt{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-right:6px;white-space:nowrap}
+#miniMapModal .mm-wpt{position:relative;display:inline-block;margin-right:6px;font-size:13px}
+#miniMapModal .mm-wpt summary{cursor:pointer;padding:5px 9px;border:1px solid var(--line,#555);border-radius:6px;list-style:none;white-space:nowrap}
+#miniMapModal .mm-wpt-list{position:absolute;right:0;top:110%;z-index:5;background:var(--panel,#1b1f24);border:1px solid var(--line,#555);border-radius:6px;padding:6px 10px;max-height:50vh;overflow:auto;min-width:200px;text-align:left}
+#miniMapModal .mm-wpt-list label{display:flex;gap:6px;align-items:center;padding:4px 0;white-space:nowrap}
 #miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
 #miniMapModal img{display:block;width:100%;height:auto}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
@@ -6653,7 +6656,7 @@ function buildMiniMap(opt){
   var PTR=PT(11);   /* route waypoints + route airports (SPD: 11 pt) */
   var PTO=PT(9);    /* off-route points + nearby airports: 2 pt smaller */
   var PTE=PT(13);   /* start / end point names: 2 pt bigger */
-  var useOffs=!(opt&&opt.offs===false);   /* off-route waypoints on the sheet? (checkbox in the MINI MAP window) */
+  var offSkip={};(opt&&opt.skip||[]).forEach(function(k){offSkip[k]=1;});   /* off-route points unticked in the WPt list */
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
   /* route + nearby off-route points in world px at z=0 */
   var all=pts.map(function(p){return mmWorld(p.lat,p.lng,0);});
@@ -6825,7 +6828,7 @@ function buildMiniMap(opt){
       }
       return best;
     }
-    var offs=(useOffs?offRoutePts||[]:[]).filter(function(p){
+    var offs=(offRoutePts||[]).filter(function(p){return !offSkip[mmOffKey(p)];}).filter(function(p){
       var nm=(p.name||'').toUpperCase();
       nm=nm.trim();
       if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
@@ -6967,7 +6970,7 @@ function buildMiniMap(opt){
         if(mmSegHitsBox(q,{x:bx,y:by},{x:o.x+2,y:o.y+2,w:o.w-4,h:o.h-4}))return false;}
       return true;
     }
-    function placeAndDraw(q,lines,pad,small,align){
+    function placeAndDraw(q,lines,pad,small,align,noTag){
       var m=mmMeasure(ctx,lines,pad),gap=22*S,placed=null;
       var cands=[[1,-1],[1,0],[-1,-1],[-1,0],[1,1],[-1,1],[0,-1],[0,1]];
       for(var g=1;g<=4&&!placed;g++)for(var k=0;k<cands.length&&!placed;k++){
@@ -6987,6 +6990,7 @@ function buildMiniMap(opt){
         }
         placed=best;
       }
+      if(!placed&&noTag)return false;
       if(!placed){   /* sheet is full: never cover other boxes, show only the name next to the point */
         var t=lines[0].t.split(' ')[0];ctx.font=lines[0].f;
         var tw=ctx.measureText(t).width+10*S,th=lines[0].sz+8*S,tb=null;
@@ -6994,13 +6998,14 @@ function buildMiniMap(opt){
           if(tb)return;var bb={x:o[0]>0?q.x+o[0]*S:q.x+o[0]*S-tw,y:o[1]>0?q.y+o[1]*S:q.y-th-4*S,w:tw,h:th};if(free(bb,false))tb=bb;
         });
         if(tb){boxes.push(tb);mmMeasure(ctx,[lines[0]],0);mmDrawBox(ctx,tb,[{t:t,f:lines[0].f,lh:th,sz:lines[0].sz,c:lines[0].c,asc:lines[0].asc,desc:lines[0].desc}],0,'center',1.5*S);}
-        return;
+        return false;
       }
       boxes.push(placed);
       /* leader line when the box ended up far from its point */
       var bx=Math.max(placed.x,Math.min(q.x,placed.x+placed.w)),by=Math.max(placed.y,Math.min(q.y,placed.y+placed.h));
       if(Math.hypot(bx-q.x,by-q.y)>(small?16:30)*S){ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);}
       mmDrawBox(ctx,placed,lines,pad,align,(small?1.5:2)*S);
+      return true;
     }
     /* small ident tag next to airport points (AD details are in the corner box) */
     function adTag(p,q,end){
@@ -7142,7 +7147,12 @@ function buildMiniMap(opt){
     }
     edgeBoxes();
     offs.forEach(function(o,i){wpBox(o.p,o.q,i,true);});
-    nearAD.forEach(function(o){placeAndDraw(o.q,adLines(o.id,PTO,true),5*S,true,'left');});
+    /* airports off the route: info box in smaller type (8 pt, then 7 pt if space is short), name tag only as a last resort */
+    nearAD.forEach(function(o){
+      if(placeAndDraw(o.q,adLines(o.id,PT(8),true),4*S,true,'left',true))return;
+      if(placeAndDraw(o.q,adLines(o.id,PT(7),true),4*S,true,'left',true))return;
+      placeAndDraw(o.q,adLines(o.id,PT(7),true),4*S,true,'left');
+    });
 
     /* AD boxes last so they sit on top */
     boxes.forEach(function(b){if(b.ad)mmDrawBox(ctx,b,b.lines,b.pad,'left',3*S);});
@@ -7163,9 +7173,14 @@ function showMiniMap(cv){
   var fname='MiniMap_'+dep+'_'+arr+'.png';
   var url=cv.toDataURL('image/png');
   var d=document.createElement('div');d.id='miniMapModal';
-  var nOff=(offRoutePts||[]).length;
-  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MINI MAP</b><span>'+
-    (nOff?'<label class="mm-opt"><input type="checkbox" id="mmOffs"'+(mmOffsOn()?' checked':'')+'> WP นอกเส้นทาง</label> ':'')+
+  var offList=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}),skip=mmOffSkip(),skipSet={};
+  skip.forEach(function(k){skipSet[k]=1;});
+  var nOn=offList.filter(function(p){return !skipSet[mmOffKey(p)];}).length;
+  var wpt=offList.length?'<details class="mm-wpt" id="mmWpt"'+(mmWptOpen?' open':'')+'><summary>WPt ('+nOn+'/'+offList.length+')</summary><div class="mm-wpt-list">'+
+    '<label><input type="checkbox" id="mmWptAll"'+(nOn===offList.length?' checked':'')+'> <b>ทั้งหมด</b></label>'+
+    offList.map(function(p,i){return '<label><input type="checkbox" data-i="'+i+'"'+(skipSet[mmOffKey(p)]?'':' checked')+'> '+esc(p.name||('WPt '+(i+1)))+'</label>';}).join('')+
+    '</div></details> ':'';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MINI MAP</b><span>'+wpt+
     '<button type="button" id="mmSave">บันทึก PNG</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
@@ -7174,12 +7189,22 @@ function showMiniMap(cv){
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
-  var oc=document.getElementById('mmOffs');
-  if(oc)oc.onchange=function(){   /* include / leave out off-route waypoints, remembered, then redraw */
-    try{localStorage.setItem('fp-mm-offs',oc.checked?'1':'0');}catch(e){}
-    oc.disabled=true;
-    buildMiniMap({offs:oc.checked}).then(showMiniMap).catch(function(err){oc.disabled=false;alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');});
-  };
+  /* WPt list: tick / untick each off-route waypoint; remembered on this device, sheet redrawn after a short pause */
+  var wd=document.getElementById('mmWpt'),wt=null;
+  if(wd){
+    wd.addEventListener('toggle',function(){mmWptOpen=wd.open;});
+    var boxesW=[].slice.call(wd.querySelectorAll('input[data-i]')),all=document.getElementById('mmWptAll');
+    function apply(){
+      var sk=offList.filter(function(p,i){return !boxesW[i].checked;}).map(mmOffKey);
+      try{localStorage.setItem('fp-mm-offx',JSON.stringify(sk));}catch(e){}
+      clearTimeout(wt);wt=setTimeout(function(){
+        wd.querySelectorAll('input').forEach(function(x){x.disabled=true;});
+        buildMiniMap({skip:sk}).then(showMiniMap).catch(function(err){alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');});
+      },700);
+    }
+    all.onchange=function(){boxesW.forEach(function(x){x.checked=all.checked;});apply();};
+    boxesW.forEach(function(x){x.onchange=function(){all.checked=boxesW.every(function(y){return y.checked;});apply();};});
+  }
   d.addEventListener('click',function(e){if(e.target===d)d.remove();});
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
@@ -7194,12 +7219,15 @@ function showMiniMap(cv){
   };
 }
 
-function mmOffsOn(){try{return localStorage.getItem('fp-mm-offs')!=='0';}catch(e){return true;}}
+var mmWptOpen=false;
+function mmOffKey(p){return (p.name||'')+'|'+(+p.lat).toFixed(4)+'|'+(+p.lng).toFixed(4);}
+function mmOffSkip(){try{var a=JSON.parse(localStorage.getItem('fp-mm-offx')||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
 function exportMiniMap(){
   if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อน export MINI MAP');return;}
   var btn=document.getElementById('exportMiniMap');
   btn.disabled=true;var lbl=btn.textContent;btn.textContent='กำลังสร้าง…';
-  buildMiniMap({offs:mmOffsOn()}).then(showMiniMap).catch(function(err){
+  mmWptOpen=false;
+  buildMiniMap({skip:mmOffSkip()}).then(showMiniMap).catch(function(err){
     alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');
   }).then(function(){btn.disabled=false;btn.textContent=lbl;});
 }
