@@ -7156,15 +7156,14 @@ function buildFlightLog(f){
     var ty=625;
     txt('PAX :',X[0],X[2],ty-14,ty+14,{align:'left',size:19,weight:'700'});
     txt('TAXI :',X[2],X[4],ty-14,ty+14,{align:'left',size:19,weight:'700'});
-    /* PRI/SEC + start-up box: top-left of the overview, under the PAX line */
-    var bx0=X[0],bxM=X[0]+100,bx1=X[0]+180,prT=ty+18,prH=Math.min(35,(NT-40-prT)/7);
+    /* PRI/SEC + start-up box: top-right corner of the overview */
+    var bx0=X[7],bxM=X[8],bx1=X[9],prT=576,prH=Math.min(35,(NT-40-prT)/7);
     rect(bx0,prT,bx1,prT+prH,'#fff',2);txt('PRI :',bx0,bx1,prT,prT+prH,{align:'left',size:19,weight:'700'});
     rect(bx0,prT+prH,bx1,prT+2*prH,'#fff',2);txt('SEC:',bx0,bx1,prT+prH,prT+2*prH,{align:'left',size:19,weight:'700'});
     ['APU','Start Up','ENG','HIT RDY','TAXI'].forEach(function(t,i){var y=prT+(2+i)*prH;rect(bx0,y,bxM,y+prH);rect(bxM,y,bx1,y+prH);txt(t,bx0,bxM,y,y+prH,{size:17});});
-    /* AIRWORK list to the right of the box */
-    var awX=bx1+14,awS=Math.min(33.4,(NT-60-660)/5);
+    var awX=X[0]+4,awS=Math.min(33.4,(NT-60-660)/5);
     [['AIRWORK',1],['NAV'],['COM'],['FMS'],['CONF'],['FAM']].forEach(function(a,i){
-      var ay=660+i*awS;txt(a[0],awX,X[5],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true,pad:0});
+      var ay=660+i*awS;txt(a[0],awX,X[4],ay-14,ay+14,{align:'left',size:a[1]?21:19,weight:a[1]?'700':'400',underline:true,pad:0});
     });
     txt('TAXI :',X[0],X[2],NT-33,NT-5,{align:'left',size:19,weight:'700'});
     txt('SHUT DOWN :',X[2],X[5],NT-33,NT-5,{align:'left',size:19,weight:'700'});
