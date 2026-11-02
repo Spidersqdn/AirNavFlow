@@ -5083,7 +5083,7 @@ radarPane.style.zIndex=340;
 radarPane.style.pointerEvents='none';
 var RADAR_API='https://api.rainviewer.com/public/weather-maps.json';
 var radarLayer=L.layerGroup();
-var radarState={frames:[],layers:[],idx:-1,host:'',timer:0,refresh:0,playing:false,on:false,err:''};
+var radarState={frames:[],layers:[],idx:-1,host:'',timer:0,refresh:0,playing:false,on:false,err:'',size:512,okTiles:false};
 var RadarCtl=L.Control.extend({
   options:{position:'bottomright'},
   onAdd:function(){
@@ -5150,11 +5150,19 @@ function radarLoad(){
     radarState.host=j.host||'https://tilecache.rainviewer.com';
     radarState.frames=frames;
     radarState.layers=frames.map(function(f){
-      /* free API serves up to z7; Leaflet scales it up beyond that */
-      var l=L.tileLayer(radarState.host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',{
-        pane:'radar',opacity:0,maxNativeZoom:7,maxZoom:19,zIndex:1,
+      /* free API serves up to z7. 512 px tiles carry twice the pixels of 256 px ones at the same zoom
+         (sharper when zoomed in); falls back to 256 px if the server refuses 512. Leaflet scales beyond. */
+      var big=radarState.size===512;
+      var l=L.tileLayer(radarState.host+f.path+'/'+radarState.size+'/{z}/{x}/{y}/2/1_1.png',{
+        pane:'radar',opacity:0,zIndex:1,maxZoom:19,
+        tileSize:big?512:256,zoomOffset:big?-1:0,minNativeZoom:big?1:0,maxNativeZoom:big?8:7,
         attribution:'Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'
       });
+      if(big)l.on('tileerror',function(){
+        if(radarState.size!==512||!radarState.on||radarState.okTiles)return;
+        radarState.size=256;radarState.frames=[];radarLoad();   /* 512 not served: rebuild with 256 */
+      });
+      l.on('tileload',function(){radarState.okTiles=true;});
       radarLayer.addLayer(l);return l;
     });
     radarShow(frames.length-1);
