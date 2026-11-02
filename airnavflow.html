@@ -7004,7 +7004,7 @@ function buildFlightLog(f){
   var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=0;
   /* fuel table sits at the bottom (ends with the right column, y=1570); the overview box above it stretches/shrinks.
      Past ~13 rows the overview hits its minimum and the card grows taller instead. */
-  var nF=Math.max(pts.length,10),RH=34.5;
+  var nF=pts.length,RH=34.5;   /* one row per route point, no blank rows */
   var FT=Math.max(1020,1570-70-nF*RH),FY=FT+70,NT=FT-170,DY=NT-985;
   var BH=Math.max(1570,FY+nF*RH)+8+14;
   var cv=document.createElement('canvas');cv.width=BW*K;cv.height=Math.round(BH*K);
