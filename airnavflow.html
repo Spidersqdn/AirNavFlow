@@ -7053,7 +7053,7 @@ function buildFlightLog(f){
     txt(f.date,X[0]+68,X[2],45,80,{align:'left',color:INK,size:16,weight:'600'});
     txt('ROUTE :',X[2],X[11],45,80,{align:'left',weight:'700',size:15});
     txt(routeTxt,X[2]+70,X[11],45,80,{align:'left',color:INK,size:16,weight:'600'});
-    rect(X[11],8,X[12],80);
+    rect(X[11],8,X[12],80,'#ddd3ee');   /* light purple behind the squadron badge */
     if(logo){var lh=66,lw=logo.width*lh/logo.height;ctx.drawImage(logo,(X[11]+X[12]-lw)/2,11,lw,lh);}
 
     /* ---- airport information ---- */
