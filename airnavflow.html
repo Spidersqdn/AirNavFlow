@@ -761,6 +761,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .rtaf-row{margin:3px 0 5px;font-size:12px;line-height:1.35}
 #status{position:absolute;left:10px;bottom:10px;z-index:900;background:rgba(55,60,67,.90);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:12px var(--mono);color:var(--text);max-width:calc(100% - 20px)}
 .pl{font-size:11px;color:var(--mute);font-family:var(--sans)}
+.wp-rmk{font-weight:400;font-style:italic;opacity:.85}
 .ap h4{margin:0 0 4px;font-size:14px}.ap div{font-size:12px;line-height:1.5}.ap button{margin-top:6px;background:#f5b335;color:#1a1200;border:none;font-weight:600;padding:5px 10px}
 #windy{position:absolute;right:10px;bottom:44px;width:min(440px,calc(100% - 20px));height:min(360px,58%);z-index:950;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:none;flex-direction:column;overflow:hidden}
 #windy.on{display:flex}
@@ -1596,6 +1597,9 @@ td .wp-delete{
         <input id="wpAirportQuery" type="text" list="airportList" placeholder="e.g. Don Mueang, Kamphaeng Saen, VTBD, VTBK">
         <datalist id="airportList"></datalist>
       </label>
+      <label class="full">หมายเหตุ / Remark (optional)
+        <input id="wpAirportRemark" type="text" maxlength="60" placeholder="e.g. HOLD / FUEL STOP">
+      </label>
     </div>
     <div class="wp-add-row">
       <button type="button" class="wp-add" id="wpAddAirport">Add ROUTE</button>
@@ -1614,6 +1618,9 @@ td .wp-delete{
       </label>
       <label class="full">Waypoint Name (optional)
         <input id="wpName" type="text" placeholder="e.g. WP1">
+      </label>
+      <label class="full">หมายเหตุ / Remark (optional)
+        <input id="wpRemark" type="text" maxlength="60" placeholder="e.g. TURN POINT / CHECK ALT">
       </label>
     </div>
     <div class="wp-add-row">
@@ -1636,6 +1643,9 @@ td .wp-delete{
       </label>
       <label>Waypoint Name (optional)
         <input id="wpRadialName" type="text" placeholder="VTBD R090/10">
+      </label>
+      <label class="full">หมายเหตุ / Remark (optional)
+        <input id="wpRadialRemark" type="text" maxlength="60" placeholder="e.g. IP / ORBIT">
       </label>
     </div>
     <div class="wp-add-row">
@@ -4596,11 +4606,12 @@ function geocodeOffRoute(p){
   }).catch(function(){});
 }
 
-function addOffRoutePt(lat,lng,name,refIcao){
+function addOffRoutePt(lat,lng,name,refIcao,remark){
   var p={
     lat:lat,
     lng:lng,
     name:name||'',
+    remark:remark||'',
     place:'',
     refIcao:(refIcao||'').toUpperCase()
   };
@@ -4623,6 +4634,7 @@ function openOffRouteEditor(marker,p,index){
     '<div class="wp-editor">'+
       '<h4>Edit OFF-ROUTE Wpt '+(index+1)+'</h4>'+
       '<label>Name<input id="offEditName" type="text" value="'+esc(p.name||'')+'"></label>'+
+      '<label>หมายเหตุ / Remark<input id="offEditRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
       '<div class="wp-edit-tabs offroute-tabs">'+
         '<button type="button" id="offEditLatBtn" class="active">LAT / LONG</button>'+
         '<button type="button" id="offEditRadBtn">RADIAL / DME</button>'+
@@ -4748,6 +4760,7 @@ function openOffRouteEditor(marker,p,index){
 
       committed=true;
       p.name=name;
+      p.remark=root.querySelector('#offEditRemark').value.trim();
       p.lat=lat;
       p.lng=lng;
       p.place='';
@@ -4766,7 +4779,7 @@ function openOffRouteEditor(marker,p,index){
     if(addRouteBtn){
       addRouteBtn.onclick=function(){
         var ep=currentDraftPoint();
-        addPt(ep.lat,ep.lng,p.name||('OFF '+(index+1)),p.refIcao||'');
+        addPt(ep.lat,ep.lng,p.name||('OFF '+(index+1)),p.refIcao||'',root.querySelector('#offEditRemark').value.trim());
         map.closePopup();
       };
     }
@@ -4807,14 +4820,14 @@ function drawOffRouteMarkers(){
       autoPan:isMapEdit,
       icon:L.divIcon({
         className:'',
-        html:'<div class="offroute-pin'+(isMapEdit?' map-edit':'')+'">'+esc(label)+'</div>',
+        html:'<div class="offroute-pin'+(isMapEdit?' map-edit':'')+'">'+esc(label)+(p.remark?' <span class="wp-rmk">('+esc(p.remark)+')</span>':'')+'</div>',
         iconSize:null,
         iconAnchor:[15,12]
       })
     });
 
     m.bindTooltip(
-      '<span class="offroute-tooltip">'+esc(label)+
+      '<span class="offroute-tooltip">'+esc(label)+(p.remark?'<br>'+esc(p.remark):'')+
       (isMapEdit?'<br>DRAG TO MOVE • Save to confirm':'')+
       '</span>',
       {direction:'top',offset:[0,-10]}
@@ -4856,11 +4869,12 @@ function drawOffRouteMarkers(){
   });
 }
 
-function addPt(lat,lng,name,refIcao){
+function addPt(lat,lng,name,refIcao,remark){
   var p={
     lat:lat,
     lng:lng,
     name:name||'',
+    remark:remark||'',
     place:'',
     refIcao:(refIcao||'').toUpperCase()
   };
@@ -5570,6 +5584,7 @@ function drawLines(){
 
     h+='<tr><td data-edit-wp="'+i+'" style="cursor:pointer"><span class="dot">'+(i+1)+'</span>'+
       (p.name?'<b>'+esc(p.name)+'</b>':(i===0?'ต้นทาง':''))+
+      (p.remark?' <span class="wp-rmk">('+esc(p.remark)+')</span>':'')+
       (p.place?'<div class="pl">'+esc(p.place)+'</div>':'')+'</td>'+
       '<td>'+(lg?fmtD(lg.d):'')+'</td>'+
       '<td>'+(lg?String(Math.round(lg.c)%360).padStart(3,'0')+'°':'')+'</td>'+
@@ -5633,6 +5648,7 @@ function openWaypointEditor(marker,p,index){
     '<div class="wp-editor">'+
       '<h4>Edit Waypoint '+(index+1)+'</h4>'+
       '<label>Name<input id="editWpName" type="text" value="'+esc(p.name||'')+'"></label>'+
+      '<label>หมายเหตุ / Remark<input id="editWpRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
       '<div class="wp-edit-tabs route-tabs">'+
         '<button type="button" id="editModeLatBtn" class="active">LAT / LONG</button>'+
         '<button type="button" id="editModeRadBtn">RADIAL / DME</button>'+
@@ -5724,6 +5740,7 @@ function openWaypointEditor(marker,p,index){
 
     function getRouteEditorPoint(){
       var name=root.querySelector('#editWpName').value.trim();
+      var remark=root.querySelector('#editWpRemark').value.trim();
       var lat,lng;
       var refIcao=refInput.value.trim().toUpperCase();
       if(refIcao && !APX[refIcao])refIcao='';
@@ -5731,7 +5748,7 @@ function openWaypointEditor(marker,p,index){
       if(routeMapEditIndex===index && routeMapEditDraft){
         lat=routeMapEditDraft.lat;
         lng=routeMapEditDraft.lng;
-        return {lat:lat,lng:lng,name:name,refIcao:refIcao};
+        return {lat:lat,lng:lng,name:name,remark:remark,refIcao:refIcao};
       }
 
       if(mode==='latlon'){
@@ -5770,7 +5787,7 @@ function openWaypointEditor(marker,p,index){
         }
       }
 
-      return {lat:lat,lng:lng,name:name,refIcao:refIcao};
+      return {lat:lat,lng:lng,name:name,remark:remark,refIcao:refIcao};
     }
 
     if(mapBtn){
@@ -5796,6 +5813,7 @@ function openWaypointEditor(marker,p,index){
 
         committed=true;
         p.name=edited.name;
+        p.remark=edited.remark||'';
         p.lat=edited.lat;
         p.lng=edited.lng;
         p.place='';
@@ -5820,7 +5838,8 @@ function openWaypointEditor(marker,p,index){
           edited.lat,
           edited.lng,
           edited.name||p.name||('WP '+(index+1)),
-          edited.refIcao
+          edited.refIcao,
+          edited.remark
         );
       };
     }
@@ -6211,7 +6230,7 @@ function buildRouteKml(){
     var nm=p.name||('Waypoint '+(i+1));
     return '<Placemark>'+ 
       '<name>'+xmlEsc(nm)+'</name>'+ 
-      '<description>'+xmlEsc(formatDDM(p.lat,true)+' / '+formatDDM(p.lng,false))+'</description>'+ 
+      '<description>'+xmlEsc((p.remark?p.remark+' • ':'')+formatDDM(p.lat,true)+' / '+formatDDM(p.lng,false))+'</description>'+ 
       '<Point><coordinates>'+p.lng.toFixed(7)+','+p.lat.toFixed(7)+',0</coordinates></Point>'+ 
       '</Placemark>';
   }).join('');
@@ -6752,6 +6771,7 @@ function buildMiniMap(){
       var rr=mmRadial(p);ctx.font=sz+'px '+WFONT;
       var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
       lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw));
+      if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw));
       lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
       lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
       if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});
@@ -6822,6 +6842,7 @@ function buildMiniMap(){
         var nsz=end?PT14:sz,rr0=end?'':(mmRadial(p)||'');ctx.font=sz+'px '+WFONT;
         var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width*1.05,ctx.measureText(rr0).width*1.05,end?190*S-2*pad:0);   /* wrap only names wider than the other lines */
         lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+nsz+'px '+WFONT,nsz,cw,'#1f2fd6'));
+        if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,'#1f2fd6'));
         lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
         lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
@@ -7570,7 +7591,7 @@ document.getElementById('wpAddAirport').onclick=function(){
     return;
   }
 
-  addPt(ap[4],ap[5],ap[0],ap[0]);
+  addPt(ap[4],ap[5],ap[0],ap[0],rmkVal('wpAirportRemark'));
   map.flyTo([ap[4],ap[5]],Math.max(map.getZoom(),9));
 };
 
@@ -7578,7 +7599,7 @@ document.getElementById('wpAddAirportOffRoute').onclick=function(){
   var q=document.getElementById('wpAirportQuery').value;
   var ap=findAirportByQuery(q);
   if(!ap){alert('Airport not found in database');return;}
-  addOffRoutePt(ap[4],ap[5],ap[0],ap[0]);
+  addOffRoutePt(ap[4],ap[5],ap[0],ap[0],rmkVal('wpAirportRemark'));
   map.flyTo([ap[4],ap[5]],Math.max(map.getZoom(),9));
 };
 
@@ -7592,7 +7613,7 @@ document.getElementById('wpAddLatLon').onclick=function(){
     return;
   }
 
-  addPt(lat,lng,name);
+  addPt(lat,lng,name,'',rmkVal('wpRemark'));
   map.flyTo([lat,lng],Math.max(map.getZoom(),9));
 };
 
@@ -7606,7 +7627,7 @@ document.getElementById('wpAddLatLonOffRoute').onclick=function(){
     return;
   }
 
-  addOffRoutePt(lat,lng,name);
+  addOffRoutePt(lat,lng,name,'',rmkVal('wpRemark'));
   map.flyTo([lat,lng],Math.max(map.getZoom(),9));
 };
 
@@ -7633,7 +7654,7 @@ document.getElementById('wpAddRadial').onclick=function(){
   var defaultName=icao+' R'+String(Math.round(radial)).padStart(3,'0')+'/'+dme.toFixed(1);
   var name=document.getElementById('wpRadialName').value.trim() || defaultName;
 
-  addPt(p[0],p[1],name,icao);
+  addPt(p[0],p[1],name,icao,rmkVal('wpRadialRemark'));
   map.flyTo(p,Math.max(map.getZoom(),9));
 };
 
@@ -7655,9 +7676,11 @@ document.getElementById('wpAddRadialOffRoute').onclick=function(){
   var defaultName=icao+' R'+String(Math.round(radial)).padStart(3,'0')+'/'+dme.toFixed(1);
   var name=document.getElementById('wpRadialName').value.trim()||defaultName;
 
-  addOffRoutePt(p[0],p[1],name,icao);
+  addOffRoutePt(p[0],p[1],name,icao,rmkVal('wpRadialRemark'));
   map.flyTo(p,Math.max(map.getZoom(),9));
 };
+
+function rmkVal(id){var el=document.getElementById(id);return el?el.value.trim():'';}
 
 document.getElementById('cancelInsertMode').onclick=function(){
   pendingInsertIndex=null;
@@ -7670,7 +7693,7 @@ function saveOffRoute(){
   try{
     localStorage.setItem(OFFROUTE_KEY,JSON.stringify(
       offRoutePts.map(function(p){
-        return {lat:p.lat,lng:p.lng,name:p.name||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};
+        return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};
       })
     ));
   }catch(e){}
@@ -7697,7 +7720,7 @@ function saveRoute(){
       if(ev&&ev.ft!==undefined)elev[k]=ev;
     }
     localStorage.setItem(ROUTE_KEY,JSON.stringify({
-      pts:pts.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};}),
+      pts:pts.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};}),
       speed:document.getElementById('speed').value,
       burn:document.getElementById('burn').value,
       fuel:document.getElementById('fuel').value,
