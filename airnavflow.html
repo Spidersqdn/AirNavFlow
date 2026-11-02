@@ -6881,7 +6881,7 @@ function exportMiniMap(){
    nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
    Typed fields (call sign, type, mission ...) come from the form and are remembered on this device. ---- */
 var FL_KEY='fp-flightlog-v1';
-var FL_FIELDS=[['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],['mission','MISSION'],['iff','IFF'],
+var FL_FIELDS=[['date','DATE'],['type','TYPE'],['rule','FLIGHT RULE'],['iff','IFF'],
   ['alt','ALTITUDE'],['qnh','QNH'],['bingo','BINGO'],['pax','PAX'],['taxi','TAXI (เชื้อเพลิง)']];
 function flLoad(){
   var o={};try{o=JSON.parse(localStorage.getItem(FL_KEY)||'{}')||{};}catch(e){}
@@ -6929,6 +6929,18 @@ function buildFlightLog(f){
     var sz=o.size||15,w=o.weight||'400',pad=o.pad==null?4:o.pad,room=x1-x0-pad*2;
     ctx.font=w+' '+sz+'px '+FONT;
     while(ctx.measureText(s).width>room&&sz>8){sz-=0.5;ctx.font=w+' '+sz+'px '+FONT;}
+    if(o.wrap&&sz<o.wrap&&/\s/.test(s)){   /* too small on one line: split into 2 lines at the middle space */
+      var ws=s.split(/\s+/),best=null;
+      for(var i=1;i<ws.length;i++){var l1=ws.slice(0,i).join(' '),l2=ws.slice(i).join(' ');l1=l1.replace(/\s*\/$/,'');l2=l2.replace(/^\/\s*/,'');
+        ctx.font=w+' 10px '+FONT;var m=Math.max(ctx.measureText(l1).width,ctx.measureText(l2).width);if(!best||m<best.m)best={m:m,l:[l1,l2]};}
+      var hh=(y1-y0)/2,sz2=Math.min(o.size||15,hh*0.95);ctx.font=w+' '+sz2+'px '+FONT;
+      while(Math.max(ctx.measureText(best.l[0]).width,ctx.measureText(best.l[1]).width)>room&&sz2>7){sz2-=0.5;ctx.font=w+' '+sz2+'px '+FONT;}
+      if(sz2>sz){
+        ctx.fillStyle=o.color||'#000';ctx.textBaseline='middle';ctx.textAlign='center';
+        ctx.fillText(best.l[0],(x0+x1)/2,y0+hh/2+1);ctx.fillText(best.l[1],(x0+x1)/2,y0+hh*1.5);
+        return;
+      }
+    }
     ctx.fillStyle=o.color||'#000';ctx.textBaseline='middle';
     var al=o.align||'center';ctx.textAlign=al;
     var x=al==='left'?x0+pad:al==='right'?x1-pad:(x0+x1)/2;
@@ -6958,6 +6970,9 @@ function buildFlightLog(f){
     var AC=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12]];
     grid(108,138,AC,GRY,['A/F','R/W','ELEV','ILS','VOR','ADF','TAC','GND','TWR','APP','DEP','ATIS'],{size:15});
     var ads=[];pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
+    function vhf(t){   /* keep VHF COM freqs only (118-137 MHz), drop UHF */
+      return String(t||'').split(/[\/,\s]+/).filter(function(x){var v=parseFloat(x);return v>=118&&v<137;}).join(' / ');
+    }
     function adv(id,k){
       var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
       return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
@@ -6974,19 +6989,19 @@ function buildFlightLog(f){
     for(var r=0;r<5;r++){
       var y0=138+r*29,id=adRows[r];
       var vals=id?[id,(RWY_INFO[id]||[]).map(function(w){return w[0].id+'/'+w[1].id;}).join(' '),APX[id][6]!=null&&APX[id][6]!==''?APX[id][6]:'',
-        adv(id,'ILS'),adv(id,'VOR'),adv(id,'NDB')||adv(id,'ADF'),adv(id,'TAC'),adv(id,'GND'),adv(id,'TWR'),adv(id,'APP'),adv(id,'DEP'),adv(id,'ATIS')]:[];
-      grid(y0,y0+29,AC,r<2?'#fff':YEL,vals,{color:INK,size:14,weight:'600'});
+        adv(id,'ILS'),adv(id,'VOR'),adv(id,'NDB')||adv(id,'ADF'),adv(id,'TAC'),vhf(adv(id,'GND')),vhf(adv(id,'TWR')),vhf(adv(id,'APP')),adv(id,'DEP'),adv(id,'ATIS')]:[];
+      grid(y0,y0+29,AC,r<2?'#fff':YEL,vals,{color:INK,size:19,weight:'600',pad:3,wrap:13});   /* shrinks only when the text would overflow */
     }
 
     /* ---- call sign / mission rows ---- */
     var C1=[[0,2],[2,3],[3,5],[5,6],[6,8],[8,9],[9,10],[10,11],[11,12]];
     grid(283,310,C1,PUR,null);
     C1.forEach(function(c,k){txt(['CALL SIGN','TYPE','FLIGHT RULE','FROM','DEST.','STEP','START','T/O','L/D'][k],X[c[0]],X[c[1]],283,310,{color:'#fff',size:18});});
-    grid(310,340,C1,'#fff',[f.callsign,f.type,f.rule,dep.name||'',arr.name||'','','','',''],{color:INK,size:20,weight:'700'});
+    grid(310,340,C1,'#fff',['',f.type,f.rule,dep.name||'',arr.name||'','','','',''],{color:INK,size:20,weight:'700'});
     var C2=[[0,2],[2,3],[3,5],[5,6],[6,7],[7,8],[8,9]];
     grid(340,370,C2,PUR,null);
     C2.forEach(function(c,k){txt(['MISSION','IFF','ALTITUDE','QNH','IAS','FUEL','BINGO'][k],X[c[0]],X[c[1]],340,370,{color:'#fff',size:18});});
-    grid(370,405,C2,'#fff',[f.mission,f.iff,f.alt,f.qnh,spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
+    grid(370,405,C2,'#fff',['',f.iff,f.alt,f.qnh,spd>0?String(spd):'',isFinite(fuel0)?String(fuel0):'',f.bingo],{color:INK,size:18,weight:'700'});
 
     /* ---- crew table ---- */
     var C3=[[0,1],[1,2],[2,3],[3,5],[5,6],[6,8],[8,9]];
@@ -7063,7 +7078,7 @@ function buildFlightLog(f){
     /* ---- NOTAM / weather / briefing ticks ---- */
     rect(X[0],(985+DY),X[8],(1155+DY),null,2);
     rect(X[0],(985+DY),X[2],(1018+DY),PUR,2);txt('NOTAM :',X[0],X[2],(985+DY),(1018+DY),{align:'left',color:'#fff',size:19,weight:'700'});
-    var nIds=flRouteNotamIds(),nTxt=nIds.join(', ');
+    var nIds=[],nTxt='';   /* NOTAM box left blank for handwriting (SPD) */
     if(nTxt){
       ctx.font='600 15px '+FONT;ctx.fillStyle=INK;ctx.textAlign='left';ctx.textBaseline='middle';
       var words=nIds.slice(),line='',ly=(1003+DY),lx0=X[2]+6,maxW=X[8]-lx0-6,rows=[];
