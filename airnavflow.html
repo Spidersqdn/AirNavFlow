@@ -246,6 +246,14 @@ svg.leaflet-zoom-animated {
 	cursor:         grabbing;
 	}
 
+.radar-ctl{display:flex;align-items:center;gap:6px;background:rgba(48,52,58,.92);color:var(--text);
+  border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:12px var(--mono);max-width:calc(100vw - 24px)}
+.radar-ctl .rd-play{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:4px;
+  min-width:30px;height:26px;cursor:pointer;font-size:12px}
+.radar-ctl .rd-slider{width:70px;accent-color:#4fa3ff}
+.radar-ctl .rd-time{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radar-ctl.rd-err .rd-play,.radar-ctl.rd-err .rd-slider{display:none}
+.radar-ctl.rd-err .rd-time{color:var(--amber)}
 /* marker & overlays interactivity */
 .leaflet-marker-icon,
 .leaflet-marker-shadow,
@@ -5069,10 +5077,109 @@ var airspaceGroup=L.layerGroup([prohibLayer,restrictLayer,dangerLayer,traLayer])
 var enrGroup=L.layerGroup([enrAtsLayer,enrNavLayer,enrLblLayer,enrWptLayer,enrRnavLayer,enrRnavLblLayer]);   /* ATS blue, RNAV magenta */
 var vfrRptGroup=L.layerGroup([lightRptLayer,heliRptLayer]);
 
+/* ---- Rain radar (online only): RainViewer public API, past ~2 h of frames, auto-refresh, play/pause ---- */
+var radarPane=map.createPane('radar');
+radarPane.style.zIndex=340;
+radarPane.style.pointerEvents='none';
+var RADAR_API='https://api.rainviewer.com/public/weather-maps.json';
+var radarLayer=L.layerGroup();
+var radarState={frames:[],layers:[],idx:-1,host:'',timer:0,refresh:0,playing:false,on:false,err:''};
+var RadarCtl=L.Control.extend({
+  options:{position:'bottomright'},
+  onAdd:function(){
+    var d=L.DomUtil.create('div','radar-ctl');
+    d.innerHTML='<button type="button" class="rd-play" title="เล่น/หยุด">▶</button>'+
+      '<input type="range" class="rd-slider" min="0" max="0" value="0">'+
+      '<span class="rd-time">เรดาร์ฝน…</span>';
+    L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);
+    d.querySelector('.rd-play').onclick=function(){radarPlay(!radarState.playing);};
+    d.querySelector('.rd-slider').oninput=function(){radarPlay(false);radarShow(+this.value);};
+    return d;
+  }
+});
+var radarCtl=new RadarCtl();
+function radarFmt(t){
+  var d=new Date(t*1000),p=function(n){return (n<10?'0':'')+n;};
+  var age=Math.round((Date.now()/1000-t)/60);
+  return p(d.getUTCHours())+p(d.getUTCMinutes())+'Z/'+p(d.getHours())+':'+p(d.getMinutes())+' น. '+(age<=0?'(ล่าสุด)':'(-'+age+' นาที)');
+}
+function radarLabel(){
+  var c=radarCtl.getContainer();if(!c)return;
+  var t=c.querySelector('.rd-time'),s=c.querySelector('.rd-slider');
+  if(radarState.err){t.textContent=radarState.err;c.classList.add('rd-err');return;}
+  c.classList.remove('rd-err');
+  var f=radarState.frames[radarState.idx];
+  t.textContent=f?'ฝน '+radarFmt(f.time):'เรดาร์ฝน…';
+  s.max=Math.max(0,radarState.frames.length-1);s.value=Math.max(0,radarState.idx);
+  c.querySelector('.rd-play').textContent=radarState.playing?'❚❚':'▶';
+}
+function radarShow(i){
+  if(!radarState.layers.length)return;
+  radarState.idx=(i+radarState.layers.length)%radarState.layers.length;
+  radarState.layers.forEach(function(l,k){l.setOpacity(k===radarState.idx?0.65:0);});
+  radarLabel();
+}
+function radarPlay(on){
+  radarState.playing=on&&radarState.layers.length>1;
+  clearInterval(radarState.timer);radarState.timer=0;
+  if(radarState.playing){
+    radarState.timer=setInterval(function(){
+      /* pause 2 frames on the newest image before looping */
+      if(radarState.idx===radarState.layers.length-1&&!radarState.hold){radarState.hold=2;}
+      if(radarState.hold){radarState.hold--;if(radarState.hold)return;}
+      radarShow(radarState.idx+1);
+    },600);
+  }
+  radarLabel();
+}
+function radarClear(){
+  radarState.layers.forEach(function(l){radarLayer.removeLayer(l);});
+  radarState.layers=[];radarState.frames=[];radarState.idx=-1;
+}
+function radarLoad(){
+  if(!radarState.on)return;
+  if(navigator.onLine===false){radarState.err='เรดาร์ฝน: ออฟไลน์ (ต้องใช้อินเทอร์เน็ต)';radarClear();radarLabel();return;}
+  fetch(RADAR_API,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+    if(!radarState.on)return;
+    var frames=((j.radar&&j.radar.past)||[]).slice(-12);
+    if(!frames.length)throw new Error('empty');
+    var last=radarState.frames.length&&radarState.frames[radarState.frames.length-1].time;
+    if(last===frames[frames.length-1].time&&!radarState.err)return;   /* nothing new */
+    var wasPlaying=radarState.playing;
+    radarPlay(false);radarClear();radarState.err='';
+    radarState.host=j.host||'https://tilecache.rainviewer.com';
+    radarState.frames=frames;
+    radarState.layers=frames.map(function(f){
+      /* free API serves up to z7; Leaflet scales it up beyond that */
+      var l=L.tileLayer(radarState.host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',{
+        pane:'radar',opacity:0,maxNativeZoom:7,maxZoom:19,zIndex:1,
+        attribution:'Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'
+      });
+      radarLayer.addLayer(l);return l;
+    });
+    radarShow(frames.length-1);
+    if(wasPlaying)radarPlay(true);
+  }).catch(function(){
+    if(!radarState.on)return;
+    radarState.err='เรดาร์ฝน: โหลดไม่ได้ (ต้องใช้อินเทอร์เน็ต)';radarClear();radarLabel();
+  });
+}
+radarLayer.on('add',function(){
+  radarState.on=true;radarState.err='';radarCtl.addTo(map);radarLabel();radarLoad();
+  clearInterval(radarState.refresh);radarState.refresh=setInterval(radarLoad,5*60*1000);
+});
+radarLayer.on('remove',function(){
+  radarState.on=false;radarPlay(false);clearInterval(radarState.refresh);
+  radarClear();radarCtl.remove();
+});
+window.addEventListener('online',function(){if(radarState.on){radarState.err='';radarLoad();}});
+window.addEventListener('offline',function(){if(radarState.on)radarLoad();});
+
 var layerCtl=L.control.layers(
  {'ภาพดาวเทียม':sat,'แผนที่ถนน':osm,'ภูมิประเทศ':topo,'แผนที่ออฟไลน์ (OSM)':offlineBase},
  {
    'เส้นชั้นความสูง (Contour ft)':contourLayer,
+   '<span style="color:#4fa3ff;font-weight:600">เรดาร์ฝน (Rain Radar)</span>':radarLayer,
    '<span style="color:#d9dde2;font-weight:600">OFF-ROUTE Wpt</span>':offRouteLayer,
    'เส้นจังหวัด':provLayer,
    'มทบ.':mtbLayer,
