@@ -1146,6 +1146,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 #miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
+#miniMapModal .mm-opt{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-right:6px;white-space:nowrap}
 #miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
 #miniMapModal img{display:block;width:100%;height:auto}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
@@ -6645,12 +6646,14 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
   ctx.restore();
 }
 
-function buildMiniMap(){
+function buildMiniMap(opt){
   var S=2,W=900*S,HEAD=118*S,FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
   var WFONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';   /* waypoint boxes: TH SarabunPSK (Sarabun web font as fallback) */
-  var PT12=Math.ceil(W/210*25.4/72*12);   /* 12 pt on an A4-wide sheet, in canvas px */
-  var PT10=Math.ceil(W/210*25.4/72*10);   /* off-route points: 2 pt smaller */
-  var PT14=Math.ceil(W/210*25.4/72*14);   /* start / end point names: 2 pt bigger */
+  function PT(n){return Math.ceil(W/210*25.4/72*n);}   /* n pt on an A4-wide sheet, in canvas px */
+  var PTR=PT(11);   /* route waypoints + route airports (SPD: 11 pt) */
+  var PTO=PT(9);    /* off-route points + nearby airports: 2 pt smaller */
+  var PTE=PT(13);   /* start / end point names: 2 pt bigger */
+  var useOffs=!(opt&&opt.offs===false);   /* off-route waypoints on the sheet? (checkbox in the MINI MAP window) */
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
   /* route + nearby off-route points in world px at z=0 */
   var all=pts.map(function(p){return mmWorld(p.lat,p.lng,0);});
@@ -6777,7 +6780,7 @@ function buildMiniMap(){
       [[false,0],[true,0],[false,1],[true,1]].forEach(function(o){   /* full box, short box, then the same crossing the route */
         if(placed)return;
         var short=o[0],pass=o[1];
-        lines=adLines(id,PT12,short);m=mmMeasure(ctx,lines,pad);
+        lines=adLines(id,PTR,short);m=mmMeasure(ctx,lines,pad);
         {
           for(var k=0;k<order.length&&!placed;k++){var b=cornerBox(order[k]);if(free(b,pass===1)&&clearOfAD(b)){placed=b;corners.splice(corners.indexOf(order[k]),1);}}
           if(placed)return;
@@ -6822,7 +6825,7 @@ function buildMiniMap(){
       }
       return best;
     }
-    var offs=(offRoutePts||[]).filter(function(p){
+    var offs=(useOffs?offRoutePts||[]:[]).filter(function(p){
       var nm=(p.name||'').toUpperCase();
       nm=nm.trim();
       if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
@@ -6907,7 +6910,7 @@ function buildMiniMap(){
         ctx.strokeStyle='#fff';ctx.lineWidth=1.2*S;ctx.setLineDash([5*S,4*S]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);
       });
       /* runway numbers just beyond each end */
-      var fs=PT10,rwLbl=[];ctx.font='600 '+fs+'px '+WFONT;ctx.textAlign='center';ctx.textBaseline='middle';
+      var fs=PTO,rwLbl=[];ctx.font='600 '+fs+'px '+WFONT;ctx.textAlign='center';ctx.textBaseline='middle';
       rw.forEach(function(r,j){
         var a=t(segs[j][0]),b=t(segs[j][1]),L=Math.hypot(b.x-a.x,b.y-a.y)||1,ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
         [[r[0].id,a,-1],[r[1].id,b,1]].forEach(function(e){
@@ -6947,7 +6950,7 @@ function buildMiniMap(){
     function wpBox(p,q,i,small){
       var id=(p.name||'').toUpperCase();
       /* off-route point: name, lat, long, radial; TH SarabunPSK 2 pt smaller than route points, all black */
-      var sz=PT10,lh=LH(sz),pad=5*S,lines=[];
+      var sz=PTO,lh=LH(sz),pad=5*S,lines=[];
       var rr=mmRadial(p);ctx.font=sz+'px '+WFONT;
       var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
       lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw));
@@ -7001,7 +7004,7 @@ function buildMiniMap(){
     }
     /* small ident tag next to airport points (AD details are in the corner box) */
     function adTag(p,q,end){
-      var t=(p.name||'').toUpperCase(),sz=end?PT14:14*S;ctx.font=end?'600 '+sz+'px '+WFONT:'600 '+sz+'px '+FONT;
+      var t=(p.name||'').toUpperCase(),sz=end?PTE:14*S;ctx.font=end?'600 '+sz+'px '+WFONT:'600 '+sz+'px '+FONT;
       var w=ctx.measureText(t).width*1.06+14*S,h=Math.round(sz*1.5),placed=null;
       var hs=h/S;
       [[40,8],[-40-w/S,8],[40,-8-hs],[-40-w/S,-8-hs],[-w/(2*S),40],[-w/(2*S),-40-hs],[16,8],[-16-w/S,8],[16,-8-hs],[-16-w/S,-8-hs]].forEach(function(o){
@@ -7014,14 +7017,14 @@ function buildMiniMap(){
     }
     /* route waypoints: boxes stacked along the left / right map edges, joined to their point by a leader line */
     function edgeBoxes(){
-      var items=[],sz=PT12,lh=LH(sz),pad=6*S;
+      var items=[],sz=PTR,lh=LH(sz),pad=6*S;
       pts.forEach(function(p,i){
         /* same point entered twice (e.g. a round trip back to the start): one box only, for its first visit */
         var nmU=(p.name||'').toUpperCase().trim();
         if(pts.slice(0,i).some(function(r){return dist(r,p)<0.1||(nmU&&(r.name||'').toUpperCase().trim()===nmU);}))return;
         if(APX[(p.name||'').toUpperCase()]){adTag(p,P[i],i===0||i===pts.length-1);return;}
         var end=(i===0||i===pts.length-1),lines=[],ef=elevFt[i];
-        var nsz=end?PT14:sz,rr0=end?'':(mmRadial(p)||'');ctx.font=sz+'px '+WFONT;
+        var nsz=end?PTE:sz,rr0=end?'':(mmRadial(p)||'');ctx.font=sz+'px '+WFONT;
         var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width*1.05,ctx.measureText(rr0).width*1.05,end?190*S-2*pad:0);   /* wrap only names wider than the other lines */
         lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+nsz+'px '+WFONT,nsz,cw,'#1f2fd6'));
         if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,'#1f2fd6'));
@@ -7139,7 +7142,7 @@ function buildMiniMap(){
     }
     edgeBoxes();
     offs.forEach(function(o,i){wpBox(o.p,o.q,i,true);});
-    nearAD.forEach(function(o){placeAndDraw(o.q,adLines(o.id,PT10,true),5*S,true,'left');});
+    nearAD.forEach(function(o){placeAndDraw(o.q,adLines(o.id,PTO,true),5*S,true,'left');});
 
     /* AD boxes last so they sit on top */
     boxes.forEach(function(b){if(b.ad)mmDrawBox(ctx,b,b.lines,b.pad,'left',3*S);});
@@ -7160,7 +7163,9 @@ function showMiniMap(cv){
   var fname='MiniMap_'+dep+'_'+arr+'.png';
   var url=cv.toDataURL('image/png');
   var d=document.createElement('div');d.id='miniMapModal';
+  var nOff=(offRoutePts||[]).length;
   d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MINI MAP</b><span>'+
+    (nOff?'<label class="mm-opt"><input type="checkbox" id="mmOffs"'+(mmOffsOn()?' checked':'')+'> WP นอกเส้นทาง</label> ':'')+
     '<button type="button" id="mmSave">บันทึก PNG</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
@@ -7169,6 +7174,12 @@ function showMiniMap(cv){
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
+  var oc=document.getElementById('mmOffs');
+  if(oc)oc.onchange=function(){   /* include / leave out off-route waypoints, remembered, then redraw */
+    try{localStorage.setItem('fp-mm-offs',oc.checked?'1':'0');}catch(e){}
+    oc.disabled=true;
+    buildMiniMap({offs:oc.checked}).then(showMiniMap).catch(function(err){oc.disabled=false;alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');});
+  };
   d.addEventListener('click',function(e){if(e.target===d)d.remove();});
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
@@ -7183,11 +7194,12 @@ function showMiniMap(cv){
   };
 }
 
+function mmOffsOn(){try{return localStorage.getItem('fp-mm-offs')!=='0';}catch(e){return true;}}
 function exportMiniMap(){
   if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อน export MINI MAP');return;}
   var btn=document.getElementById('exportMiniMap');
   btn.disabled=true;var lbl=btn.textContent;btn.textContent='กำลังสร้าง…';
-  buildMiniMap().then(showMiniMap).catch(function(err){
+  buildMiniMap({offs:mmOffsOn()}).then(showMiniMap).catch(function(err){
     alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');
   }).then(function(){btn.disabled=false;btn.textContent=lbl;});
 }
