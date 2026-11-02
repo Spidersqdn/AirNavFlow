@@ -6660,6 +6660,7 @@ function buildMiniMap(){
   var portrait=true;   /* always A4 portrait (1 : 1.414) */
   var H=Math.round(900*Math.SQRT2)*S,MH=H-HEAD;
   var innerW=W*(spanX>spanY?0.62:0.45),innerH=MH*0.72;
+  if(pts.length>9){innerW*=0.85;innerH=MH*0.6;}   /* many points: leave a margin all round for the edge boxes */
   var z=Math.log2(Math.min(innerW/spanX,innerH/spanY));
   z=Math.max(5,Math.min(z,13.5));
   var sc=Math.pow(2,z);
@@ -6850,7 +6851,10 @@ function buildMiniMap(){
       var crs=course(pts[li-1],pts[li]),d=dist(pts[li-1],pts[li]),rec=(crs+180)%360;
       var ang=Math.atan2(B.y-A.y,B.x-A.x),fwd=true;
       if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
-      var txt='<- '+mmPad3(fwd?rec:crs)+'°  '+(d<100?d.toFixed(1):Math.round(d))+' NM  '+mmPad3(fwd?crs:rec)+'° ->';
+      var dTxt=(d<100?d.toFixed(1):Math.round(d))+' NM';
+      /* many waypoints (>7) or a short leg (<10 NM): outbound heading only, arrow in the direction of flight */
+      var txt=(pts.length>7||d<10)?(fwd?mmPad3(crs)+'°  '+dTxt+' ->':'<- '+mmPad3(crs)+'°  '+dTxt)
+        :'<- '+mmPad3(fwd?rec:crs)+'°  '+dTxt+'  '+mmPad3(fwd?crs:rec)+'° ->';
       var nx=-Math.sin(ang),ny=Math.cos(ang),ca=Math.abs(Math.cos(ang)),sa=Math.abs(Math.sin(ang)),got=null;
       [16*S,13*S,11*S].forEach(function(fs0){
         if(got)return;
@@ -6858,7 +6862,7 @@ function buildMiniMap(){
         var tw=ctx.measureText(txt).width+18*S,bh=fs*1.6;
         if(tw>W*0.6)return;
         [0.5,0.38,0.62,0.28,0.72,0.2,0.8].forEach(function(t){
-          [1,1.7,2.6,3.6].forEach(function(om){
+          (pts.length>9?[1,1.7]:[1,1.7,2.6,3.6]).forEach(function(om){   /* many points: keep the sheet edges for the boxes */
             [1,-1].forEach(function(side){
               if(got)return;
               var off=(bh/2+12*S)*om,cx=A.x+(B.x-A.x)*t+nx*off*side,cy=A.y+(B.y-A.y)*t+ny*off*side;
@@ -7031,26 +7035,40 @@ function buildMiniMap(){
       });
       if(!items.length)return;
       var mid=P.reduce(function(a,q){return a+q.x;},0)/P.length,gap=6*S,E=8*S;
-      var side={L:[],R:[]};
-      items.forEach(function(it){side[it.q.x<mid?'L':'R'].push(it);});
+      /* many points: boxes go round all four sheet edges (side picked by the point's direction from the route centre) */
+      var four=items.length>8,side={L:[],R:[],T:[],B:[]};
+      var cxr=mid,cyr=P.reduce(function(a,q){return a+q.y;},0)/P.length;
+      var spX=Math.max(1,Math.max.apply(null,P.map(function(q){return q.x;}))-Math.min.apply(null,P.map(function(q){return q.x;})));
+      var spY=Math.max(1,Math.max.apply(null,P.map(function(q){return q.y;}))-Math.min.apply(null,P.map(function(q){return q.y;})));
+      items.forEach(function(it){
+        if(!four){side[it.q.x<mid?'L':'R'].push(it);return;}
+        var dx=(it.q.x-cxr)/spX,dy=(it.q.y-cyr)/spY;
+        side[Math.abs(dx)>=Math.abs(dy)?(dx<0?'L':'R'):(dy<0?'T':'B')].push(it);
+      });
       /* balance the two columns so neither runs off the sheet: move the point nearest the other side across */
       var avail=H-HEAD-2*E;
       function tot(l){return l.reduce(function(a,it){return a+it.m.h+gap;},0);}
-      for(var bal=0;bal<items.length;bal++){
+      for(var bal=0;!four&&bal<items.length;bal++){
         var tl=tot(side.L),tr=tot(side.R);
         if(tl>avail*0.8&&tl>tr+gap){side.L.sort(function(a,b){return b.q.x-a.q.x;});var mv=side.L.shift();if(tot(side.R)+mv.m.h>tl-mv.m.h+gap){side.L.unshift(mv);break;}side.R.push(mv);}
         else if(tr>avail*0.8&&tr>tl+gap){side.R.sort(function(a,b){return a.q.x-b.q.x;});var mv2=side.R.shift();if(tot(side.L)+mv2.m.h>tr-mv2.m.h+gap){side.R.unshift(mv2);break;}side.L.push(mv2);}
         else break;
       }
-      function place(list,s){   /* stack top-to-bottom near each point, then push up from the bottom edge if the column overflows */
-        var w=list.reduce(function(a,it){return Math.max(a,it.m.w);},0),x=s==='L'?E:W-E-w,cur=HEAD+E,obs=boxes.slice(),left=[];
-        list.sort(function(a,b){return a.q.y-b.q.y;});
-        function hits(b){
+      function hitsFn(obs,row){   /* first thing a box runs into; segments/points give a small step along the stacking axis */
+        return function(b){
+          var step=row?{x:b.x,y:b.y,w:8*S-gap,h:b.h}:{x:b.x,y:b.y,w:b.w,h:8*S-gap};
           for(var k=0;k<obs.length;k++)if(mmBoxOverlap(b,obs[k]))return obs[k];
-          for(var s2=0;s2<segs.length;s2++)if(mmSegHitsBox(segs[s2][0],segs[s2][1],b))return {y:b.y,h:8*S-gap};
-          for(var j=0;j<symPts.length;j++){var q=symPts[j];if(q.x>b.x-12*S&&q.x<b.x+b.w+12*S&&q.y>b.y-12*S&&q.y<b.y+b.h+12*S)return {y:b.y,h:8*S-gap};}
+          for(var s2=0;s2<segs.length;s2++)if(mmSegHitsBox(segs[s2][0],segs[s2][1],b))return step;
+          for(var j=0;j<symPts.length;j++){var q=symPts[j];if(q.x>b.x-12*S&&q.x<b.x+b.w+12*S&&q.y>b.y-12*S&&q.y<b.y+b.h+12*S)return step;}
           return null;
-        }
+        };
+      }
+      function place(list,s){   /* column: stack top-to-bottom near each point, then push up from the bottom edge */
+        if(!list.length)return [];
+        if(s==='T'||s==='B')return placeRow(list,s);
+        var w=list.reduce(function(a,it){return Math.max(a,it.m.w);},0),x=s==='L'?E:W-E-w,cur=HEAD+E,left=[];
+        var hits=hitsFn(boxes.slice(),false);
+        list.sort(function(a,b){return a.q.y-b.q.y;});
         list.forEach(function(it){
           var b={x:x,y:Math.max(cur,it.q.y-it.m.h/2),w:w,h:it.m.h},o;
           while((o=hits(b))&&b.y<H)b.y=o.y+o.h+gap;
@@ -7069,9 +7087,37 @@ function buildMiniMap(){
         });
         return left;
       }
-      var restL=place(side.L,'L'),restR=place(side.R,'R');
-      if(restL.length)restR=restR.concat(place(restL,'R'));
-      if(restR.length)place(restR,'L').forEach(function(it){   /* last resort: nearest free spot, same content */
+      function placeRow(list,s){   /* row along the top / bottom edge: left-to-right near each point, then push back from the right edge */
+        var cur=E,left=[],hits=hitsFn(boxes.slice(),true);
+        function yOf(it){return s==='T'?HEAD+E:H-E-it.m.h;}
+        list.sort(function(a,b){return a.q.x-b.q.x;});
+        list.forEach(function(it){
+          var b={x:Math.max(cur,it.q.x-it.m.w/2),y:yOf(it),w:it.m.w,h:it.m.h},o;
+          while((o=hits(b))&&b.x<W)b.x=o.x+o.w+gap;
+          it.b=b;cur=b.x+b.w+gap;
+        });
+        var limit=W-E;
+        for(var i=list.length-1;i>=0;i--){
+          var b=list[i].b;
+          if(b.x+b.w>limit)b.x=limit-b.w;
+          var o=hits(b);
+          if(o&&o.x<b.x+b.w&&o.x+o.w>b.x)b.x=Math.min(b.x,o.x-gap-b.w);
+          limit=b.x-gap;
+        }
+        list.forEach(function(it){
+          if(it.b.x<E||hits(it.b)){it.b=null;left.push(it);}else boxes.push(it.b);
+        });
+        return left;
+      }
+      var order=four?['L','R','T','B']:['L','R'],rest=[];
+      order.forEach(function(sd){rest=rest.concat(place(side[sd],sd));});
+      rest=rest.filter(function(it){   /* leftovers: the free edge nearest to the point (short leader lines) */
+        var d={L:it.q.x,R:W-it.q.x,T:it.q.y-HEAD,B:H-it.q.y};
+        var sds=order.slice().sort(function(a,b){return d[a]-d[b];});
+        for(var k=0;k<sds.length;k++)if(!place([it],sds[k]).length)return false;
+        return true;
+      });
+      rest.forEach(function(it){   /* last resort: nearest free spot, same content */
         var best=null,bd=Infinity,st=8*S,m=it.m;
         for(var pass=0;pass<3&&!best;pass++)
         for(var gy=HEAD+E;gy+m.h<H-E;gy+=st)for(var gx=E;gx+m.w<W-E;gx+=st){
@@ -7081,7 +7127,9 @@ function buildMiniMap(){
         it.b=best||{x:E,y:H-E-m.h,w:m.w,h:m.h};boxes.push(it.b);
       });
       items.forEach(function(it){   /* leader lines first, boxes on top */
-        var b=it.b,q=it.q,bx=b.x+b.w/2<q.x?b.x+b.w:b.x,by=Math.max(b.y+6*S,Math.min(q.y,b.y+b.h-6*S));
+        var b=it.b,q=it.q,bx,by;
+        if((q.y<b.y||q.y>b.y+b.h)&&q.x>b.x-40*S&&q.x<b.x+b.w+40*S){bx=Math.max(b.x+6*S,Math.min(q.x,b.x+b.w-6*S));by=q.y<b.y?b.y:b.y+b.h;}   /* point above / below: leave from the top / bottom edge */
+        else{bx=b.x+b.w/2<q.x?b.x+b.w:b.x;by=Math.max(b.y+6*S,Math.min(q.y,b.y+b.h-6*S));}
         ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();
         leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);
       });
