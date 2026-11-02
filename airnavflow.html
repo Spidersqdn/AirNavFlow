@@ -1724,7 +1724,7 @@ td .wp-delete{
   <div id="map"></div>
   <div id="status">กด On MAP เพื่อเพิ่ม waypoint • กดค้างที่แผนที่เพื่อดูข้อมูลจุด</div>
   <div id="windy">
-    <header><span>Windy</span><span><button id="wSync" type="button">จุดล่าสุด</button> <button id="wClose" type="button">✕</button></span></header>
+    <header><span>Windy</span><span><button id="wSync" type="button">กึ่งกลางเส้นทาง</button> <button id="wClose" type="button">✕</button></span></header>
     <iframe id="wFrame" title="Windy" loading="lazy"></iframe>
   </div>
 </div>
@@ -7398,9 +7398,36 @@ map.on('contextmenu',function(e){
   c.addEventListener('pointercancel',up);
 })();
 
+// Point halfway along the total route distance (great-circle legs).
+function routeMidpoint(){
+  if(!pts.length)return null;
+  if(pts.length===1)return {lat:pts[0].lat,lng:pts[0].lng};
+  var R=Math.PI/180,legs=[],tot=0,i;
+  function gc(a,b){
+    var f1=a.lat*R,f2=b.lat*R,dl=(b.lng-a.lng)*R;
+    var h=Math.pow(Math.sin((f2-f1)/2),2)+Math.cos(f1)*Math.cos(f2)*Math.pow(Math.sin(dl/2),2);
+    return 2*Math.asin(Math.min(1,Math.sqrt(h)));
+  }
+  for(i=1;i<pts.length;i++){var d=gc(pts[i-1],pts[i]);legs.push(d);tot+=d;}
+  if(!(tot>0))return {lat:pts[0].lat,lng:pts[0].lng};
+  var half=tot/2;
+  for(i=0;i<legs.length;i++){
+    if(half<=legs[i]||i===legs.length-1){
+      var a=pts[i],b=pts[i+1],d=legs[i],t=d>0?Math.min(1,half/d):0;
+      if(d<1e-9)return {lat:a.lat,lng:a.lng};
+      var f1=a.lat*R,l1=a.lng*R,f2=b.lat*R,l2=b.lng*R;
+      var A=Math.sin((1-t)*d)/Math.sin(d),B=Math.sin(t*d)/Math.sin(d);
+      var x=A*Math.cos(f1)*Math.cos(l1)+B*Math.cos(f2)*Math.cos(l2);
+      var y=A*Math.cos(f1)*Math.sin(l1)+B*Math.cos(f2)*Math.sin(l2);
+      var z=A*Math.sin(f1)+B*Math.sin(f2);
+      return {lat:Math.atan2(z,Math.sqrt(x*x+y*y))/R,lng:Math.atan2(y,x)/R};
+    }
+    half-=legs[i];
+  }
+  return null;
+}
 function openWindy(){
-  var p=pts.length?pts[pts.length-1]:null;
-  var c=p?{lat:p.lat,lng:p.lng}:map.getCenter().wrap();
+  var c=routeMidpoint()||map.getCenter().wrap();
   var z=Math.max(5,Math.min(map.getZoom(),9));
 
   document.getElementById('wFrame').src=
