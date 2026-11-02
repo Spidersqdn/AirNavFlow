@@ -7012,10 +7012,24 @@ function buildFlightLog(f){
 
     /* ---- nav aid ident (morse) ---- */
     head(X[9],X[12],676,706,'Nav Aid IDENT');
-    var ids=[];ads.forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){if(r[0]==='MORSE')r[1].split(/[ ,]+/).filter(Boolean).forEach(function(n){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);});});});
+    /* idents + frequency from data/AD.txt: rows like "NDB | 280 [LB]" give LB=280; MORSE rows add idents without a frequency.
+       Route airports first (departure, destination, then the rest), up to 4 */
+    var ids=[],frq={};
+    function addId(n,fq){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);if(fq&&!frq[n])frq[n]=fq;}
+    onR.concat(ads).forEach(function(id){(AD_INFO[id]||[]).forEach(function(r){
+      if(r[0]==='MORSE'){r[1].split(/[ ,]+/).filter(Boolean).forEach(function(n){addId(n,'');});return;}
+      var m=/\[([A-Z0-9]{2,5})\]/i.exec(r[1]);
+      if(m)addId(m[1],r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim());
+    });});
     for(var n=0;n<4;n++){
       var ny=706+n*34.75;rect(X[9],ny,X[10],ny+34.75);rect(X[10],ny,X[12],ny+34.75);
-      if(ids[n]){txt('['+ids[n]+']',X[9],X[10],ny,ny+34.75,{size:17});txt(morseOf(ids[n]),X[10],X[12],ny,ny+34.75,{size:20,weight:'700'});}
+      if(ids[n]){
+        if(frq[ids[n]]){   /* ident on top, frequency below */
+          txt('['+ids[n]+']',X[9],X[10],ny+1,ny+18,{size:15,weight:'700'});
+          txt(frq[ids[n]],X[9],X[10],ny+17,ny+34,{size:13,color:INK,weight:'600'});
+        }else txt('['+ids[n]+']',X[9],X[10],ny,ny+34.75,{size:17});
+        txt(morseOf(ids[n]),X[10],X[12],ny,ny+34.75,{size:20,weight:'700'});
+      }
     }
 
     /* ---- approach procedure / before landing (static memory aids) ---- */
