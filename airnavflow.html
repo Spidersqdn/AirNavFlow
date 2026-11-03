@@ -1500,10 +1500,10 @@ td .wp-delete{
 }
 
 
-/* ROUTE waypoint editor: 3 equal buttons on one line */
+/* ROUTE waypoint editor: 4 equal buttons, 2 per row */
 .route-edit-actions{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:5px;
 }
 .route-edit-actions button{
@@ -1518,6 +1518,11 @@ td .wp-delete{
   text-align:center;
   font-size:10px;
   line-height:1.15;
+}
+.route-edit-add-again{
+  background:#1f6f43!important;
+  border-color:#2e8a57!important;
+  color:#fff!important;
 }
 .route-edit-add-offroute{
   background:#626870!important;
@@ -5672,6 +5677,7 @@ function openWaypointEditor(marker,p,index){
       '<div class="wp-editor-actions route-edit-actions">'+
         '<button type="button" class="wp-editor-save" id="editWpSave">Save</button>'+
         '<button type="button" class="wp-editor-delete" id="editWpDelete">Delete</button>'+
+        '<button type="button" class="route-edit-add-again" id="editWpAddAgain" title="Add this point to the route again (fly over it twice)">Add ROUTE again</button>'+
         '<button type="button" class="route-edit-add-offroute" id="editWpAddOffRoute">Add Off-Route</button>'+
       '</div>'+
     '</div>';
@@ -5695,6 +5701,7 @@ function openWaypointEditor(marker,p,index){
     var saveBtn=root.querySelector('#editWpSave');
     var delBtn=root.querySelector('#editWpDelete');
     var addOffRouteBtn=root.querySelector('#editWpAddOffRoute');
+    var addAgainBtn=root.querySelector('#editWpAddAgain');
     var latInput=root.querySelector('#editWpLat');
     var lngInput=root.querySelector('#editWpLng');
     var refInput=root.querySelector('#editWpRefIcao');
@@ -5832,6 +5839,20 @@ function openWaypointEditor(marker,p,index){
         refresh();
         geocode(p);
         st.textContent='ROUTE Wpt saved';
+      };
+    }
+
+    /* Same point again as a new ROUTE Wpt (e.g. overfly a VFR heli Wpt twice).
+       The route pin sits on top of the layer marker, so this is the way to re-add it. */
+    if(addAgainBtn){
+      addAgainBtn.onclick=function(){
+        var edited=getRouteEditorPoint();
+        if(!edited)return;
+        if(routeMapEditIndex===index){routeMapEditIndex=null;routeMapEditDraft=null;}
+        committed=true;
+        map.closePopup();
+        addPt(edited.lat,edited.lng,edited.name||p.name,edited.refIcao||p.refIcao,edited.remark);
+        st.textContent='ROUTE Wpt '+(index+1)+' added again';
       };
     }
 
