@@ -6830,9 +6830,10 @@ function buildMiniMap(opt){
   var S=2,W=900*S,HEAD=118*S,FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
   var WFONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';   /* waypoint boxes: TH SarabunPSK (Sarabun web font as fallback) */
   function PT(n){return Math.ceil(W/210*25.4/72*n);}   /* n pt on an A4-wide sheet, in canvas px */
-  var PTR=PT(11);   /* route waypoints + route airports (SPD: 11 pt) */
+  var PTR=PT(11);   /* route airports (SPD: 11 pt) */
+  var PTW=PT(10);   /* route waypoint boxes (SPD 3 NOV: 1 pt smaller) */
   var PTO=PT(9);    /* off-route points + nearby airports: 2 pt smaller */
-  var PTE=PT(13);   /* start / end point names: 2 pt bigger */
+  var PTE=PT(12);   /* start / end point names: 2 pt bigger than waypoints */
   var offSkip={};(opt&&opt.skip||[]).forEach(function(k){offSkip[k]=1;});   /* off-route points unticked in the WPt list */
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
   /* route + nearby off-route points in world px at z=0 */
@@ -6926,17 +6927,22 @@ function buildMiniMap(opt){
     }
 
     /* AD box text (same font/size as the route waypoint boxes); short = nearby airport off the route */
+    /* SPD order: name, (coords: route airports only), 1 runways, 2 frequencies, 3 nav aids, 4 ELEV; name 2 pt bigger */
     function adLines(id,sz,short){
-      var a=APX[id],lh=LH(sz),f=sz+'px '+WFONT,lines=[
-        {t:id+' '+a[2]+(a[6]!==''&&a[6]!=null?' (ELEV '+a[6]+' ft)':''),f:'600 '+f,lh:lh,sz:sz,u:id,c:'#1f2fd6'}];
-      if(!short)lines.push({t:mmDDM(a[4],true)+'  '+mmDDM(a[5],false),f:f,lh:lh,sz:sz});
-      (RWY_INFO[id]||[]).forEach(function(r){lines.push({t:'RWY '+r[0].id+'/'+r[1].id+(r[0].dim?'  '+r[0].dim+' m':''),f:f,lh:lh,sz:sz});});
-      (AD_INFO[id]||[]).forEach(function(r){
-        var k=r[0];
-        if(k==='MORSE'){
-          if(!short)r[1].split(/[ ,]+/).filter(Boolean).forEach(function(nid){lines.push({t:morseOf(nid)+'  ['+nid.toUpperCase()+']',f:'600 '+f,lh:lh,sz:sz});});
-        }else if(!short||/^(APP|TWR|GND|ATIS|CTAF|RADIO)$/.test(k))lines.push({t:r[1]?(k?k+' '+r[1]:r[1]):k,f:f,lh:lh,sz:sz});
-      });
+      var a=APX[id],lh=LH(sz),f=sz+'px '+WFONT,nsz=sz+PT(2),lines=[
+        {t:id+' '+a[2],f:'600 '+nsz+'px '+WFONT,lh:LH(nsz),sz:nsz,u:id,c:'#1f2fd6'}];
+      function L(t,b){lines.push({t:t,f:(b?'600 ':'')+f,lh:lh,sz:sz});}
+      if(!short)L(mmDDM(a[4],true)+'  '+mmDDM(a[5],false));
+      (RWY_INFO[id]||[]).forEach(function(r){L('RWY '+r[0].id+'/'+r[1].id+(r[0].dim?'  '+r[0].dim+' m':''));});
+      var info=AD_INFO[id]||[],NAV=/^(NDB|VOR|ILS|LOC|DME|TAC|TACAN|VORTAC|VOR\/DME|GP)$/,OTH=/^(CTZ|MORSE)$/;
+      function txt(r){return r[1]?(r[0]?r[0]+' '+r[1]:r[1]):r[0];}
+      info.forEach(function(r){if(!NAV.test(r[0])&&!OTH.test(r[0])&&/\d/.test(r[1]||'')&&!/[\u0E00-\u0E7F]/.test(r[0]))L(txt(r));});   /* frequencies */
+      info.forEach(function(r){if(NAV.test(r[0]))L(txt(r));});   /* nav aids */
+      if(!short){   /* route airports keep their morse lines and other notes */
+        info.forEach(function(r){if(r[0]==='MORSE')r[1].split(/[ ,]+/).filter(Boolean).forEach(function(nid){L(morseOf(nid)+'  ['+nid.toUpperCase()+']',true);});});
+        info.forEach(function(r){if(!NAV.test(r[0])&&r[0]!=='MORSE'&&!(/\d/.test(r[1]||'')&&!OTH.test(r[0])&&!/[\u0E00-\u0E7F]/.test(r[0])))L(txt(r));});
+      }
+      if(a[6]!==''&&a[6]!=null)L('ELEV '+a[6]+' ft');
       return lines;
     }
     /* ---- AD info boxes (corners), for route points that are airports ---- */
@@ -7134,11 +7140,10 @@ function buildMiniMap(opt){
       /* off-route point: name, lat, long, radial; TH SarabunPSK 2 pt smaller than route points, all black */
       var lh=LH(sz),pad=5*S,lines=[];
       var rr=mmRadial(p);ctx.font=sz+'px '+WFONT;
-      var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
+      var cw=Math.max(ctx.measureText('R-000/00 VTXX').width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
       lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw));
       if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw));
-      lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
-      lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
+      /* SPD 3 NOV: off-route points show no lat / long */
       if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});
       return placeAndDraw(q,lines,pad,small,'center',noTag);
     }
@@ -7188,7 +7193,7 @@ function buildMiniMap(opt){
     }
     /* small ident tag next to airport points (AD details are in the corner box) */
     function adTag(p,q,end){
-      var t=(p.name||'').toUpperCase(),sz=end?PTE:14*S;ctx.font=end?'600 '+sz+'px '+WFONT:'600 '+sz+'px '+FONT;
+      var t=(p.name||'').toUpperCase(),sz=(end?PT(13):14*S)+PT(2);   /* airport names 2 pt bigger */ctx.font=end?'600 '+sz+'px '+WFONT:'600 '+sz+'px '+FONT;
       var w=ctx.measureText(t).width*1.06+14*S,h=Math.round(sz*1.5),placed=null;
       var hs=h/S;
       [[40,8],[-40-w/S,8],[40,-8-hs],[-40-w/S,-8-hs],[-w/(2*S),40],[-w/(2*S),-40-hs],[16,8],[-16-w/S,8],[16,-8-hs],[-16-w/S,-8-hs]].forEach(function(o){
@@ -7201,7 +7206,7 @@ function buildMiniMap(opt){
     }
     /* route waypoints: boxes stacked along the left / right map edges, joined to their point by a leader line */
     function edgeBoxes(){
-      var items=[],sz=PTR,lh=LH(sz),pad=6*S;
+      var items=[],sz=PTW,lh=LH(sz),pad=6*S;
       pts.forEach(function(p,i){
         /* same point entered twice (e.g. a round trip back to the start): one box only, for its first visit */
         var nmU=(p.name||'').toUpperCase().trim();
