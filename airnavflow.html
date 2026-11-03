@@ -6746,7 +6746,7 @@ function mmProfSamples(rp){
   return {pts:out,cum:cum,tot:tot};
 }
 /* elevation profile strip along the bottom of the sheet: terrain (ft) against distance, waypoint ticks */
-function mmDrawProfile(ctx,x0,y0,w,h,prof,ft,S,FONT){
+function mmDrawProfile(ctx,x0,y0,w,h,prof,ft,S,FONT,wpFt){
   ctx.save();
   ctx.fillStyle='#fff';ctx.fillRect(x0,y0,w,h);
   ctx.strokeStyle='#111';ctx.lineWidth=2*S;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+w,y0);ctx.stroke();
@@ -6777,7 +6777,23 @@ function mmDrawProfile(ctx,x0,y0,w,h,prof,ft,S,FONT){
   var hi=ft.indexOf(mx),hx=X(prof.pts[hi].d),hy=Y(mx),lbl=Math.round(mx).toLocaleString('en-US')+' ft';
   ctx.fillStyle='#c0392b';ctx.beginPath();ctx.moveTo(hx,hy-1*S);ctx.lineTo(hx-5*S,hy-9*S);ctx.lineTo(hx+5*S,hy-9*S);ctx.closePath();ctx.fill();
   ctx.font='700 '+(10*S)+'px '+FONT;var tw=ctx.measureText(lbl).width,tx=Math.min(Math.max(hx+8*S,x0+L+2*S),x0+L+pw-tw-2*S);
-  ctx.textBaseline='top';ctx.lineWidth=3*S;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.strokeText(lbl,tx,y0+3*S);ctx.fillText(lbl,tx,y0+3*S);
+  var used=[{x:tx-3*S,y:y0+2*S,w:tw+6*S,h:12*S}];   /* red (highest) label keeps its place; black labels never overlap it */
+  /* ELEV of each waypoint in black, just above the terrain at its tick (skipped where labels would overlap) */
+  ctx.save();ctx.font='600 '+(8*S)+'px '+FONT;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillStyle='#111';
+  (wpFt||[]).forEach(function(v,i){
+    if(v==null||prof.cum[i]==null)return;
+    var t=Math.round(v).toLocaleString('en-US')+' ft',w2=ctx.measureText(t).width,x=X(prof.cum[i]);
+    var lx=Math.min(Math.max(x+3*S,x0+L+2*S),x0+L+pw-w2-2*S),by=Math.max(top+10*S,Math.min(Y(v)-3*S,bot-2*S));
+    var r={x:lx-2*S,y:by-10*S,w:w2+4*S,h:10*S};
+    if(used.some(function(u){return r.x<u.x+u.w&&u.x<r.x+r.w&&r.y<u.y+u.h&&u.y<r.y+r.h;})){
+      r.y=y0+2*S;by=r.y+10*S;   /* try the top line instead */
+      if(used.some(function(u){return r.x<u.x+u.w&&u.x<r.x+r.w&&r.y<u.y+u.h&&u.y<r.y+r.h;}))return;
+    }
+    used.push(r);
+    ctx.lineWidth=3*S;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.strokeText(t,lx,by);ctx.fillText(t,lx,by);
+  });
+  ctx.restore();
+  ctx.fillStyle='#c0392b';ctx.textBaseline='top';ctx.lineWidth=3*S;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.strokeText(lbl,tx,y0+3*S);ctx.fillText(lbl,tx,y0+3*S);
   ctx.font='500 '+(8*S)+'px '+FONT;ctx.fillStyle='#555';ctx.textAlign='right';ctx.textBaseline='middle';
   ctx.fillText(top2.toLocaleString('en-US'),x0+L-4*S,Y(top2));ctx.fillText('0',x0+L-4*S,bot);
   ctx.restore();
@@ -6892,7 +6908,7 @@ function buildMiniMap(opt){
       ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
     }
 
-    mmDrawProfile(ctx,0,H,W,PROF,prof,profFt,S,FONT);
+    mmDrawProfile(ctx,0,H,W,PROF,prof,profFt,S,FONT,elevFt);
     var P=pts.map(px),boxes=[],segs=[];
     for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
     function free(b,ignoreSegs,overLeg){   /* overLeg: last resort, may cover a leg label (never another box) */
