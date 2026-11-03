@@ -6242,7 +6242,7 @@ function xmlEsc(s){
     .replace(/'/g,'&apos;');
 }
 
-function buildRouteKml(){
+function buildRouteKml(offSel){
   var lineCoords=[];
 
   for(var i=1;i<pts.length;i++){
@@ -6262,7 +6262,7 @@ function buildRouteKml(){
       '</Placemark>';
   }
   var placemarks=pts.map(function(p,i){return pointPm(p,p.name||('Waypoint '+(i+1)));}).join('');
-  var offs=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
+  var offs=(offSel||offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
   var offFolder=offs.length?'<Folder><name>Off-Route</name>'+offs.map(function(p,i){return pointPm(p,p.name||('Off-Route '+(i+1)));}).join('')+'</Folder>':'';
 
   var routeName=(pts[0].name||'WP1')+' - '+(pts[pts.length-1].name||('WP'+pts.length));
@@ -6288,8 +6288,94 @@ function exportRouteKmz(){
     return;
   }
 
+  var offs=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
+  if(!offs.length){writeRouteKmz([]);return;}
+  askKmzOffRoute(offs).then(function(sel){if(sel)writeRouteKmz(sel);});
+}
+
+/* NM from point p to the nearest route leg (flat-earth, fine for <= a few hundred NM) */
+function kmzNmFromRoute(p){
+  var rad=Math.PI/180,best=Infinity,c=Math.cos(p.lat*rad);
+  function xy(a){return {x:a.lng*60*c,y:a.lat*60};}
+  var o=xy(p);
+  for(var k=1;k<pts.length;k++){
+    var a=xy(pts[k-1]),b=xy(pts[k]),dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+    var t=L2?Math.max(0,Math.min(1,((o.x-a.x)*dx+(o.y-a.y)*dy)/L2)):0;
+    best=Math.min(best,Math.hypot(o.x-a.x-t*dx,o.y-a.y-t*dy));
+  }
+  return best;
+}
+
+/* EXPORT KMZ: choose which off-route points go into the file.
+   resolves to an array of points (may be empty) or null = cancel */
+function askKmzOffRoute(offs){
+  return new Promise(function(res){
+    var bg=document.createElement('div');
+    bg.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#3a3f46;color:#fff;border:1px solid #666d76;border-radius:10px;padding:16px;max-width:360px;width:100%;max-height:90vh;display:flex;flex-direction:column;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+    bg.appendChild(box);
+    function close(v){if(bg.parentNode)document.body.removeChild(bg);res(v);}
+    function btn(label,primary,fn){
+      var b=document.createElement('button');
+      b.type='button';b.textContent=label;
+      b.style.cssText='display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #666d76;background:'+(primary?'#4a5058':'transparent')+';color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer';
+      b.onclick=fn;return b;
+    }
+    var near=offs.map(function(p){return {p:p,d:kmzNmFromRoute(p)};})
+      .filter(function(x){return x.d<=20;})
+      .sort(function(a,b){return a.d-b.d;});
+    function menu(){
+      box.innerHTML='';
+      var t=document.createElement('div');
+      t.style.cssText='margin-bottom:10px;font-weight:600';
+      t.textContent='Off-Route Waypoint ใน KMZ (มี '+offs.length+' จุด)';
+      box.appendChild(t);
+      box.appendChild(btn('1. ทั้งหมด ('+offs.length+')',true,function(){close(offs);}));
+      box.appendChild(btn('2. รอบเส้นทางบิน 20 NM ('+near.length+') → เลือก',true,pick));
+      box.appendChild(btn('3. ไม่ใส่ (สำหรับ FalCon2CP)',true,function(){close([]);}));
+      box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
+    }
+    function pick(){
+      box.innerHTML='';
+      var t=document.createElement('div');
+      t.style.cssText='margin-bottom:8px;font-weight:600';
+      t.textContent=near.length?'เอาเครื่องหมายออกจากจุดที่ไม่ต้องการ':'ไม่มี Off-Route ภายใน 20 NM';
+      box.appendChild(t);
+      var list=document.createElement('div');
+      list.style.cssText='overflow:auto;flex:1 1 auto;min-height:0;border:1px solid #666d76;border-radius:8px;padding:4px 8px;margin-bottom:6px';
+      var cbs=near.map(function(x,i){
+        var l=document.createElement('label');
+        l.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid #4a5058';
+        var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.style.cssText='width:18px;height:18px;flex:none';
+        var n=document.createElement('span');n.style.cssText='flex:1;min-width:0;overflow-wrap:anywhere';
+        n.textContent=(x.p.name||('Off-Route '+(offs.indexOf(x.p)+1)))+(x.p.remark?' ('+x.p.remark+')':'');
+        var d=document.createElement('span');d.style.cssText='flex:none;color:#9fd';d.textContent=x.d.toFixed(1)+' NM';
+        l.appendChild(cb);l.appendChild(n);l.appendChild(d);list.appendChild(l);
+        return cb;
+      });
+      if(near.length)box.appendChild(list);
+      if(near.length){
+        var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
+        var all=btn('เลือกทั้งหมด',false,function(){cbs.forEach(function(c){c.checked=true;});});
+        var none=btn('ไม่เลือกเลย',false,function(){cbs.forEach(function(c){c.checked=false;});});
+        all.style.margin=none.style.margin='0 0 6px';
+        row.appendChild(all);row.appendChild(none);box.appendChild(row);
+      }
+      box.appendChild(btn('EXPORT KMZ',true,function(){
+        close(near.filter(function(x,i){return cbs[i].checked;}).map(function(x){return x.p;}));
+      }));
+      box.appendChild(btn('ย้อนกลับ',false,menu));
+    }
+    bg.onclick=function(e){if(e.target===bg)close(null);};
+    menu();
+    document.body.appendChild(bg);
+  });
+}
+
+function writeRouteKmz(offSel){
   var zip=new JSZip();
-  zip.file('doc.kml',buildRouteKml());
+  zip.file('doc.kml',buildRouteKml(offSel));
 
   zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}).then(function(blob){
     var a=document.createElement('a');
