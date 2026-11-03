@@ -6289,7 +6289,6 @@ function exportRouteKmz(){
   }
 
   var offs=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
-  if(!offs.length){writeRouteKmz([]);return;}
   askKmzOffRoute(offs).then(function(sel){if(sel)writeRouteKmz(sel);});
 }
 
@@ -6325,15 +6324,29 @@ function askKmzOffRoute(offs){
     var near=offs.map(function(p){return {p:p,d:kmzNmFromRoute(p)};})
       .filter(function(x){return x.d<=20;})
       .sort(function(a,b){return a.d-b.d;});
+    /* option 3 (Falcon2CP): KMZ without off-route points, made now so the Share sheet can open
+       straight from the tap (iOS needs navigator.share inside the click itself) */
+    var falconFile=null;
+    kmzBlob([]).then(function(b){
+      try{falconFile=new File([b],kmzFileName(),{type:'application/vnd.google-earth.kmz'});}catch(e){}
+    });
+    function openInFalcon(){
+      if(falconFile&&navigator.canShare&&navigator.canShare({files:[falconFile]})){
+        navigator.share({files:[falconFile],title:kmzFileName()}).catch(function(e){
+          if(!e||e.name!=='AbortError')writeRouteKmz([]); /* share failed: download instead */
+        });
+        close(null);
+      }else close([]); /* no Share sheet (desktop): just download */
+    }
     function menu(){
       box.innerHTML='';
       var t=document.createElement('div');
       t.style.cssText='margin-bottom:10px;font-weight:600';
-      t.textContent='Off-Route Waypoint ใน KMZ (มี '+offs.length+' จุด)';
+      t.textContent='EXPORT KMZ (Off-Route มี '+offs.length+' จุด)';
       box.appendChild(t);
       box.appendChild(btn('1. ทั้งหมด ('+offs.length+')',true,function(){close(offs);}));
       box.appendChild(btn('2. รอบเส้นทางบิน 20 NM ('+near.length+') → เลือก',true,pick));
-      box.appendChild(btn('3. ไปเปิดใน Falcon2CP (ไม่ใส่ Off-Route)',true,function(){close([]);}));
+      box.appendChild(btn('3. ไปเปิดใน Falcon2CP (ไม่ใส่ Off-Route)',true,openInFalcon));
       box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
     }
     function pick(){
@@ -6373,17 +6386,22 @@ function askKmzOffRoute(offs){
   });
 }
 
-function writeRouteKmz(offSel){
+function kmzBlob(offSel){
   var zip=new JSZip();
   zip.file('doc.kml',buildRouteKml(offSel));
-
-  zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}).then(function(blob){
+  return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+}
+function kmzFileName(){
+  var start=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_');
+  var end=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
+  return 'Flight_Route_'+start+'_'+end+'.kmz';
+}
+function writeRouteKmz(offSel){
+  kmzBlob(offSel).then(function(blob){
     var a=document.createElement('a');
     var url=URL.createObjectURL(blob);
-    var start=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_');
-    var end=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
     a.href=url;
-    a.download='Flight_Route_'+start+'_'+end+'.kmz';
+    a.download=kmzFileName();
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
