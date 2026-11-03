@@ -6333,7 +6333,7 @@ function askKmzOffRoute(offs){
       box.appendChild(t);
       box.appendChild(btn('1. ทั้งหมด ('+offs.length+')',true,function(){close(offs);}));
       box.appendChild(btn('2. รอบเส้นทางบิน 20 NM ('+near.length+') → เลือก',true,pick));
-      box.appendChild(btn('3. ไม่ใส่ (สำหรับ FalCon2CP)',true,function(){close([]);}));
+      box.appendChild(btn('3. ไปเปิดใน Falcon2CP (ไม่ใส่ Off-Route)',true,function(){close([]);}));
       box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
     }
     function pick(){
