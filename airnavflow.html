@@ -6321,9 +6321,9 @@ function askKmzOffRoute(offs){
       b.style.cssText='display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #666d76;background:'+(primary?'#4a5058':'transparent')+';color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer';
       b.onclick=fn;return b;
     }
-    var near=offs.map(function(p){return {p:p,d:kmzNmFromRoute(p)};})
-      .filter(function(x){return x.d<=20;})
+    var allD=offs.map(function(p){return {p:p,d:kmzNmFromRoute(p)};})
       .sort(function(a,b){return a.d-b.d;});
+    var within=allD.filter(function(x){return x.d<=20;});
     /* option 3 (Falcon2CP): KMZ without off-route points, made now so the Share sheet can open
        straight from the tap (iOS needs navigator.share inside the click itself) */
     var falconFile=null;
@@ -6344,16 +6344,16 @@ function askKmzOffRoute(offs){
       t.style.cssText='margin-bottom:10px;font-weight:600';
       t.textContent='EXPORT KMZ (Off-Route มี '+offs.length+' จุด)';
       box.appendChild(t);
-      box.appendChild(btn('1. All W.Pt',true,function(){close(offs);}));
-      box.appendChild(btn('2. W.Pt with in 20NM',true,pick));
+      box.appendChild(btn('1. All W.Pt',true,function(){pick(allD,'ไม่มี Off-Route');}));
+      box.appendChild(btn('2. W.Pt with in 20NM',true,function(){pick(within,'ไม่มี Off-Route ภายใน 20 NM');}));
       box.appendChild(btn('3. No W.Pt (for FalCon2CP)',true,openInFalcon));
       box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
     }
-    function pick(){
+    function pick(near,emptyMsg){
       box.innerHTML='';
       var t=document.createElement('div');
       t.style.cssText='margin-bottom:8px;font-weight:600';
-      t.textContent=near.length?'เอาเครื่องหมายออกจากจุดที่ไม่ต้องการ':'ไม่มี Off-Route ภายใน 20 NM';
+      t.textContent=near.length?'เอาเครื่องหมายออกจากจุดที่ไม่ต้องการ':emptyMsg;
       box.appendChild(t);
       var list=document.createElement('div');
       list.style.cssText='overflow:auto;flex:1 1 auto;min-height:0;border:1px solid #666d76;border-radius:8px;padding:4px 8px;margin-bottom:6px';
