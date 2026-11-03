@@ -6344,9 +6344,9 @@ function askKmzOffRoute(offs){
       t.style.cssText='margin-bottom:10px;font-weight:600';
       t.textContent='EXPORT KMZ (Off-Route มี '+offs.length+' จุด)';
       box.appendChild(t);
-      box.appendChild(btn('1. ทั้งหมด ('+offs.length+')',true,function(){close(offs);}));
-      box.appendChild(btn('2. รอบเส้นทางบิน 20 NM ('+near.length+') → เลือก',true,pick));
-      box.appendChild(btn('3. ไปเปิดใน Falcon2CP (ไม่ใส่ Off-Route)',true,openInFalcon));
+      box.appendChild(btn('1. All W.Pt',true,function(){close(offs);}));
+      box.appendChild(btn('2. W.Pt with in 20NM',true,pick));
+      box.appendChild(btn('3. No W.Pt (for FalCon2CP)',true,openInFalcon));
       box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
     }
     function pick(){
