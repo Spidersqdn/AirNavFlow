@@ -6619,12 +6619,64 @@ function mmElevFt(list){
   return Promise.all(list.map(function(p){return (elevPM?elevAt(p.lat,p.lng):Promise.resolve(null)).catch(function(){return null;});})).then(function(m){
     var miss=[];m.forEach(function(v,i){if(v==null)miss.push(i);});
     if(!miss.length||!navigator.onLine)return m;
-    var la=miss.map(function(i){return list[i].lat.toFixed(4);}).join(','),lo=miss.map(function(i){return list[i].lng.toFixed(4);}).join(',');
-    var ctl=window.AbortController?new AbortController():null,t=setTimeout(function(){if(ctl)ctl.abort();},6000);
-    return fetch('https://api.open-meteo.com/v1/elevation?latitude='+la+'&longitude='+lo,ctl?{signal:ctl.signal}:{}).then(function(r){return r.json();}).then(function(j){
-      clearTimeout(t);(j.elevation||[]).forEach(function(v,k){if(isFinite(v))m[miss[k]]=v;});return m;
-    }).catch(function(){clearTimeout(t);return m;});
+    var parts=[];for(var c=0;c<miss.length;c+=100)parts.push(miss.slice(c,c+100));   /* Open-Meteo: up to 100 points per call */
+    return Promise.all(parts.map(function(ix){
+      var la=ix.map(function(i){return list[i].lat.toFixed(4);}).join(','),lo=ix.map(function(i){return list[i].lng.toFixed(4);}).join(',');
+      var ctl=window.AbortController?new AbortController():null,t=setTimeout(function(){if(ctl)ctl.abort();},8000);
+      return fetch('https://api.open-meteo.com/v1/elevation?latitude='+la+'&longitude='+lo,ctl?{signal:ctl.signal}:{}).then(function(r){return r.json();}).then(function(j){
+        clearTimeout(t);(j.elevation||[]).forEach(function(v,k){if(isFinite(v))m[ix[k]]=v;});
+      }).catch(function(){clearTimeout(t);});
+    })).then(function(){return m;});
   }).then(function(m){return m.map(function(v){return v==null?null:Math.round(v/0.3048);});});
+}
+
+/* points every ~equal distance along the route for the elevation profile (max 90 + waypoints) */
+function mmProfSamples(rp){
+  var cum=[0];for(var i=1;i<rp.length;i++)cum.push(cum[i-1]+dist(rp[i-1],rp[i]));
+  var tot=cum[cum.length-1]||1,N=90,out=[];
+  for(var k=0;k<=N;k++){
+    var dd=tot*k/N,j=1;while(j<rp.length-1&&cum[j]<dd)j++;
+    var a=rp[j-1],b=rp[j],L=cum[j]-cum[j-1],t=L?Math.max(0,Math.min(1,(dd-cum[j-1])/L)):0;
+    out.push({lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t,d:dd});
+  }
+  return {pts:out,cum:cum,tot:tot};
+}
+/* elevation profile strip along the bottom of the sheet: terrain (ft) against distance, waypoint ticks */
+function mmDrawProfile(ctx,x0,y0,w,h,prof,ft,S,FONT){
+  ctx.save();
+  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,w,h);
+  ctx.strokeStyle='#111';ctx.lineWidth=2*S;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+w,y0);ctx.stroke();
+  var L=56*S,Rr=10*S,top=y0+8*S,bot=y0+h-6*S,pw=w-L-Rr;
+  var vals=ft.filter(function(v){return v!=null;});
+  ctx.font='600 '+(9*S)+'px '+FONT;ctx.fillStyle='#111';ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillText('ELEV',8*S,y0+h*0.35);ctx.fillText('(ft)',8*S,y0+h*0.68);
+  if(!vals.length){
+    ctx.textAlign='center';ctx.fillStyle='#666';ctx.fillText('ไม่มีข้อมูลความสูง (ดาวน์โหลดข้อมูลความสูงออฟไลน์ หรือต่อเน็ต)',x0+L+pw/2,y0+h/2);
+    ctx.restore();return;
+  }
+  var mx=Math.max.apply(null,vals),top2=Math.max(500,Math.ceil(mx*1.15/500)*500);
+  function X(d){return x0+L+pw*d/prof.tot;}
+  function Y(v){return bot-(bot-top)*Math.max(0,v)/top2;}
+  /* scale line */
+  ctx.strokeStyle='#c8cdd3';ctx.lineWidth=1*S;ctx.setLineDash([4*S,4*S]);
+  ctx.beginPath();ctx.moveTo(x0+L,Y(top2));ctx.lineTo(x0+L+pw,Y(top2));ctx.stroke();ctx.setLineDash([]);
+  /* terrain */
+  ctx.beginPath();ctx.moveTo(X(0),bot);
+  prof.pts.forEach(function(p,i){var v=ft[i];ctx.lineTo(X(p.d),Y(v==null?0:v));});
+  ctx.lineTo(X(prof.tot),bot);ctx.closePath();
+  ctx.fillStyle='#b98a52';ctx.fill();ctx.strokeStyle='#5b3b16';ctx.lineWidth=1.5*S;ctx.stroke();
+  ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(x0+L,bot);ctx.lineTo(x0+L+pw,bot);ctx.stroke();
+  /* waypoint ticks */
+  ctx.strokeStyle='#1f2fd6';ctx.lineWidth=1.2*S;
+  prof.cum.forEach(function(d){var x=X(d);ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,bot);ctx.stroke();});
+  /* highest point */
+  var hi=ft.indexOf(mx),hx=X(prof.pts[hi].d),hy=Y(mx),lbl=Math.round(mx).toLocaleString('en-US')+' ft';
+  ctx.fillStyle='#c0392b';ctx.beginPath();ctx.moveTo(hx,hy-1*S);ctx.lineTo(hx-5*S,hy-9*S);ctx.lineTo(hx+5*S,hy-9*S);ctx.closePath();ctx.fill();
+  ctx.font='700 '+(10*S)+'px '+FONT;var tw=ctx.measureText(lbl).width,tx=Math.min(Math.max(hx+8*S,x0+L+2*S),x0+L+pw-tw-2*S);
+  ctx.textBaseline='top';ctx.lineWidth=3*S;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.strokeText(lbl,tx,y0+3*S);ctx.fillText(lbl,tx,y0+3*S);
+  ctx.font='500 '+(8*S)+'px '+FONT;ctx.fillStyle='#555';ctx.textAlign='right';ctx.textBaseline='middle';
+  ctx.fillText(top2.toLocaleString('en-US'),x0+L-4*S,Y(top2));ctx.fillText('0',x0+L-4*S,bot);
+  ctx.restore();
 }
 
 function mmRoundRect(ctx,x,y,w,h){ctx.beginPath();ctx.rect(x,y,w,h);}
@@ -6685,7 +6737,7 @@ function buildMiniMap(opt){
   all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
   var portrait=true;   /* always A4 portrait (1 : 1.414) */
-  var H=Math.round(900*Math.SQRT2)*S,MH=H-HEAD;
+  var H=Math.round(900*Math.SQRT2)*S,PROF=Math.round(H/25),MH=H-HEAD-PROF;   /* bottom strip (1/25 of the sheet) = elevation profile */
   var innerW=W*(spanX>spanY?0.62:0.45),innerH=MH*0.72;
   if(pts.length>9){innerW*=0.85;innerH=MH*0.6;}   /* many points: leave a margin all round for the edge boxes */
   var z=Math.log2(Math.min(innerW/spanX,innerH/spanY));
@@ -6703,7 +6755,7 @@ function buildMiniMap(opt){
   var mctx=mapCv.getContext('2d');
 
   var hasContour=false;
-  var logo=null,elevFt=[];
+  var logo=null,elevFt=[],prof=mmProfSamples(pts),profFt=[];
   var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun','Aก่ำ'),document.fonts.load('600 36px Sarabun','Aก่ำ')]).catch(function(){}):Promise.resolve();
   return fontsReady.then(function(){
     return mmDrawBase(mctx,W,MH,cxW,cyW,z,center);
@@ -6712,8 +6764,9 @@ function buildMiniMap(opt){
   }).then(function(){
     return mmLoadImg('icons/sqn201.png',4000).then(function(im){logo=im;});
   }).then(function(){
-    return mmElevFt(pts).then(function(e){elevFt=e;});
+    return mmElevFt(pts.concat(prof.pts)).then(function(e){elevFt=e.slice(0,pts.length);profFt=e.slice(pts.length);});
   }).then(function(){
+    var HF=H;H=HF-PROF;   /* from here on H = bottom of the map area; the profile strip sits below it */
     ctx.drawImage(mapCv,0,HEAD);
     ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);   /* fade like a printed strip chart */
 
@@ -6734,6 +6787,7 @@ function buildMiniMap(opt){
       ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
     }
 
+    mmDrawProfile(ctx,0,H,W,PROF,prof,profFt,S,FONT);
     var P=pts.map(px),boxes=[],segs=[];
     for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
     function free(b,ignoreSegs,overLeg){   /* overLeg: last resort, may cover a leg label (never another box) */
@@ -6849,12 +6903,14 @@ function buildMiniMap(opt){
       }
       return best;
     }
-    var offs=(offRoutePts||[]).filter(function(p){return !offSkip[mmOffKey(p)];}).filter(function(p){
+    var offCand=(offRoutePts||[]).filter(function(p){
       var nm=(p.name||'').toUpperCase();
       nm=nm.trim();
       if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
       return nmFromRoute(p)<=20;
     }).map(function(p){return {p:p,q:px(p)};}).filter(function(o){return o.q.x>20*S&&o.q.x<W-20*S&&o.q.y>HEAD+20*S&&o.q.y<H-20*S;});
+    var offs=offCand.filter(function(o){return !offSkip[mmOffKey(o.p)];});
+    var many=pts.length+offs.length>10;   /* SPD: more than 10 points -> no ELEV line, off-route type may drop 2 pt more */
 
     /* ---- leg labels: blue bar along each leg "<- 341° 31.8 NM 161° ->" ----
        the bar must not touch any route leg, waypoint / airport symbol or other box: tried at several
@@ -6873,6 +6929,7 @@ function buildMiniMap(opt){
       for(var r=0;r<symR.length;r++){var l2=loc(symR[r].q),dx=Math.max(Math.abs(l2.x)-hw,0),dy=Math.max(Math.abs(l2.y)-hh,0);if(Math.hypot(dx,dy)<symR[r].r)return true;}
       return false;
     }
+    var legLbl=[];
     for(var li=1;li<pts.length;li++){
       var A=P[li-1],B=P[li],len=Math.hypot(B.x-A.x,B.y-A.y);
       var crs=course(pts[li-1],pts[li]),d=dist(pts[li-1],pts[li]),rec=(crs+180)%360;
@@ -6880,7 +6937,7 @@ function buildMiniMap(opt){
       if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
       var dTxt=(d<100?d.toFixed(1):Math.round(d))+' NM';
       /* many waypoints (>7) or a short leg (<10 NM): outbound heading only, arrow in the direction of flight */
-      var txt=(pts.length>7||d<10)?(fwd?mmPad3(crs)+'°  '+dTxt+' ->':'<- '+mmPad3(crs)+'°  '+dTxt)
+      var txt=(pts.length>7||d<10)?(fwd?dTxt+'  '+mmPad3(crs)+'° ->':'<- '+mmPad3(crs)+'°  '+dTxt)
         :'<- '+mmPad3(fwd?rec:crs)+'°  '+dTxt+'  '+mmPad3(fwd?crs:rec)+'° ->';
       var nx=-Math.sin(ang),ny=Math.cos(ang),ca=Math.abs(Math.cos(ang)),sa=Math.abs(Math.sin(ang)),got=null;
       [16*S,13*S,11*S].forEach(function(fs0){
@@ -6901,10 +6958,7 @@ function buildMiniMap(opt){
         });
       });
       if(!got)continue;
-      ctx.save();ctx.translate(got.cx,got.cy);ctx.rotate(ang);ctx.font='600 '+got.fs+'px '+FONT;
-      ctx.fillStyle='#1f2fd6';ctx.fillRect(-got.tw/2,-got.bh/2,got.tw,got.bh);
-      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,got.fs*0.05);
-      ctx.restore();
+      got.ang=ang;got.txt=txt;legLbl.push(got);   /* drawn last, so no box can ever cover it */
       got.bb.leg=true;boxes.push(got.bb);
     }
 
@@ -6971,10 +7025,10 @@ function buildMiniMap(opt){
     offs.forEach(function(o){ring(o.q,10*S);});
 
     /* ---- waypoint info boxes (route + off-route) ---- */
-    function wpBox(p,q,i,small){
+    function wpBox(p,q,i,small,sz,noTag){
       var id=(p.name||'').toUpperCase();
       /* off-route point: name, lat, long, radial; TH SarabunPSK 2 pt smaller than route points, all black */
-      var sz=PTO,lh=LH(sz),pad=5*S,lines=[];
+      var lh=LH(sz),pad=5*S,lines=[];
       var rr=mmRadial(p);ctx.font=sz+'px '+WFONT;
       var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
       lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw));
@@ -6982,7 +7036,7 @@ function buildMiniMap(opt){
       lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
       lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
       if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});
-      placeAndDraw(q,lines,pad,small,'center');
+      return placeAndDraw(q,lines,pad,small,'center',noTag);
     }
     function leadOk(q,b){   /* a box's leader line may not run through another box */
       var bx=Math.max(b.x,Math.min(q.x,b.x+b.w)),by=Math.max(b.y,Math.min(q.y,b.y+b.h));
@@ -7057,7 +7111,7 @@ function buildMiniMap(opt){
         lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
         lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
-        lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
+        if(end||!many)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(end)for(var k=0;k<4;k++)lines.push({t:'',f:sz+'px '+WFONT,lh:lh,sz:sz});   /* blank rows to fill in by hand */
         var m=mmMeasure(ctx,lines,pad);if(end)m.w=Math.max(m.w,190*S);
         items.push({p:p,q:P[i],lines:lines,m:m,pad:pad});
@@ -7148,10 +7202,10 @@ function buildMiniMap(opt){
       });
       rest.forEach(function(it){   /* last resort: nearest free spot, same content */
         var best=null,bd=Infinity,st=8*S,m=it.m;
-        for(var pass=0;pass<3&&!best;pass++)
+        for(var pass=0;pass<2&&!best;pass++)
         for(var gy=HEAD+E;gy+m.h<H-E;gy+=st)for(var gx=E;gx+m.w<W-E;gx+=st){
           var dd=Math.pow(gx+m.w/2-it.q.x,2)+Math.pow(gy+m.h/2-it.q.y,2);if(dd>=bd)continue;
-          var b={x:gx,y:gy,w:m.w,h:m.h};if(free(b,pass>0,pass===2)){best=b;bd=dd;}
+          var b={x:gx,y:gy,w:m.w,h:m.h};if(free(b,pass>0)){best=b;bd=dd;}
         }
         it.b=best||{x:E,y:H-E-m.h,w:m.w,h:m.h};boxes.push(it.b);
       });
@@ -7167,7 +7221,10 @@ function buildMiniMap(opt){
       });
     }
     edgeBoxes();
-    offs.forEach(function(o,i){wpBox(o.p,o.q,i,true);});
+    offs.forEach(function(o,i){   /* 9 pt; 7 pt when the sheet is crowded or the 9 pt box finds no room */
+      if(!many&&wpBox(o.p,o.q,i,true,PTO,true))return;
+      wpBox(o.p,o.q,i,true,PT(7));
+    });
     /* airports off the route: info box in smaller type (8 pt, then 7 pt if space is short), name tag only as a last resort */
     nearAD.forEach(function(o){
       if(placeAndDraw(o.q,adLines(o.id,PT(8),true),4*S,true,'left',true))return;
@@ -7177,13 +7234,21 @@ function buildMiniMap(opt){
 
     /* AD boxes last so they sit on top */
     boxes.forEach(function(b){if(b.ad)mmDrawBox(ctx,b,b.lines,b.pad,'left',3*S);});
+    /* leg HDG / distance bars on top of everything */
+    legLbl.forEach(function(g){
+      ctx.save();ctx.translate(g.cx,g.cy);ctx.rotate(g.ang);ctx.font='600 '+g.fs+'px '+FONT;
+      ctx.fillStyle='#1f2fd6';ctx.fillRect(-g.tw/2,-g.bh/2,g.tw,g.bh);
+      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.txt,0,g.fs*0.05);
+      ctx.restore();
+    });
 
     /* north arrow in a free corner */
     ctx.save();ctx.translate(NA.x+NA.w/2,NA.y+30*S);
     ctx.fillStyle='#111';ctx.beginPath();ctx.moveTo(0,-22*S);ctx.lineTo(9*S,8*S);ctx.lineTo(0,2*S);ctx.lineTo(-9*S,8*S);ctx.closePath();ctx.fill();
     ctx.font='700 '+(13*S)+'px '+FONT;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('N',0,10*S);
     ctx.restore();
-    ctx.strokeStyle='#111';ctx.lineWidth=3*S;ctx.strokeRect(0,0,W,H);
+    ctx.strokeStyle='#111';ctx.lineWidth=3*S;ctx.strokeRect(0,0,W,HF);
+    cv.mmOffs=offCand.map(function(o){return o.p;});   /* off-route points that fall inside this sheet (for the WPt list) */
     return cv;
   });
 }
@@ -7194,7 +7259,7 @@ function showMiniMap(cv){
   var fname='MiniMap_'+dep+'_'+arr+'.png';
   var url=cv.toDataURL('image/png');
   var d=document.createElement('div');d.id='miniMapModal';
-  var offList=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}),skip=mmOffSkip(),skipSet={};
+  var offList=(cv.mmOffs||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}),skip=mmOffSkip(),skipSet={};   /* only points inside this sheet */
   skip.forEach(function(k){skipSet[k]=1;});
   var nOn=offList.filter(function(p){return !skipSet[mmOffKey(p)];}).length;
   var wpt=offList.length?'<details class="mm-wpt" id="mmWpt"'+(mmWptOpen?' open':'')+'><summary>WPt ('+nOn+'/'+offList.length+')</summary><div class="mm-wpt-list">'+
@@ -7216,7 +7281,8 @@ function showMiniMap(cv){
     wd.addEventListener('toggle',function(){mmWptOpen=wd.open;});
     var boxesW=[].slice.call(wd.querySelectorAll('input[data-i]')),all=document.getElementById('mmWptAll');
     function apply(){
-      var sk=offList.filter(function(p,i){return !boxesW[i].checked;}).map(mmOffKey);
+      var inList={};offList.forEach(function(p){inList[mmOffKey(p)]=1;});
+      var sk=skip.filter(function(k){return !inList[k];}).concat(offList.filter(function(p,i){return !boxesW[i].checked;}).map(mmOffKey));   /* keep choices for points outside this sheet */
       try{localStorage.setItem('fp-mm-offx',JSON.stringify(sk));}catch(e){}
       clearTimeout(wt);wt=setTimeout(function(){
         wd.querySelectorAll('input').forEach(function(x){x.disabled=true;});
