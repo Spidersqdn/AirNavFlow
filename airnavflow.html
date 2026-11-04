@@ -6815,6 +6815,22 @@ function mmDrawProfile(ctx,x0,y0,w,h,prof,ft,S,FONT,wpFt){
   ctx.restore();
 }
 
+/* DIST (total NM) and FT (flight time at the set speed + 5 min, h:mm) box beside the profile strip */
+function mmDrawDistFt(ctx,x0,y0,w,h,tot,S,FONT){
+  var spd=num('speed'),mins=spd>0?Math.round(tot/spd*60)+5:NaN;
+  var ft=isFinite(mins)?Math.floor(mins/60)+':'+String(mins%60).padStart(2,'0'):'-';
+  ctx.save();
+  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,w,h);
+  ctx.strokeStyle='#111';ctx.lineWidth=2*S;
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+w,y0);ctx.moveTo(x0,y0);ctx.lineTo(x0,y0+h);ctx.moveTo(x0+w/2,y0);ctx.lineTo(x0+w/2,y0+h);ctx.stroke();
+  [['DIST',Math.round(tot)+' NM'],['FT',ft]].forEach(function(c,i){
+    var cx=x0+w*(i+0.5)/2;
+    ctx.fillStyle='#555';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='600 '+(9*S)+'px '+FONT;ctx.fillText(c[0],cx,y0+h*0.24);
+    ctx.fillStyle='#1f2fd6';ctx.font='700 '+(17*S)+'px '+FONT;ctx.fillText(c[1],cx,y0+h*0.64,w/2-8*S);
+  });
+  ctx.restore();
+}
 function mmRoundRect(ctx,x,y,w,h){ctx.beginPath();ctx.rect(x,y,w,h);}
 function mmBoxOverlap(a,b){return a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;}
 function mmSegHitsBox(p,q,b){   /* segment vs rectangle (sampled) */
@@ -6924,7 +6940,9 @@ function buildMiniMap(opt){
       ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
     }
 
-    mmDrawProfile(ctx,0,H,W,PROF,prof,profFt,S,FONT,elevFt);
+    var PW=Math.round(W*3/4);   /* SPD: profile = 3/4 of sheet width, DIST/FT box = 1/4 on the right */
+    mmDrawProfile(ctx,0,H,PW,PROF,prof,profFt,S,FONT,elevFt);
+    mmDrawDistFt(ctx,PW,H,W-PW,PROF,prof.tot,S,FONT);
     var P=pts.map(px),boxes=[],segs=[];
     for(var i=1;i<P.length;i++)segs.push([P[i-1],P[i]]);
     function free(b,ignoreSegs,overLeg){   /* overLeg: last resort, may cover a leg label (never another box) */
