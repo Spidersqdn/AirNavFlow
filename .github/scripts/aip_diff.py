@@ -24,7 +24,7 @@ import urllib.request
 from html.parser import HTMLParser
 
 SITE = os.environ.get("AIP_SITE", "https://aip.caat.or.th")
-UA = "Mozilla/5.0 (AirNavFlow AIP watch; +https://github.com/Spidersqdn/FLIGHT)"
+UA = "Mozilla/5.0 (AirNavFlow AIP watch; +https://github.com/Spidersqdn/AirNavFlow)"
 PAGE_RE = re.compile(r"VT-(?:ENR-(?:3\.\d|4\.\d|5\.1)|AD-2\.[A-Z]{4}|AMDT)-en-GB\.html")
 EXTRA = ["eSUP/VT-eSUPs-en-GB.html", "eAIC/VT-eAICs-en-GB.html"]
 FALLBACK = (["eAIP/VT-ENR-3.%d-en-GB.html" % i for i in range(1, 7)]

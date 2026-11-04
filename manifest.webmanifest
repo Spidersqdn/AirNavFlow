@@ -3,7 +3,7 @@
   "short_name": "AirNavFLOW",
   "description": "VFR flight planner – AIP Thailand",
   "lang": "th",
-  "start_url": "airnavflow.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
