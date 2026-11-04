@@ -1619,11 +1619,11 @@ td .wp-delete{
 
   <div class="wp-mode" id="wpModeLatLon">
     <div class="wp-grid">
-      <label>Latitude (N13 54.750)
-        <input id="wpLat" type="text" placeholder="N13 54.750" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <label>Latitude 6 digits DDMMmm (135475 = N13 54.75)
+        <input id="wpLat" type="text" inputmode="numeric" placeholder="135475" autocomplete="off" autocapitalize="characters" spellcheck="false">
       </label>
-      <label>Longitude (E099 45.000)
-        <input id="wpLng" type="text" placeholder="E099 45.000" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <label>Longitude 7 digits DDDMMmm (0994500 = E099 45.00)
+        <input id="wpLng" type="text" inputmode="numeric" placeholder="0994500" autocomplete="off" autocapitalize="characters" spellcheck="false">
       </label>
       <label class="full">Waypoint Name (optional)
         <input id="wpName" type="text" placeholder="e.g. WP1">
@@ -3552,6 +3552,9 @@ function dm(d,m){ return d + m/60; }
 function parseCoordInput(value,isLat){
   var s=String(value||'').trim().toUpperCase();
   if(!s) return NaN;
+  // Digits only: LAT 6 = DDMMmm (N), LONG 7 = DDDMMmm (E)
+  if(isLat && /^\d{6}$/.test(s)) s=s.slice(0,2)+' '+s.slice(2,4)+'.'+s.slice(4)+'N';
+  else if(!isLat && /^\d{7}$/.test(s)) s=s.slice(0,3)+' '+s.slice(3,5)+'.'+s.slice(5)+'E';
   // Hemisphere prefix (N13 54.750 / E099 45.000) -> suffix form
   var pre=s.match(/^([NSEW])\s*(.+)$/);
   if(pre) s=pre[2].trim()+pre[1];
@@ -8132,7 +8135,7 @@ document.getElementById('wpAddLatLon').onclick=function(){
   var name=document.getElementById('wpName').value.trim();
 
   if(!isFinite(lat) || !isFinite(lng)){
-    alert("Invalid LAT / LONG format. e.g. N13 54.750 / E099 45.000");
+    alert("Invalid LAT / LONG format. e.g. 135475 / 0994500 (or N13 54.750 / E099 45.000)");
     return;
   }
 
@@ -8146,7 +8149,7 @@ document.getElementById('wpAddLatLonOffRoute').onclick=function(){
   var name=document.getElementById('wpName').value.trim();
 
   if(!isFinite(lat)||!isFinite(lng)){
-    alert("Invalid LAT / LONG format. e.g. N13 54.750 / E099 45.000");
+    alert("Invalid LAT / LONG format. e.g. 135475 / 0994500 (or N13 54.750 / E099 45.000)");
     return;
   }
 
