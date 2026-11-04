@@ -7686,8 +7686,8 @@ function buildSlide(f){
     ctx.save();ctx.beginPath();ctx.rect(MX,MY,MWd,MHt);ctx.clip();ctx.translate(MX,MY);
     var P=pts.map(px);
     ctx.lineJoin='round';ctx.lineCap='round';
-    ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=9*S;ctx.beginPath();P.forEach(function(q,i){i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});ctx.stroke();
-    ctx.strokeStyle='#e01010';ctx.lineWidth=5*S;ctx.stroke();
+    ctx.beginPath();P.forEach(function(q,i){i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});
+    ctx.strokeStyle='#e01010';ctx.lineWidth=5*S;ctx.stroke();   /* SPD: red line only, no white halo */
     P.forEach(function(q,i){   /* end points: yellow pin + name; turn points: small dot + name */
       var end=(i===0||i===P.length-1),nm=pts[i].name||'';
       if(end){
