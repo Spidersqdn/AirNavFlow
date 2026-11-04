@@ -21,7 +21,7 @@
 3. ไปแท็บ **Actions** จะเห็น "Build offline map and deploy" ทำงานเอง (ถ้าไม่เห็น กด **Run workflow**)
    - รอบแรกใช้เวลาหลายนาที เพราะต้องตัดแผนที่ไทยจากแผนที่โลก
    - เมื่อเสร็จ ในหน้าสรุปของรอบนั้นจะบอกขนาดไฟล์แผนที่
-4. เปิดเว็บ `https://spidersqdn.github.io/airnavflow.html` (repo ชื่อ `spidersqdn.github.io` = ลิงก์ที่ root; ถ้าใช้ชื่ออื่นจะเป็น `https://<ชื่อผู้ใช้>.github.io/<ชื่อ repo>/airnavflow.html`)
+4. เปิดเว็บ `https://spidersqdn.github.io/AirNavFlow/` (repo ชื่อ `AirNavFlow`; index.html พาไป airnavflow.html)
 
 ## ใช้งานบนมือถือ
 1. เปิดเว็บด้วย **Safari (iPhone/iPad)** หรือ **Chrome (Android)** ตอนมี Wi-Fi
