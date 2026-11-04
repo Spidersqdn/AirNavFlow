@@ -4412,8 +4412,9 @@ function removeNotam(uid){
 }
 function renderNotamImportList(){
   var el=document.getElementById('notamImportList');if(!el)return;
-  var tg=document.getElementById('btnNotamListToggle'),hide=false;
-  try{hide=localStorage.getItem('fp-notam-list-hidden')==='1';}catch(e){}
+  var tg=document.getElementById('btnNotamListToggle'),hide=true;
+  /* Hidden by default; shown only after the user opens it (new key so old saved choices reset). */
+  try{hide=localStorage.getItem('fp-notam-list-hidden-v2')!=='0';}catch(e){}
   if(tg){tg.style.display=NOTAM_DB.length?'':'none';tg.textContent=(hide?'▸ แสดงรายการ NOTAM (':'▾ ซ่อนรายการ NOTAM (')+NOTAM_DB.length+')';}
   el.style.display=hide?'none':'';
   if(!NOTAM_DB.length){el.innerHTML='';return;}
@@ -4423,7 +4424,7 @@ function renderNotamImportList(){
 }
 document.getElementById('btnNotamListToggle').addEventListener('click',function(){
   var hide=document.getElementById('notamImportList').style.display!=='none';
-  try{localStorage.setItem('fp-notam-list-hidden',hide?'1':'0');}catch(e){}
+  try{localStorage.setItem('fp-notam-list-hidden-v2',hide?'1':'0');}catch(e){}
   renderNotamImportList();
 });
 document.addEventListener('click',function(e){
@@ -4435,7 +4436,7 @@ document.addEventListener('click',function(e){
   if(fl){
     e.preventDefault();
     var n=NOTAM_DB.filter(function(x){return x.uid===Number(fl.getAttribute('data-fly'));})[0];
-    if(n){ if(n.poly)map.fitBounds(L.latLngBounds(n.poly).pad(.2)); else map.flyTo([n.lat,n.lng],Math.max(map.getZoom(),8)); }
+    if(n){ notamLayer.addTo(map); if(n.poly)map.fitBounds(L.latLngBounds(n.poly).pad(.2)); else map.flyTo([n.lat,n.lng],Math.max(map.getZoom(),8)); }
   }
 });
 
