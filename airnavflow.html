@@ -1154,17 +1154,17 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal .mm-img{overflow:auto;flex:1;background:#fff}
 #miniMapModal img{display:block;width:100%;height:auto}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
-#flightLogModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
-#flightLogModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
-#flightLogModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
-#flightLogModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
-#flightLogModal img{display:block;width:100%;height:auto}
-#flightLogModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
-#flightLogModal .fl-form{padding:0 10px 8px;color:var(--text,#fff);font-size:12px}
-#flightLogModal .fl-form summary{cursor:pointer;padding:4px 0}
-#flightLogModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
-#flightLogModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
-#flightLogModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
+#flightLogModal,#slideModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+#flightLogModal .mm-card,#slideModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+#flightLogModal .mm-bar,#slideModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
+#flightLogModal .mm-img,#slideModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
+#flightLogModal img,#slideModal img{display:block;width:100%;height:auto}
+#flightLogModal .mm-note,#slideModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
+#flightLogModal .fl-form,#slideModal .fl-form{padding:0 10px 8px;color:var(--text,#fff);font-size:12px}
+#flightLogModal .fl-form summary,#slideModal .fl-form summary{cursor:pointer;padding:4px 0}
+#flightLogModal .fl-grid,#slideModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+#flightLogModal .fl-grid label,#slideModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
+#flightLogModal .fl-grid input,#slideModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
 .actions button{
   flex:1 1 calc(33.333% - 8px);
   min-width:92px;
@@ -1677,6 +1677,7 @@ td .wp-delete{
   <button id="measureBtn" type="button">RULER</button>
   <button id="wBtn" type="button">WINDY</button>
   <button id="importKmz" type="button" title="Import route / waypoints from a KMZ or KML file (e.g. Google Earth)">IMPORT KMZ</button>
+  <button id="slideBtn" type="button" title="Mission overview slide 16:9 (PNG)">SLIDE</button>
   <input id="importKmzFile" type="file" hidden>
 </div>
 
@@ -7479,6 +7480,152 @@ function exportMiniMap(){
   }).then(function(){btn.disabled=false;btn.textContent=lbl;});
 }
 
+/* ---- SLIDE: 16:9 "MISSION OVERVIEW" briefing slide (PNG): header with logos, route map left, ENROUTE table right, S P D bar.
+   Route name / ALT / MSA are typed in the form (remembered on this device); MSA blank = highest terrain + 1000 ft (rounded up to 100).
+   Time = route time at Airspeed + 5 min (same rule as MINI MAP FT). Background icons/slide-bg.jpg (SPD's template: logos, header, S P D bar). ---- */
+var SL_KEY='fp-slide-v1';
+function slLoad(){try{var o=JSON.parse(localStorage.getItem(SL_KEY)||'{}');return o&&typeof o==='object'?o:{};}catch(e){return {};}}
+function slSave(o){try{localStorage.setItem(SL_KEY,JSON.stringify(o));}catch(e){}}
+function slPtName(p){   /* airport ICAO -> Thai airport name; other points keep their own name */
+  var id=(p.name||'').toUpperCase();
+  return APX[id]?('ท่าอากาศยาน'+String(APX[id][2]||id).split('/')[0].trim()):(p.name||'');
+}
+function slRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join('>');}
+function buildSlide(f){
+  var S=2,W=1600*S,H=900*S,FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
+  var NAVY='#1f3461',HEAD=108*S,BAR=46*S;
+  var MX=30*S,MY=190*S,MWd=770*S,MHt=520*S;   /* map panel */
+  var TX=822*S,TW=708*S;                       /* table panel */
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var ctx=cv.getContext('2d');
+  /* map: fit the whole route (both ends + every point) inside the panel */
+  var all=pts.map(function(p){return mmWorld(p.lat,p.lng,0);});
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
+  var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
+  var z=Math.log2(Math.min(MWd*0.8/spanX,MHt*0.78/spanY));z=Math.max(5,Math.min(z,13.5));
+  var sc=Math.pow(2,z),cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
+  var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
+  function px(p){var q=mmWorld(p.lat,p.lng,z);return {x:q.x-cxW+MWd/2,y:q.y-cyW+MHt/2};}
+  var mapCv=document.createElement('canvas');mapCv.width=MWd;mapCv.height=MHt;
+  var mctx=mapCv.getContext('2d');
+  var bg=null,prof=mmProfSamples(pts),terr=[];
+  var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun','Aก่ำ'),document.fonts.load('600 36px Sarabun','Aก่ำ')]).catch(function(){}):Promise.resolve();
+  return fontsReady.then(function(){return mmDrawBase(mctx,MWd,MHt,cxW,cyW,z,center);})
+  .then(function(){return mmDrawContours(mctx,MWd,MHt,cxW,cyW,z,S);})
+  .then(function(){return mmLoadImg('icons/slide-bg.jpg',5000).then(function(im){bg=im;});})
+  .then(function(){return (f.msa?Promise.resolve([]):mmElevFt(pts.concat(prof.pts)).catch(function(){return [];})).then(function(e){terr=e||[];});})
+  .then(function(){
+    /* background: SPD's slide template (header, both logos, S P D bar); plain fallback if the file is missing */
+    if(bg)ctx.drawImage(bg,0,0,W,H);
+    else{
+      ctx.fillStyle='#eceef1';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#d3d6da';ctx.fillRect(0,0,W,HEAD);
+      ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font='500 '+(46*S)+'px '+FONT;ctx.fillText('MISSION OVERVIEW',W/2,HEAD/2+2*S);
+      ctx.fillStyle='#b88a1c';ctx.fillRect(0,H-BAR,W,BAR);
+      ctx.fillStyle='rgba(255,236,170,.92)';ctx.textAlign='left';ctx.font='400 '+(27*S)+'px '+FONT;
+      ctx.fillText('S - Safety is our Priority   P - Perfect Professional Unity   D - Development and Dedication to Integrity',22*S,H-BAR/2+1*S,W-44*S);
+    }
+    /* map panel */
+    ctx.drawImage(mapCv,MX,MY);
+    ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(MX,MY,MWd,MHt);
+    ctx.save();ctx.beginPath();ctx.rect(MX,MY,MWd,MHt);ctx.clip();ctx.translate(MX,MY);
+    var P=pts.map(px);
+    ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=9*S;ctx.beginPath();P.forEach(function(q,i){i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});ctx.stroke();
+    ctx.strokeStyle='#e01010';ctx.lineWidth=5*S;ctx.stroke();
+    P.forEach(function(q,i){   /* end points: yellow pin + name; turn points: small dot + name */
+      var end=(i===0||i===P.length-1),nm=pts[i].name||'';
+      if(end){
+        ctx.strokeStyle='#333';ctx.lineWidth=2*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x+6*S,q.y-18*S);ctx.stroke();
+        ctx.fillStyle='#ffd600';ctx.beginPath();ctx.arc(q.x+7*S,q.y-21*S,7*S,0,2*Math.PI);ctx.fill();ctx.stroke();
+      }else{
+        ctx.fillStyle='#fff';ctx.strokeStyle='#e01010';ctx.lineWidth=2*S;ctx.beginPath();ctx.arc(q.x,q.y,5*S,0,2*Math.PI);ctx.fill();ctx.stroke();
+      }
+      if(!nm)return;
+      ctx.font=(end?'600 ':'500 ')+((end?18:14)*S)+'px '+FONT;ctx.textBaseline='middle';
+      var tw=ctx.measureText(nm).width,lx=q.x+16*S,ly=end?q.y-21*S:q.y-12*S;
+      ctx.textAlign='left';if(lx+tw>MWd-6*S){ctx.textAlign='right';lx=q.x-12*S;}
+      ctx.lineWidth=4*S;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(nm,lx,ly);
+      ctx.fillStyle='#fff';ctx.fillText(nm,lx,ly);
+    });
+    ctx.restore();
+    ctx.strokeStyle='#9aa0a8';ctx.lineWidth=1*S;ctx.strokeRect(MX,MY,MWd,MHt);
+    /* table */
+    var tot=prof.tot,spd=num('speed'),mins=spd>0?Math.round(tot/spd*60)+5:NaN;
+    var msa=f.msa;
+    if(!msa){var mx=-Infinity;terr.forEach(function(v){if(isFinite(v))mx=Math.max(mx,v);});if(isFinite(mx)&&mx>0)msa=String(Math.ceil((mx+1000)/100)*100);}
+    function unit(v,u){v=String(v||'').trim();return v?(/[^\d.,\s]/.test(v)?v:v+' '+u):'-';}
+    var dep=pts[0],arr=pts[pts.length-1];
+    var routeTh=f.route||(slPtName(dep)+' - '+slPtName(arr));
+    function box(y,h,fill){ctx.fillStyle=fill||NAVY;ctx.fillRect(TX,y,TW,h);ctx.strokeStyle='#0d1a33';ctx.lineWidth=2*S;ctx.strokeRect(TX,y,TW,h);}
+    ctx.fillStyle='#fff';
+    var y=MY+8*S;
+    box(y,64*S);ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2*S;ctx.strokeRect(TX+1*S,y+1*S,TW-2*S,64*S-2*S);
+    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='400 '+(27*S)+'px '+FONT;ctx.fillText('ENROUTE / DIST / ALT / SPEED / ETE',TX+TW/2,y+33*S,TW-20*S);
+    y+=70*S;box(y,116*S);
+    ctx.fillStyle='#fff';ctx.font='500 '+(26*S)+'px '+FONT;ctx.fillText('เส้นทางบิน',TX+TW/2,y+34*S);
+    ctx.fillText(routeTh,TX+TW/2,y+84*S,TW-24*S);
+    y+=116*S;var rows=[['ระยะทาง',Math.round(tot)+' ไมล์ทะเล'],['ความสูงบิน',unit(f.alt,'ฟุต')],['MSA',unit(msa,'ฟุต')],['ความเร็ว',spd>0?Math.round(spd)+' นอต':'-'],['ใช้เวลา',isFinite(mins)?mins+' นาที':'-']];
+    var RH=46*S;box(y,rows.length*RH+16*S);
+    ctx.textAlign='left';ctx.font='400 '+(25*S)+'px '+FONT;
+    rows.forEach(function(r,i){var yy=y+8*S+RH*(i+0.5);ctx.fillStyle='#fff';ctx.fillText(r[0],TX+16*S,yy);ctx.fillText(r[1],TX+TW*0.44,yy,TW*0.54);});
+    y+=rows.length*RH+16*S+6*S;box(y,62*S);
+    var code=function(p){return (p.name||'').toUpperCase()||'-';};
+    ctx.fillStyle='#fff';ctx.fillText('เส้นทางบิน : '+code(dep)+' - '+code(arr),TX+16*S,y+31*S,TW-30*S);
+    cv.slMsa=msa;
+    return cv;
+  });
+}
+function openSlide(){
+  if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อนทำ SLIDE');return;}
+  var old=document.getElementById('slideModal');if(old)old.remove();
+  var f=slLoad(),cv=null,rk=slRouteKey();
+  if(f.rk!==rk){f.route='';f.msa='';}   /* new route: route name + MSA start from the auto values */
+  var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
+  var fname='MissionOverview_'+dep+'_'+arr+'.png';
+  var auto=slPtName(pts[0])+' - '+slPtName(pts[pts.length-1]);
+  var d=document.createElement('div');d.id='slideModal';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>SLIDE</b><span>'+
+    '<button type="button" id="slMake">อัปเดต</button> '+
+    '<button type="button" id="slSave">บันทึก PNG</button> '+
+    (navigator.canShare?'<button type="button" id="slShare">แชร์</button> ':'')+
+    '<button type="button" id="slClose">✕</button></span></div>'+
+    '<details class="fl-form" open><summary>ข้อมูลที่กรอกเอง (จำไว้ในเครื่องนี้)</summary><div class="fl-grid">'+
+    '<label style="grid-column:1/-1">เส้นทางบิน (ชื่อไทย)<input data-sl="route" type="text" placeholder="'+esc(auto)+'" value="'+esc(f.route||'')+'"></label>'+
+    '<label>ความสูงบิน (ft)<input data-sl="alt" type="text" inputmode="numeric" value="'+esc(f.alt||'')+'"></label>'+
+    '<label>MSA (ft)<input data-sl="msa" type="text" inputmode="numeric" placeholder="อัตโนมัติ" value="'+esc(f.msa||'')+'"></label>'+
+    '</div></details>'+
+    '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
+    '<p class="mm-note">16:9 · ระยะทาง/ความเร็วจากแอป · เวลา = เวลาบิน + 5 นาที · MSA ว่าง = ภูมิประเทศสูงสุด + 1000 ft · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos</p></div>';
+  document.body.appendChild(d);
+  var imgBox=d.querySelector('.mm-img');
+  function read(){d.querySelectorAll('[data-sl]').forEach(function(i){f[i.getAttribute('data-sl')]=i.value.trim();});f.rk=rk;slSave(f);}
+  function make(){
+    read();imgBox.innerHTML='<p class="mm-note">กำลังสร้าง…</p>';
+    buildSlide(f).then(function(c){cv=c;imgBox.innerHTML='<img alt="Mission overview" src="'+c.toDataURL('image/png')+'">';
+      var mi=d.querySelector('[data-sl="msa"]');if(mi&&!mi.value&&c.slMsa)mi.placeholder='อัตโนมัติ '+c.slMsa;})
+      .catch(function(err){imgBox.innerHTML='<p class="mm-note">สร้างไม่สำเร็จ ('+esc(err&&err.message||err)+')</p>';});
+  }
+  document.getElementById('slMake').onclick=make;
+  document.getElementById('slClose').onclick=function(){read();d.remove();};
+  d.addEventListener('click',function(e){if(e.target===d){read();d.remove();}});
+  document.getElementById('slSave').onclick=function(){
+    if(!cv)return;var a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  };
+  var sh=document.getElementById('slShare');
+  if(sh)sh.onclick=function(){
+    if(!cv)return;
+    cv.toBlob(function(blob){
+      var fl=new File([blob],fname,{type:'image/png'});
+      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl],title:fname}).catch(function(){});
+      else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
+    },'image/png');
+  };
+  make();
+}
+
 /* ---- FLIGHT LOG: Pilot Mission Data Card (PNG), layout after the squadron's paper card.
    Auto-filled: date, route, airport info (AIRPORT DB + data/AD.txt + data/RWY.txt), FROM/DEST, IAS, swing radials,
    nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
@@ -7996,6 +8143,7 @@ document.getElementById('importKmzFile').onchange=function(){
 };
 document.getElementById('exportMiniMap').onclick=exportMiniMap;
 document.getElementById('flightLogBtn').onclick=openFlightLog;
+document.getElementById('slideBtn').onclick=openSlide;
 
 document.getElementById('undo').onclick=function(){
   if(!pts.length)return;
