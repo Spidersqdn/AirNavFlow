@@ -767,6 +767,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #windy.on{display:flex}
 #windy header{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px}
 #windy header button{padding:2px 8px}
+#windy header button.wPos.on{background:var(--accent,#2b7);color:#fff}
 #windy iframe{flex:1;border:0;width:100%}
 .airspace-popup h4{margin:0 0 5px;font-size:13px;font-family:var(--mono)}
 .airspace-popup pre{background:#30343a;color:#f1f3f5;padding:6px;border-radius:4px;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;font-family:var(--mono);border:1px solid #666d76}
@@ -1735,7 +1736,7 @@ td .wp-delete{
   <div id="map"></div>
   <div id="status">กด On MAP เพื่อเพิ่ม waypoint • กดค้างที่แผนที่เพื่อดูข้อมูลจุด</div>
   <div id="windy">
-    <header><span>Windy</span><span><button id="wSync" type="button">กึ่งกลางเส้นทาง</button> <button id="wClose" type="button">✕</button></span></header>
+    <header><span>Windy</span><span><button id="wDep" class="wPos" type="button">DEPARTURE</button> <button id="wSync" class="wPos" type="button">MidWay</button> <button id="wDest" class="wPos" type="button">DESTINATION</button> <button id="wClose" type="button">✕</button></span></header>
     <iframe id="wFrame" title="Windy" loading="lazy"></iframe>
   </div>
 </div>
@@ -7949,8 +7950,14 @@ function routeMidpoint(){
   }
   return null;
 }
-function openWindy(){
-  var c=routeMidpoint()||map.getCenter().wrap();
+function openWindy(mode){
+  if(typeof mode!=='string')mode='mid';
+  var p=null;
+  if(pts.length)p=mode==='dep'?pts[0]:mode==='dest'?pts[pts.length-1]:routeMidpoint();
+  var c=p?{lat:p.lat,lng:p.lng}:map.getCenter().wrap();
+  ['wDep','wSync','wDest'].forEach(function(id,i){
+    document.getElementById(id).classList.toggle('on',['dep','mid','dest'][i]===mode);
+  });
   var z=Math.max(5,Math.min(map.getZoom(),9));
 
   document.getElementById('wFrame').src=
@@ -7964,7 +7971,9 @@ function openWindy(){
   document.getElementById('windy').classList.add('on');
 }
 document.getElementById('wBtn').onclick=openWindy;
-document.getElementById('wSync').onclick=openWindy;
+document.getElementById('wSync').onclick=function(){openWindy('mid');};
+document.getElementById('wDep').onclick=function(){openWindy('dep');};
+document.getElementById('wDest').onclick=function(){openWindy('dest');};
 document.getElementById('wClose').onclick=function(){
   document.getElementById('windy').classList.remove('on');
   document.getElementById('wFrame').removeAttribute('src');
