@@ -1675,8 +1675,8 @@ td .wp-delete{
   <button id="flightLogBtn" type="button" title="Pilot mission data card (PNG)">MSN CARD</button>
   <button id="wBtn" type="button">WINDY</button>
   <button id="slideBtn" type="button" title="Mission overview slide 16:9 (PNG)">SLIDE</button>
-  <button id="exportKmz" type="button">EXPORT KMZ</button>
-  <button id="importKmz" type="button" title="Import route / waypoints from a KMZ or KML file (e.g. Google Earth)">IMPORT KMZ</button>
+  <button id="exportKmz" type="button" title="Export route as KMZ / KML / GPX / CSV">EXPORT</button>
+  <button id="importKmz" type="button" title="Import route / waypoints from KMZ, KML, GPX or CSV (e.g. Google Earth)">IMPORT</button>
   <button id="measureBtn" type="button">RULER</button>
   <input id="importKmzFile" type="file" hidden>
 </div>
@@ -6298,7 +6298,7 @@ function buildRouteKml(offSel){
 
 function exportRouteKmz(){
   if(pts.length<2){
-    alert('Add at least two waypoints before exporting KMZ.');
+    alert('Add at least two waypoints before exporting.');
     return;
   }
   if(typeof JSZip==='undefined'){
@@ -6307,7 +6307,7 @@ function exportRouteKmz(){
   }
 
   var offs=(offRoutePts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
-  askKmzOffRoute(offs).then(function(sel){if(sel)writeRouteKmz(sel);});
+  askKmzOffRoute(offs).then(function(sel){if(sel)writeRouteFile(sel,exportFmt);});
 }
 
 /* NM from point p to the nearest route leg (flat-earth, fine for <= a few hundred NM) */
@@ -6351,20 +6351,29 @@ function askKmzOffRoute(offs){
     function openInFalcon(){
       if(falconFile&&navigator.canShare&&navigator.canShare({files:[falconFile]})){
         navigator.share({files:[falconFile],title:kmzFileName()}).catch(function(e){
-          if(!e||e.name!=='AbortError')writeRouteKmz([]); /* share failed: download instead */
+          if(!e||e.name!=='AbortError')writeRouteFile([],'kmz'); /* share failed: download instead */
         });
         close(null);
-      }else close([]); /* no Share sheet (desktop): just download */
+      }else{close(null);writeRouteFile([],'kmz');} /* no Share sheet (desktop): just download KMZ */
     }
     function menu(){
       box.innerHTML='';
       var t=document.createElement('div');
       t.style.cssText='margin-bottom:10px;font-weight:600';
-      t.textContent='EXPORT KMZ (Off-Route มี '+offs.length+' จุด)';
+      t.textContent='EXPORT (Off-Route มี '+offs.length+' จุด)';
       box.appendChild(t);
+      var fr=document.createElement('div');
+      fr.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px';
+      EXPORT_FMTS.forEach(function(f){
+        var b=btn(f.toUpperCase(),exportFmt===f,function(){exportFmt=f;try{localStorage.setItem('fp-export-fmt',f);}catch(e){}menu();});
+        b.style.margin='0';
+        if(exportFmt===f){b.style.background='#2f7fd1';b.style.borderColor='#2f7fd1';}
+        fr.appendChild(b);
+      });
+      box.appendChild(fr);
       box.appendChild(btn('1. All W.Pt',true,function(){pick(allD,'ไม่มี Off-Route');}));
       box.appendChild(btn('2. W.Pt with in 20NM',true,function(){pick(within,'ไม่มี Off-Route ภายใน 20 NM');}));
-      box.appendChild(btn('3. No W.Pt (for FalCon2CP)',true,openInFalcon));
+      box.appendChild(btn('3. No W.Pt (for FalCon2CP, KMZ)',true,openInFalcon));
       box.appendChild(btn('ยกเลิก',false,function(){close(null);}));
     }
     function pick(near,emptyMsg){
@@ -6393,7 +6402,7 @@ function askKmzOffRoute(offs){
         all.style.margin=none.style.margin='0 0 6px';
         row.appendChild(all);row.appendChild(none);box.appendChild(row);
       }
-      box.appendChild(btn('EXPORT KMZ',true,function(){
+      box.appendChild(btn('EXPORT '+exportFmt.toUpperCase(),true,function(){
         close(near.filter(function(x,i){return cbs[i].checked;}).map(function(x){return x.p;}));
       }));
       box.appendChild(btn('ย้อนกลับ',false,menu));
@@ -6409,23 +6418,56 @@ function kmzBlob(offSel){
   zip.file('doc.kml',buildRouteKml(offSel));
   return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
 }
-function kmzFileName(){
+function kmzFileName(ext){
   var start=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_');
   var end=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
-  return 'Flight_Route_'+start+'_'+end+'.kmz';
+  return 'Flight_Route_'+start+'_'+end+'.'+(ext||'kmz');
 }
-function writeRouteKmz(offSel){
-  kmzBlob(offSel).then(function(blob){
+var EXPORT_FMTS=['kmz','kml','gpx','csv'];
+var exportFmt=(function(){try{var f=localStorage.getItem('fp-export-fmt');return EXPORT_FMTS.indexOf(f)>=0?f:'kmz';}catch(e){return 'kmz';}})();
+function buildRouteGpx(offSel){
+  function pt(tag,p,nm){
+    return '<'+tag+' lat="'+p.lat.toFixed(7)+'" lon="'+p.lng.toFixed(7)+'"><name>'+xmlEsc(nm)+'</name>'+
+      (p.remark?'<desc>'+xmlEsc(p.remark)+'</desc>':'')+'</'+tag+'>';
+  }
+  var offs=(offSel||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
+  var routeName=(pts[0].name||'WP1')+' - '+(pts[pts.length-1].name||('WP'+pts.length));
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<gpx version="1.1" creator="AirNavFlow" xmlns="http://www.topografix.com/GPX/1/1">\n'+
+    offs.map(function(p,i){return pt('wpt',p,p.name||('Off-Route '+(i+1)));}).join('\n')+(offs.length?'\n':'')+
+    '<rte><name>'+xmlEsc(routeName)+'</name>\n'+
+    pts.map(function(p,i){return pt('rtept',p,p.name||('WP'+(i+1)));}).join('\n')+
+    '\n</rte>\n</gpx>\n';
+}
+function csvCell(v){v=String(v==null?'':v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function buildRouteCsv(offSel){
+  var rows=[['type','seq','name','lat','lon','lat_ddm','lon_ddm','remark']];
+  function add(type,p,i,nm){rows.push([type,i+1,nm,p.lat.toFixed(6),p.lng.toFixed(6),formatDDM(p.lat,true),formatDDM(p.lng,false),p.remark||'']);}
+  pts.forEach(function(p,i){add('ROUTE',p,i,p.name||('WP'+(i+1)));});
+  (offSel||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);})
+    .forEach(function(p,i){add('OFF-ROUTE',p,i,p.name||('Off-Route '+(i+1)));});
+  return '﻿'+rows.map(function(r){return r.map(csvCell).join(',');}).join('\r\n')+'\r\n'; /* BOM: Thai text opens right in Excel */
+}
+function routeFileBlob(offSel,fmt){
+  if(fmt==='kml')return Promise.resolve(new Blob([buildRouteKml(offSel)],{type:'application/vnd.google-earth.kml+xml'}));
+  if(fmt==='gpx')return Promise.resolve(new Blob([buildRouteGpx(offSel)],{type:'application/gpx+xml'}));
+  if(fmt==='csv')return Promise.resolve(new Blob([buildRouteCsv(offSel)],{type:'text/csv;charset=utf-8'}));
+  if(typeof JSZip==='undefined')return Promise.reject(new Error('KMZ library unavailable'));
+  return kmzBlob(offSel);
+}
+function writeRouteFile(offSel,fmt){
+  fmt=fmt||'kmz';
+  routeFileBlob(offSel,fmt).then(function(blob){
     var a=document.createElement('a');
     var url=URL.createObjectURL(blob);
     a.href=url;
-    a.download=kmzFileName();
+    a.download=kmzFileName(fmt);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function(){URL.revokeObjectURL(url);},1500);
   }).catch(function(){
-    alert('Unable to export KMZ.');
+    alert('Unable to export '+fmt.toUpperCase()+'.');
   });
 }
 
@@ -6487,12 +6529,33 @@ function parseKmlRoute(xml){
     if(!c)return;
     points.push({lat:c.lat,lng:c.lng,name:name.slice(0,40),remark:remark,off:kmlInFolder(pm,/off.?route/i)});
   });
+  return resolveImport(points,lines,ownExport);
+}
+/* Douglas-Peucker thinning for long tracks (GPS logs), tolerance in NM */
+function thinTrack(line,tol){
+  if(line.length<=60)return line;
+  var c=Math.cos(line[0].lat*Math.PI/180);
+  function xy(a){return [a.lng*60*c,a.lat*60];}
+  var keep=new Array(line.length);keep[0]=keep[line.length-1]=true;
+  var stack=[[0,line.length-1]];
+  while(stack.length){
+    var r=stack.pop(),a=xy(line[r[0]]),b=xy(line[r[1]]),dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1e-9,md=0,mi=-1;
+    for(var i=r[0]+1;i<r[1];i++){
+      var q=xy(line[i]),d=Math.abs(dy*(q[0]-a[0])-dx*(q[1]-a[1]))/L;
+      if(d>md){md=d;mi=i;}
+    }
+    if(mi>=0&&md>tol){keep[mi]=true;stack.push([r[0],mi],[mi,r[1]]);}
+  }
+  return line.filter(function(p,i){return keep[i];});
+}
+/* points [{lat,lng,name,remark,off}], lines [[{lat,lng}...]] -> {route,off} */
+function resolveImport(points,lines,ownExport){
   var route=[],off=[];
   function mk(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:'',refIcao:''};}
   if(ownExport||!lines.length){
     points.forEach(function(p){(p.off?off:route).push(mk(p));});
   }else{
-    var line=lines.reduce(function(a,b){return b.length>a.length?b:a;});
+    var line=thinTrack(lines.reduce(function(a,b){return b.length>a.length?b:a;}),0.3);
     var used={};
     line.forEach(function(v,i){
       if(i&&dist(v,line[i-1])<0.01)return; /* duplicate vertex */
@@ -6508,6 +6571,87 @@ function parseKmlRoute(xml){
     points.forEach(function(p,j){if(!used[j])off.push(mk(p));});
   }
   return {route:route,off:off};
+}
+function parseGpxRoute(xml){
+  var doc=new DOMParser().parseFromString(xml,'application/xml');
+  if(doc.getElementsByTagName('parsererror').length)throw new Error('GPX อ่านไม่ได้');
+  function ll(el){return {lat:parseFloat(el.getAttribute('lat')),lng:parseFloat(el.getAttribute('lon'))};}
+  function info(el){
+    var o=ll(el);
+    var nm='',rm='';
+    for(var c=el.firstElementChild;c;c=c.nextElementSibling){
+      var t=(c.localName||c.nodeName);
+      if(t==='name')nm=String(c.textContent||'').trim();
+      else if((t==='desc'||t==='cmt')&&!rm)rm=kmlPlainDesc(c.textContent);
+    }
+    o.name=nm.slice(0,40);o.remark=rm;return o;
+  }
+  function ok(p){return isFinite(p.lat)&&isFinite(p.lng);}
+  var wpts=Array.prototype.map.call(doc.getElementsByTagName('wpt'),info).filter(ok);
+  var rtes=Array.prototype.map.call(doc.getElementsByTagName('rte'),function(r){
+    return Array.prototype.map.call(r.getElementsByTagName('rtept'),info).filter(ok);
+  }).filter(function(r){return r.length;});
+  if(rtes.length){ /* planned route: keep its points and names as-is, <wpt> = off-route */
+    var rte=rtes.reduce(function(a,b){return b.length>a.length?b:a;});
+    return resolveImport(rte.concat(wpts.map(function(p){p.off=true;return p;})),[],true);
+  }
+  var trks=Array.prototype.map.call(doc.getElementsByTagName('trkseg'),function(sg){
+    return Array.prototype.map.call(sg.getElementsByTagName('trkpt'),ll).filter(ok);
+  }).filter(function(t){return t.length>=2;});
+  return resolveImport(wpts,trks,false);
+}
+/* CSV: header with lat/lon columns (name, remark, type optional), or no header: name,lat,lon[,remark] / lat,lon[,name] */
+function parseCsvRoute(text){
+  text=String(text||'').replace(/^﻿/,'');
+  var first=text.split(/\r?\n/)[0]||'';
+  var delim=[',',';','\t','|'].reduce(function(a,b){return first.split(b).length>first.split(a).length?b:a;});
+  var rows=[],row=[],cell='',q=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(q){
+      if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else q=false;}
+      else cell+=ch;
+    }else if(ch==='"')q=true;
+    else if(ch===delim){row.push(cell);cell='';}
+    else if(ch==='\n'||ch==='\r'){
+      if(ch==='\r'&&text[i+1]==='\n')i++;
+      row.push(cell);cell='';rows.push(row);row=[];
+    }else cell+=ch;
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  rows=rows.map(function(r){return r.map(function(c){return c.trim();});}).filter(function(r){return r.some(Boolean);});
+  if(!rows.length)return {route:[],off:[]};
+  var h=rows[0].map(function(c){return c.toLowerCase().replace(/[^a-z]/g,'');});
+  function col(re){for(var k=0;k<h.length;k++)if(re.test(h[k]))return k;return -1;}
+  var iLat=col(/^(lat|latitude|y)$/),iLng=col(/^(lon|lng|long|longitude|x)$/);
+  if(iLat<0)iLat=col(/^lat/);if(iLng<0)iLng=col(/^(lon|lng)/);
+  var iName=col(/^(name|ident|id|wpt|waypoint|point|title)$/),iRem=col(/^(remark|remarks|desc|description|comment|note|notes|cmt)$/),iType=col(/^(type|kind|group)$/);
+  var body=rows;
+  if(iLat>=0&&iLng>=0)body=rows.slice(1);
+  else{ /* no header: guess from the first row */
+    var r0=rows[0];
+    if(r0.length>=3&&!isFinite(parseCoordInput(r0[0],true))){iName=0;iLat=1;iLng=2;iRem=3;}
+    else{iLat=0;iLng=1;iName=2;iRem=3;}
+    if(!(isFinite(parseCoordInput(r0[iLat],true))&&isFinite(parseCoordInput(r0[iLng],false))))body=rows.slice(1);
+  }
+  var points=[];
+  body.forEach(function(r){
+    var la=parseCoordInput(r[iLat],true),lo=parseCoordInput(r[iLng],false);
+    if(!isFinite(la)||!isFinite(lo))return;
+    points.push({lat:la,lng:lo,name:String(iName>=0?r[iName]||'':'').slice(0,40),remark:String(iRem>=0?r[iRem]||'':'').slice(0,120),
+      off:iType>=0&&/off/i.test(r[iType]||'')});
+  });
+  return resolveImport(points,[],true);
+}
+function parseImportText(text,fileName){
+  var head=String(text||'').replace(/^﻿/,'').slice(0,2000);
+  if(/<gpx[\s>]/i.test(head)||/\.gpx$/i.test(fileName||''))return parseGpxRoute(text);
+  if(/<kml[\s>]/i.test(head)||/\.kml$/i.test(fileName||''))return parseKmlRoute(text);
+  if(/^\s*</.test(head)){
+    if(/<gpx[\s>]/i.test(text))return parseGpxRoute(text);
+    return parseKmlRoute(text);
+  }
+  return parseCsvRoute(text);
 }
 function readKmzFile(file){
   return file.arrayBuffer().then(function(buf){
@@ -6550,7 +6694,7 @@ function askImportMode(r){
 function importRouteKmz(file){
   var r;
   readKmzFile(file).then(function(xml){
-    r=parseKmlRoute(xml);
+    r=parseImportText(xml,file.name);
     if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return 'cancel';}
     return (pts.length&&r.route.length)?askImportMode(r):'replace';
   }).then(function(mode){
@@ -6579,7 +6723,7 @@ function importRouteKmz(file){
     }
     if(st)st.textContent='นำเข้า '+file.name+': route +'+r.route.length+' จุด'+(r.off.length?', off-route +'+r.off.length+' จุด':'');
   }).catch(function(e){
-    alert('นำเข้า KMZ ไม่สำเร็จ: '+(e&&e.message?e.message:e));
+    alert('นำเข้าไฟล์ไม่สำเร็จ: '+(e&&e.message?e.message:e));
   });
 }
 
