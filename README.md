@@ -9,10 +9,10 @@
 - **ปุ่ม "ดาวน์โหลดแผนที่ลงเครื่อง"** ในแผง "แผนที่ออฟไลน์"
 - **ข้อมูลความสูงออฟไลน์ (~150 ม.) + ชั้นเส้นชั้นความสูง (Contour ft)** ไฟล์ `map/elevation.pmtiles` สร้างโดย Actions เช่นกัน
 - **บันทึกเส้นทางอัตโนมัติ** ปิดแอปแล้วเปิดใหม่ เส้นทาง ความเร็ว อัตราน้ำมัน และความสูงยังอยู่
-- ไลบรารีทั้งหมด (Leaflet, JSZip, PMTiles, protomaps-leaflet) รวมอยู่ใน `airnavflow.html` ไฟล์เดียว ไม่ต้องโหลดจากเน็ต
+- ไลบรารีทั้งหมด (Leaflet, JSZip, PMTiles, protomaps-leaflet) รวมอยู่ใน `index.html` ไฟล์เดียว ไม่ต้องโหลดจากเน็ต
 
 ## ติดตั้งขึ้น GitHub (ทำครั้งเดียว)
-1. แตกไฟล์ zip แล้วอัปโหลด**ทุกไฟล์และทุกโฟลเดอร์**ขึ้น repo เดิม (ตัวแอปชื่อ `airnavflow.html`)
+1. แตกไฟล์ zip แล้วอัปโหลด**ทุกไฟล์และทุกโฟลเดอร์**ขึ้น repo เดิม (ตัวแอปชื่อ `index.html`)
    - หน้า repo → **Add file → Upload files** → ลากไฟล์ทั้งหมดไปวาง → **Commit**
    - โฟลเดอร์ `.github` เป็นโฟลเดอร์ซ่อน บน Mac กด `Cmd + Shift + .` ใน Finder เพื่อให้เห็น
    - ถ้าลากโฟลเดอร์ `.github` ไม่ขึ้น: **Add file → Create new file** ตั้งชื่อ
@@ -21,7 +21,7 @@
 3. ไปแท็บ **Actions** จะเห็น "Build offline map and deploy" ทำงานเอง (ถ้าไม่เห็น กด **Run workflow**)
    - รอบแรกใช้เวลาหลายนาที เพราะต้องตัดแผนที่ไทยจากแผนที่โลก
    - เมื่อเสร็จ ในหน้าสรุปของรอบนั้นจะบอกขนาดไฟล์แผนที่
-4. เปิดเว็บ `https://spidersqdn.github.io/AirNavFlow/` (repo ชื่อ `AirNavFlow`; index.html พาไป airnavflow.html)
+4. เปิดเว็บ `https://spidersqdn.github.io/AirNavFlow/` (repo ชื่อ `AirNavFlow`; ตัวแอปคือ index.html, airnavflow.html เหลือไว้พาลิงก์เก่ามาที่นี่)
 
 ## ใช้งานบนมือถือ
 1. เปิดเว็บด้วย **Safari (iPhone/iPad)** หรือ **Chrome (Android)** ตอนมี Wi-Fi
@@ -52,7 +52,7 @@
 
 ## โครงสร้างไฟล์
 ```
-airnavflow.html            ตัวแอป (รวมไลบรารีไว้ในไฟล์เดียว)
+index.html                 ตัวแอป (รวมไลบรารีไว้ในไฟล์เดียว)
 sw.js                      service worker (ทำให้เปิดออฟไลน์ได้)
 manifest.webmanifest       ข้อมูลการติดตั้งแอป
 icons/                     ไอคอนแอป

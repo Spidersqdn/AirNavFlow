@@ -3,10 +3,10 @@
    - Pages: network-first, falls back to cached shell when offline
    - Province borders / fonts: stale-while-revalidate
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v63';
+var APP_CACHE='fp-app-v64';
 var RUNTIME_CACHE='fp-runtime-v1';
-var SHELL=['airnavflow.html'];
-var OPTIONAL=['./','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png','icons/slide-bg.jpg'];
+var SHELL=['./'];
+var OPTIONAL=['index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png','icons/slide-bg.jpg'];
 var RUNTIME_HOSTS=['cdn.jsdelivr.net','raw.githubusercontent.com','fonts.googleapis.com','fonts.gstatic.com'];
 
 self.addEventListener('install',function(e){
@@ -37,9 +37,9 @@ self.addEventListener('fetch',function(e){
     if(req.mode==='navigate'){
       e.respondWith(fetch(req).then(function(res){
         var copy=res.clone();
-        caches.open(APP_CACHE).then(function(c){if(/airnavflow\.html$/.test(url.pathname))c.put('airnavflow.html',copy);});
+        caches.open(APP_CACHE).then(function(c){if(/(\/|index\.html)$/.test(url.pathname))c.put('./',copy);});
         return res;
-      }).catch(function(){return caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||caches.match('airnavflow.html');});}));
+      }).catch(function(){return caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||caches.match('./');});}));
       return;
     }
     e.respondWith(caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||fetch(req);}));
