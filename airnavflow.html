@@ -3642,6 +3642,19 @@ function formatDDM(value,isLat){
   return String(d).padStart(degWidth,'0')+'°'+min.toFixed(3).padStart(6,'0')+"'"+hem;
 }
 
+// Edit boxes: digits only, LAT DDMMmm / LONG DDDMMmm (N/E). S/W falls back to N13 54.750 form.
+function formatDigitsInput(value,isLat){
+  if(!(value>=0))return formatDDMInput(value,isLat);
+  var d=Math.floor(value), min=Math.round((value-d)*6000);
+  if(min>=6000){d+=1;min=0;}
+  return String(d).padStart(isLat?2:3,'0')+String(min).padStart(4,'0');
+}
+// Unchanged edit box keeps the exact stored coordinate (no rounding drift).
+function readCoordBox(el,isLat,orig){
+  if(el.value===el.defaultValue && isFinite(orig))return orig;
+  return parseCoordInput(el.value,isLat);
+}
+
 // Value for coordinate input boxes: N13 54.750 / E099 45.000
 function formatDDMInput(value,isLat){
   var m=formatDDM(value,isLat).match(/^(\d+)°([\d.]+)'([NSEW])$/);
@@ -4655,8 +4668,8 @@ function openOffRouteEditor(marker,p,index){
         '<button type="button" id="offEditMapBtn" class="offroute-map-edit-btn">EDIT ON MAP</button>'+
       '</div>'+
       '<div id="offEditLat" class="wp-edit-mode on">'+
-        '<label>Latitude (DDM)<input id="offEditLatVal" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDDMInput(editPoint.lat,true))+'"></label>'+
-        '<label>Longitude (DDM)<input id="offEditLngVal" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDDMInput(editPoint.lng,false))+'"></label>'+
+        '<label>Latitude 6 digits (DDMMmm)<input id="offEditLatVal" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDigitsInput(editPoint.lat,true))+'"></label>'+
+        '<label>Longitude 7 digits (DDDMMmm)<input id="offEditLngVal" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDigitsInput(editPoint.lng,false))+'"></label>'+
       '</div>'+
       '<div id="offEditRad" class="wp-edit-mode">'+
         '<label>Reference Airport (ICAO)<input id="offEditRefIcao" type="text" value="'+esc(radialInfo.icao)+'" placeholder="VTBD"></label>'+
@@ -4750,10 +4763,10 @@ function openOffRouteEditor(marker,p,index){
         var draftIcao=refInput.value.trim().toUpperCase();
         if(draftIcao && APX[draftIcao])p.refIcao=draftIcao;
       }else if(mode==='latlon'){
-        lat=parseCoordInput(root.querySelector('#offEditLatVal').value,true);
-        lng=parseCoordInput(root.querySelector('#offEditLngVal').value,false);
+        lat=readCoordBox(root.querySelector('#offEditLatVal'),true,editPoint.lat);
+        lng=readCoordBox(root.querySelector('#offEditLngVal'),false,editPoint.lng);
         if(!isFinite(lat)||!isFinite(lng)){
-          alert("Invalid coordinates. Use DDM, e.g. 13°54.750'N / 100°36.400'E");
+          alert("Invalid coordinates. e.g. 135475 / 0994500 (or N13 54.750 / E099 45.000)");
           return;
         }
       }else{
@@ -5669,8 +5682,8 @@ function openWaypointEditor(marker,p,index){
         '<button type="button" id="editWpMapBtn" class="route-map-edit-btn">EDIT ON MAP</button>'+
       '</div>'+
       '<div id="editModeLat" class="wp-edit-mode on">'+
-        '<label>Latitude (DDM)<input id="editWpLat" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDDMInput(editPoint.lat,true))+'"></label>'+
-        '<label>Longitude (DDM)<input id="editWpLng" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDDMInput(editPoint.lng,false))+'"></label>'+
+        '<label>Latitude 6 digits (DDMMmm)<input id="editWpLat" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDigitsInput(editPoint.lat,true))+'"></label>'+
+        '<label>Longitude 7 digits (DDDMMmm)<input id="editWpLng" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(formatDigitsInput(editPoint.lng,false))+'"></label>'+
       '</div>'+
       '<div id="editModeRad" class="wp-edit-mode">'+
         '<label>Reference Airport (ICAO)<input id="editWpRefIcao" type="text" value="'+esc(radialInfo.icao)+'" placeholder="VTBD"></label>'+
@@ -5716,8 +5729,8 @@ function openWaypointEditor(marker,p,index){
         return {lat:routeMapEditDraft.lat,lng:routeMapEditDraft.lng};
       }
 
-      var lat=parseCoordInput(latInput.value,true);
-      var lng=parseCoordInput(lngInput.value,false);
+      var lat=readCoordBox(latInput,true,editPoint.lat);
+      var lng=readCoordBox(lngInput,false,editPoint.lng);
       if(isFinite(lat) && isFinite(lng))return {lat:lat,lng:lng};
 
       return {lat:p.lat,lng:p.lng};
@@ -5768,11 +5781,11 @@ function openWaypointEditor(marker,p,index){
       }
 
       if(mode==='latlon'){
-        lat=parseCoordInput(latInput.value,true);
-        lng=parseCoordInput(lngInput.value,false);
+        lat=readCoordBox(latInput,true,editPoint.lat);
+        lng=readCoordBox(lngInput,false,editPoint.lng);
 
         if(!isFinite(lat)||!isFinite(lng)){
-          alert("Invalid coordinates. Use DDM, e.g. 13°54.750'N / 100°36.400'E");
+          alert("Invalid coordinates. e.g. 135475 / 0994500 (or N13 54.750 / E099 45.000)");
           return null;
         }
       }else{
