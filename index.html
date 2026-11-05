@@ -7754,6 +7754,7 @@ function buildSlide(f){
     TC(routeTh,TX+TW/2,y+83*S,TW-24*S,1);
     y+=116*S;var rows=[['ระยะทาง',unit(f.dist,'ไมล์ทะเล')],['ความสูงบิน',unit(f.alt,'ฟุต')],['MSA',unit(f.msa,'ฟุต')],['ความเร็ว',unit(f.speed,'นอต')],['ใช้เวลา',unit(f.ete,'นาที')]];
     var RH=46*S;box(y,rows.length*RH+16*S);
+    ctx.strokeStyle='#fff';ctx.lineWidth=2*S;ctx.beginPath();ctx.moveTo(TX,y);ctx.lineTo(TX+TW,y);ctx.stroke();   /* SPD: white line between route name and data rows */
     ctx.textAlign='left';ctx.font=F('400',25);
     rows.forEach(function(r,i){var yy=y+8*S+RH*(i+0.5);ctx.fillStyle='#fff';TC(r[0],TX+16*S,yy,TW*0.4);TC(r[1],TX+TW*0.44,yy,TW*0.54);});
     y+=rows.length*RH+16*S+6*S;box(y,62*S);
