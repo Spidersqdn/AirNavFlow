@@ -1144,6 +1144,15 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   transform:translate(-50%,-50%);
 }
 .actions{flex-wrap:wrap}
+.umap-panel{padding:14px 18px;border-bottom:1px solid var(--line)}
+.umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
+#umapSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
+.umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
+.umap-row[hidden]{display:none}
+.umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
+.umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
+.umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
+.umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 #miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
@@ -1710,6 +1719,19 @@ td .wp-delete{
   <div id="notamRouteList" class="notam-list">
     <div style="color:var(--mute);font-size:12px">เลือกอย่างน้อย 2 จุดเพื่อคำนวณ NOTAM ใกล้เส้นทาง</div>
   </div>
+</section>
+
+<section class="umap-panel">
+  <div class="umap-head">MAP</div>
+  <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
+  <div class="umap-row" id="umapRow" hidden>
+    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
+    <button type="button" id="umapZoomBtn">Zoom</button><button type="button" id="umapDelBtn">ลบ</button>
+  </div>
+  <label class="umap-keep"><input type="checkbox" id="umapKeep"> เก็บแผนที่ที่เปิดดูไว้ใช้ offline</label>
+  <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
+  <input id="importMapFile" type="file" hidden>
+  <div class="umap-status" id="umapStatus"></div>
 </section>
 
 <section class="offline-panel">
@@ -8305,6 +8327,153 @@ document.getElementById('gpsBtn').onclick=function(){
 document.getElementById('measureBtn').onclick=function(){
   setMeasureMode(!measureActive);
 };
+
+/* ---- IMPORT MAP (like FalCon2CP): user's own .pmtiles file as a map overlay, kept offline ----
+   - raster PMTiles (PNG/JPG/WEBP/AVIF, e.g. scanned charts / VFR maps) -> L.GridLayer reading tiles from the file
+   - vector PMTiles (Protomaps basemap schema) -> protomaps-leaflet layer
+   - file kept in Cache Storage 'fp-user-maps-v1', list + opacity/on in localStorage 'fp-user-maps-v1' */
+var UMAP_CACHE='fp-user-maps-v1', UMAP_META='fp-user-maps-v1', UMAP_TYPES={1:'Vector',2:'PNG',3:'JPG',4:'WEBP',5:'AVIF'};
+var UMAP_MIME={2:'image/png',3:'image/jpeg',4:'image/webp',5:'image/avif'};
+var userMaps=[];
+var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
+function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
+function umapSave(){
+  try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.map(function(m){
+    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,on:m.on,stored:m.stored};
+  })));}catch(e){}
+}
+var UMapRaster=L.GridLayer.extend({
+  createTile:function(c,done){
+    var img=document.createElement('img'),mime=this.options.mime;
+    img.alt='';img.setAttribute('role','presentation');
+    this.options.pm.getZxy(c.z,c.x,c.y).then(function(r){
+      if(!r||!r.data){img.style.visibility='hidden';done(null,img);return;}
+      var u=URL.createObjectURL(new Blob([r.data],{type:mime}));
+      img.onload=img.onerror=function(){URL.revokeObjectURL(u);done(null,img);};
+      img.src=u;
+    }).catch(function(e){img.style.visibility='hidden';done(null,img);});
+    return img;
+  }
+});
+function umapLayer(m,pm){
+  var b=m.bounds?L.latLngBounds([m.bounds[1],m.bounds[0]],[m.bounds[3],m.bounds[2]]):undefined;
+  if(m.type===1){
+    if(typeof protomapsL==='undefined')throw new Error('lib');
+    return protomapsL.leafletLayer({url:pm,flavor:'light',lang:'th',maxDataZoom:m.maxZ||14,pane:'userMaps',opacity:m.opacity});
+  }
+  return new UMapRaster({pm:pm,mime:UMAP_MIME[m.type]||'image/png',pane:'userMaps',opacity:m.opacity,
+    tileSize:256,minNativeZoom:m.minZ,maxNativeZoom:m.maxZ,maxZoom:22,bounds:b,keepBuffer:1});
+}
+function umapLabel(m){return '<span style="color:#7ee081;font-weight:600">🗺 '+esc(m.name)+'</span>';}
+function umapAttach(m,file){
+  var pm=new pmtiles.PMTiles(new pmtiles.FileSource(file));
+  m.layer=umapLayer(m,pm);
+  m.layer.on('add',function(){
+    userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);}); /* one MAP at a time */
+    if(!m.on){m.on=true;umapSave();umapRender();}
+  });
+  m.layer.on('remove',function(){if(m.on){m.on=false;umapSave();umapRender();}});
+  layerCtl.addOverlay(m.layer,umapLabel(m));
+  if(m.on)m.layer.addTo(map);
+}
+function umapReadHeader(file){
+  return file.slice(0,7).arrayBuffer().then(function(ab){
+    var u=new Uint8Array(ab);
+    if(u[0]!==0x50||u[1]!==0x4d||u[2]!==0x54||u[3]!==0x69||u[4]!==0x6c||u[5]!==0x65||u[6]!==0x73)throw new Error('notpm');
+    return new pmtiles.PMTiles(new pmtiles.FileSource(file)).getHeader();
+  });
+}
+function importUserMap(file){
+  if(typeof pmtiles==='undefined'){alert('PMTiles library unavailable.');return;}
+  var st=document.getElementById('umapStatus');
+  if(st)st.textContent='กำลังนำเข้า '+file.name+' …';
+  umapReadHeader(file).then(function(h){
+    if(!UMAP_TYPES[h.tileType])throw new Error('type');
+    var m={id:Date.now().toString(36),name:file.name.replace(/\.pmtiles$/i,''),bytes:file.size,type:h.tileType,
+      minZ:h.minZoom||0,maxZ:h.maxZoom||14,bounds:[h.minLon,h.minLat,h.maxLon,h.maxLat],opacity:h.tileType===1?0.8:1,on:true,stored:false};
+    if(!(isFinite(m.bounds[0])&&m.bounds[2]>m.bounds[0]&&m.bounds[3]>m.bounds[1]))m.bounds=null;
+    userMaps.push(m);
+    umapAttach(m,file);
+    umapZoom(m);
+    m.file=file;
+    umapShow(m);
+    return (umapKeepOn()?umapStore(m):Promise.resolve()).then(function(){umapSave();umapRender();});
+  }).catch(function(e){
+    var msg=e&&e.message==='notpm'?'ไฟล์นี้ไม่ใช่ PMTiles (v3)':e&&e.message==='type'?'PMTiles ชนิดนี้ยังไม่รองรับ':'นำเข้าไม่ได้: '+(e&&e.message||e);
+    umapRender(msg);alert(msg);
+  });
+}
+function umapStore(m){
+  if(!('caches' in window))return Promise.resolve();
+  return caches.open(UMAP_CACHE).then(function(c){
+    return c.put(umapKey(m.id),new Response(m.file,{headers:{'content-type':'application/octet-stream'}}));
+  }).then(function(){m.stored=true;umapSave();umapRender();if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();})
+  .catch(function(){alert('เก็บไฟล์ลงเครื่องไม่ได้ (พื้นที่ไม่พอ?) แผนที่จะใช้ได้จนปิดแอพเท่านั้น');});
+}
+function umapZoom(m){
+  if(m.bounds)map.fitBounds([[m.bounds[1],m.bounds[0]],[m.bounds[3],m.bounds[2]]],{maxZoom:Math.max(8,m.maxZ||8)});
+}
+function umapDelete(m){
+  if(!confirm('ลบแผนที่ "'+m.name+'" ออกจากเครื่อง?'))return;
+  if(m.layer){map.removeLayer(m.layer);layerCtl.removeLayer(m.layer);}
+  userMaps=userMaps.filter(function(x){return x!==m;});
+  umapSave();umapRender();
+  if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return c.delete(umapKey(m.id));}).catch(function(){});
+}
+function loadUserMaps(){
+  var list;try{list=JSON.parse(localStorage.getItem(UMAP_META)||'[]')||[];}catch(e){list=[];}
+  if(!list.length||!('caches' in window)||typeof pmtiles==='undefined')return;
+  caches.open(UMAP_CACHE).then(function(c){
+    return Promise.all(list.map(function(m){
+      return c.match(umapKey(m.id)).then(function(r){return r?r.blob():null;}).then(function(blob){
+        if(!blob)return;
+        m.stored=true;userMaps.push(m);
+        try{umapAttach(m,new File([blob],m.name+'.pmtiles'));}catch(e){}
+      });
+    }));
+  }).then(function(){umapSave();umapRender();}).catch(function(){});
+}
+function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')!=='0';}catch(e){return true;}}
+function umapRender(status){
+  var sel=document.getElementById('umapSel');if(!sel)return;
+  var cur=userMaps.filter(function(m){return m.on;})[0];
+  var mb=function(b){return (b/1048576).toFixed(b<10485760?1:0)+' MB';};
+  sel.innerHTML='<option value="">— ไม่แสดง —</option>'+userMaps.map(function(m){
+    return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+'</option>';
+  }).join('');
+  document.getElementById('umapRow').hidden=!cur;
+  if(cur)document.getElementById('umapOp').value=cur.opacity;
+  document.getElementById('umapKeep').checked=umapKeepOn();
+  var st=document.getElementById('umapStatus');
+  if(status!==undefined)st.textContent=status||'';
+  else st.textContent=cur?UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ+' · '+mb(cur.bytes)+(cur.stored?' · offline ✓':' · ยังไม่เก็บลงเครื่อง'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
+}
+function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
+function umapShow(m){
+  userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);});
+  if(m&&m.layer&&!map.hasLayer(m.layer))m.layer.addTo(map);
+  umapRender();
+}
+document.getElementById('umapSel').onchange=function(){
+  var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
+  umapShow(m);if(m)umapZoom(m);
+};
+document.getElementById('umapOp').oninput=function(){
+  var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
+};
+document.getElementById('umapZoomBtn').onclick=function(){var m=umapCur();if(m)umapZoom(m);};
+document.getElementById('umapDelBtn').onclick=function(){var m=umapCur();if(m)umapDelete(m);};
+document.getElementById('umapKeep').onchange=function(){
+  var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
+  if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
+};
+document.getElementById('importMapBtn').onclick=function(){document.getElementById('importMapFile').click();};
+document.getElementById('importMapFile').onchange=function(){
+  var f=this.files&&this.files[0];
+  this.value='';
+  if(f)importUserMap(f);
+};
+loadUserMaps();umapRender();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
