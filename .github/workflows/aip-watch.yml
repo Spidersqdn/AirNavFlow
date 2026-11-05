@@ -1,5 +1,5 @@
-# Checks the Thailand eAIP (aip.caat.or.th) for a new AIRAC cycle. Started by a Claude
-# routine every Monday 18:00 Asia/Bangkok via workflow_dispatch (GitHub cron runs late).
+# Checks the Thailand eAIP (aip.caat.or.th) for a new AIRAC cycle. Runs by itself every
+# Monday 14:00 Asia/Bangkok (GitHub cron can start a few hours late), or by hand.
 # When one is published it compares ENR 3, ENR 4, ENR 5.1, AD 2, AMDT, SUP and AIC
 # with the previous cycle and opens an issue "AIP AIRAC <date>" with a change table
 # and the diff (as comments, up to MAX_DIFF_COMMENTS; the full diff is also kept as
@@ -7,6 +7,8 @@
 name: AIP AIRAC watch
 
 on:
+  schedule:
+    - cron: "0 7 * * 1" # Monday 07:00 UTC = 14:00 Bangkok
   workflow_dispatch:
 
 permissions:

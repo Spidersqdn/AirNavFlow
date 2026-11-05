@@ -6,6 +6,7 @@ name: Build offline map and deploy
 on:
   push:
     branches: [main]
+    paths-ignore: ["notam/inbox/**"] # handled by notam-import.yml
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,51 @@
+# Daily NOTAM without Claude. A Google Apps Script (tools/notam-gmail.gs) puts the
+# newest RTAF NOTAM email attachment in notam/inbox/<id>.json. This workflow converts
+# it to notam/NOTAMyyMMMdd.txt + notam/latest.txt (the app loads latest.txt), deletes
+# NOTAM files older than 3 days, commits, and redeploys GitHub Pages.
+name: NOTAM import
+
+on:
+  push:
+    branches: [main]
+    paths: ["notam/inbox/**"]
+  schedule:
+    - cron: "0 1 * * *" # daily cleanup of old files (08:00 Bangkok, may run late)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: notam-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pandoc + pdftotext
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq pandoc poppler-utils
+
+      - name: Convert inbox and remove old files
+        id: conv
+        run: |
+          OUT=$(python3 -I .github/scripts/notam_import.py)
+          echo "Result: $OUT"
+          echo "names=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and redeploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add -A notam
+          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "NOTAM: ${{ steps.conv.outputs.names }}"
+          git pull --rebase -q origin main
+          git push origin HEAD:main
+          # Pushes made with the workflow token do not start other workflows, so start the deploy.
+          gh workflow run build-map-and-deploy.yml --ref main
