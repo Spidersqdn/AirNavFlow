@@ -780,6 +780,10 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   #panel{width:100%;height:33.333vh;height:33.333dvh;border-right:none;border-top:1px solid var(--line)}
   #mapwrap{flex:1;min-height:0}
 }
+/* Desktop (mouse, wide landscape screen): wider left menu like FalCon2CP; iPad/phone unchanged */
+@media (min-width:1400px) and (orientation:landscape) and (hover:hover) and (pointer:fine){
+  #panel{width:480px}
+}
 @media (max-width:760px){
   .big{font-size:30px}
 }
