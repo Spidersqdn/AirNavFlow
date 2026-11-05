@@ -1144,6 +1144,15 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   transform:translate(-50%,-50%);
 }
 .actions{flex-wrap:wrap}
+.umap-panel{padding:14px 18px;border-bottom:1px solid var(--line)}
+.umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
+#umapSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
+.umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
+.umap-row[hidden]{display:none}
+.umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
+.umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
+.umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
+.umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 #miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
@@ -1678,8 +1687,6 @@ td .wp-delete{
   <button id="exportKmz" type="button" title="Export route as KMZ / KML / GPX / CSV">EXPORT</button>
   <button id="importKmz" type="button" title="Import route / waypoints from KMZ, KML, GPX or CSV (e.g. Google Earth)">IMPORT</button>
   <button id="measureBtn" type="button">RULER</button>
-  <button id="importMapBtn" type="button" title="Import your own map file (.pmtiles) as an overlay, kept offline">IMPORT MAP</button>
-  <input id="importMapFile" type="file" hidden>
   <input id="importKmzFile" type="file" hidden>
 </div>
 
@@ -1712,6 +1719,19 @@ td .wp-delete{
   <div id="notamRouteList" class="notam-list">
     <div style="color:var(--mute);font-size:12px">เลือกอย่างน้อย 2 จุดเพื่อคำนวณ NOTAM ใกล้เส้นทาง</div>
   </div>
+</section>
+
+<section class="umap-panel">
+  <div class="umap-head">MAP</div>
+  <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
+  <div class="umap-row" id="umapRow" hidden>
+    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
+    <button type="button" id="umapZoomBtn">Zoom</button><button type="button" id="umapDelBtn">ลบ</button>
+  </div>
+  <label class="umap-keep"><input type="checkbox" id="umapKeep"> เก็บแผนที่ที่เปิดดูไว้ใช้ offline</label>
+  <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
+  <input id="importMapFile" type="file" hidden>
+  <div class="umap-status" id="umapStatus"></div>
 </section>
 
 <section class="offline-panel">
@@ -8348,7 +8368,10 @@ function umapLabel(m){return '<span style="color:#7ee081;font-weight:600">🗺 '
 function umapAttach(m,file){
   var pm=new pmtiles.PMTiles(new pmtiles.FileSource(file));
   m.layer=umapLayer(m,pm);
-  m.layer.on('add',function(){if(!m.on){m.on=true;umapSave();umapRender();}});
+  m.layer.on('add',function(){
+    userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);}); /* one MAP at a time */
+    if(!m.on){m.on=true;umapSave();umapRender();}
+  });
   m.layer.on('remove',function(){if(m.on){m.on=false;umapSave();umapRender();}});
   layerCtl.addOverlay(m.layer,umapLabel(m));
   if(m.on)m.layer.addTo(map);
@@ -8372,15 +8395,20 @@ function importUserMap(file){
     userMaps.push(m);
     umapAttach(m,file);
     umapZoom(m);
-    var save=('caches' in window)?caches.open(UMAP_CACHE).then(function(c){
-      return c.put(umapKey(m.id),new Response(file,{headers:{'content-type':'application/octet-stream'}}));
-    }).then(function(){m.stored=true;if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}):Promise.reject(new Error('nocache'));
-    return save.catch(function(){alert('เก็บไฟล์ลงเครื่องไม่ได้ (พื้นที่ไม่พอ?) แผนที่จะใช้ได้จนปิดแอพเท่านั้น');})
-      .then(function(){umapSave();umapRender('✓ นำเข้า '+m.name+' แล้ว');});
+    m.file=file;
+    umapShow(m);
+    return (umapKeepOn()?umapStore(m):Promise.resolve()).then(function(){umapSave();umapRender();});
   }).catch(function(e){
     var msg=e&&e.message==='notpm'?'ไฟล์นี้ไม่ใช่ PMTiles (v3)':e&&e.message==='type'?'PMTiles ชนิดนี้ยังไม่รองรับ':'นำเข้าไม่ได้: '+(e&&e.message||e);
     umapRender(msg);alert(msg);
   });
+}
+function umapStore(m){
+  if(!('caches' in window))return Promise.resolve();
+  return caches.open(UMAP_CACHE).then(function(c){
+    return c.put(umapKey(m.id),new Response(m.file,{headers:{'content-type':'application/octet-stream'}}));
+  }).then(function(){m.stored=true;umapSave();umapRender();if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();})
+  .catch(function(){alert('เก็บไฟล์ลงเครื่องไม่ได้ (พื้นที่ไม่พอ?) แผนที่จะใช้ได้จนปิดแอพเท่านั้น');});
 }
 function umapZoom(m){
   if(m.bounds)map.fitBounds([[m.bounds[1],m.bounds[0]],[m.bounds[3],m.bounds[2]]],{maxZoom:Math.max(8,m.maxZ||8)});
@@ -8405,61 +8433,47 @@ function loadUserMaps(){
     }));
   }).then(function(){umapSave();umapRender();}).catch(function(){});
 }
-var umapBox=null;
+function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')!=='0';}catch(e){return true;}}
 function umapRender(status){
-  if(!umapBox)return;
+  var sel=document.getElementById('umapSel');if(!sel)return;
+  var cur=userMaps.filter(function(m){return m.on;})[0];
   var mb=function(b){return (b/1048576).toFixed(b<10485760?1:0)+' MB';};
-  var h='<div style="font-weight:600;margin-bottom:8px">IMPORT MAP (PMTiles)</div><div id="umapList">';
-  if(!userMaps.length)h+='<div style="color:#bbb;font-size:13px;margin:6px 0">ยังไม่มีแผนที่ที่นำเข้า</div>';
-  userMaps.forEach(function(m,i){
-    h+='<div style="border:1px solid #666d76;border-radius:8px;padding:8px;margin:6px 0">'+
-      '<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-um-on="'+i+'"'+(m.on?' checked':'')+'>'+esc(m.name)+'</label>'+
-      '<div style="font-size:11px;color:#bbb;margin:2px 0 4px 24px">'+UMAP_TYPES[m.type]+' · z'+m.minZ+'-'+m.maxZ+' · '+mb(m.bytes)+(m.stored?' · offline ✓':' · ยังไม่เก็บลงเครื่อง')+'</div>'+
-      '<div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#bbb">โปร่งใส</span>'+
-      '<input type="range" min="0.1" max="1" step="0.05" value="'+m.opacity+'" data-um-op="'+i+'" style="flex:1">'+
-      '<button type="button" data-um-zoom="'+i+'" style="padding:4px 8px">Zoom</button>'+
-      '<button type="button" data-um-del="'+i+'" style="padding:4px 8px">ลบ</button></div></div>';
-  });
-  h+='</div><div id="umapStatus" style="font-size:12px;color:#7ee081;min-height:16px;margin:4px 0">'+esc(status||'')+'</div>'+
-    '<button type="button" data-um-add style="display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #2f7fd1;background:#2f7fd1;color:#fff;font:600 14px system-ui,sans-serif">+ เลือกไฟล์ .pmtiles</button>'+
-    '<button type="button" data-um-close style="display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #666d76;background:transparent;color:#fff;font:600 14px system-ui,sans-serif">ปิด</button>'+
-    '<div style="font-size:11px;color:#aaa;margin-top:4px">รองรับ PMTiles v3 แบบภาพ (PNG/JPG/WEBP) และ vector · เปิด/ปิดได้ที่เมนู Layer ด้วย · ไฟล์ MBTiles/GeoTIFF ให้แปลงเป็น PMTiles ก่อน (pmtiles convert, gdal)</div>';
-  umapBox.innerHTML=h;
+  sel.innerHTML='<option value="">— ไม่แสดง —</option>'+userMaps.map(function(m){
+    return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+'</option>';
+  }).join('');
+  document.getElementById('umapRow').hidden=!cur;
+  if(cur)document.getElementById('umapOp').value=cur.opacity;
+  document.getElementById('umapKeep').checked=umapKeepOn();
+  var st=document.getElementById('umapStatus');
+  if(status!==undefined)st.textContent=status||'';
+  else st.textContent=cur?UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ+' · '+mb(cur.bytes)+(cur.stored?' · offline ✓':' · ยังไม่เก็บลงเครื่อง'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
 }
-function openImportMap(){
-  var bg=document.createElement('div');
-  bg.id='umapModal';
-  bg.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
-  umapBox=document.createElement('div');
-  umapBox.style.cssText='background:#3a3f46;color:#fff;border:1px solid #666d76;border-radius:10px;padding:16px;max-width:380px;width:100%;max-height:90vh;overflow:auto;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
-  bg.appendChild(umapBox);document.body.appendChild(bg);
-  function close(){if(bg.parentNode)document.body.removeChild(bg);umapBox=null;}
-  bg.addEventListener('click',function(e){
-    var t=e.target;
-    if(t===bg||t.hasAttribute('data-um-close')){close();return;}
-    if(t.hasAttribute('data-um-add')){document.getElementById('importMapFile').click();return;}
-    var i=t.getAttribute('data-um-zoom');if(i!==null){close();umapZoom(userMaps[+i]);return;}
-    i=t.getAttribute('data-um-del');if(i!==null){umapDelete(userMaps[+i]);return;}
-  });
-  bg.addEventListener('change',function(e){
-    var i=e.target.getAttribute('data-um-on');if(i===null)return;
-    var m=userMaps[+i];if(!m||!m.layer)return;
-    if(e.target.checked)m.layer.addTo(map);else map.removeLayer(m.layer);
-  });
-  bg.addEventListener('input',function(e){
-    var i=e.target.getAttribute('data-um-op');if(i===null)return;
-    var m=userMaps[+i];if(!m)return;
-    m.opacity=+e.target.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
-  });
+function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
+function umapShow(m){
+  userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);});
+  if(m&&m.layer&&!map.hasLayer(m.layer))m.layer.addTo(map);
   umapRender();
 }
-document.getElementById('importMapBtn').onclick=openImportMap;
+document.getElementById('umapSel').onchange=function(){
+  var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
+  umapShow(m);if(m)umapZoom(m);
+};
+document.getElementById('umapOp').oninput=function(){
+  var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
+};
+document.getElementById('umapZoomBtn').onclick=function(){var m=umapCur();if(m)umapZoom(m);};
+document.getElementById('umapDelBtn').onclick=function(){var m=umapCur();if(m)umapDelete(m);};
+document.getElementById('umapKeep').onchange=function(){
+  var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
+  if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
+};
+document.getElementById('importMapBtn').onclick=function(){document.getElementById('importMapFile').click();};
 document.getElementById('importMapFile').onchange=function(){
   var f=this.files&&this.files[0];
   this.value='';
   if(f)importUserMap(f);
 };
-loadUserMaps();
+loadUserMaps();umapRender();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
