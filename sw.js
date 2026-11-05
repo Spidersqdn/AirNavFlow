@@ -3,7 +3,7 @@
    - Pages: network-first, falls back to cached shell when offline
    - Province borders / fonts: stale-while-revalidate
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v72';
+var APP_CACHE='fp-app-v73';
 var RUNTIME_CACHE='fp-runtime-v1';
 var SHELL=['./'];
 var OPTIONAL=['index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png','icons/slide-bg.jpg'];
