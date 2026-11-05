@@ -7661,7 +7661,9 @@ function slLoad(){try{var o=JSON.parse(localStorage.getItem(SL_KEY)||'{}');retur
 function slSave(o){try{localStorage.setItem(SL_KEY,JSON.stringify(o));}catch(e){}}
 function slPtName(p){   /* airport ICAO -> Thai airport name; other points keep their own name */
   var id=(p.name||'').toUpperCase();
-  return APX[id]?('ท่าอากาศยาน'+String(APX[id][2]||id).split('/')[0].trim()):(p.name||'');
+  if(!APX[id])return p.name||'';
+  var nm=String(APX[id][2]||id),wing=/กองบิน\s*(\d+)/.exec(nm);
+  return wing?'บน.'+wing[1]:'ท่าอากาศยาน'+nm.split('/')[0].trim();   /* RTAF wing bases: "บน.21" (SPD sample) */
 }
 function slRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join('>');}
 function buildSlide(f){
