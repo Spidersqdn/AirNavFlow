@@ -1152,6 +1152,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
 .umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
 .umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
+.umap-btns{display:flex;gap:8px}.umap-btns .umap-import{flex:2;width:auto;margin:0}
+.umap-del{flex:1;margin:0;padding:10px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);font:600 14px system-ui,sans-serif;cursor:pointer}
+.umap-del:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
@@ -1726,10 +1729,13 @@ td .wp-delete{
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
   <div class="umap-row" id="umapRow" hidden>
     <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
-    <button type="button" id="umapZoomBtn">Zoom</button><button type="button" id="umapDelBtn">ลบ</button>
+    <button type="button" id="umapZoomBtn">Zoom</button>
   </div>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> เก็บแผนที่ที่เปิดดูไว้ใช้ offline</label>
-  <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
+  <div class="umap-btns">
+    <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
+    <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
+  </div>
   <input id="importMapFile" type="file" hidden>
   <div class="umap-status" id="umapStatus"></div>
 </section>
@@ -8442,6 +8448,7 @@ function umapRender(status){
     return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+'</option>';
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
+  document.getElementById('umapDelBtn').disabled=!userMaps.length;
   if(cur)document.getElementById('umapOp').value=cur.opacity;
   document.getElementById('umapKeep').checked=umapKeepOn();
   var st=document.getElementById('umapStatus');
@@ -8462,7 +8469,15 @@ document.getElementById('umapOp').oninput=function(){
   var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
 };
 document.getElementById('umapZoomBtn').onclick=function(){var m=umapCur();if(m)umapZoom(m);};
-document.getElementById('umapDelBtn').onclick=function(){var m=umapCur();if(m)umapDelete(m);};
+document.getElementById('umapDelBtn').onclick=function(){
+  var m=umapCur();
+  if(!m&&userMaps.length===1)m=userMaps[0];
+  if(!m&&userMaps.length){ /* nothing shown: pick which map to delete */
+    var a=prompt('ลบ MAP ไหน? พิมพ์หมายเลข\n'+userMaps.map(function(x,i){return (i+1)+'. '+x.name;}).join('\n'),'');
+    m=userMaps[(parseInt(a,10)||0)-1];
+  }
+  if(m)umapDelete(m);
+};
 document.getElementById('umapKeep').onchange=function(){
   var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
   if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
