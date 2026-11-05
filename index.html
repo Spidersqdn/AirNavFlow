@@ -8344,6 +8344,12 @@ document.getElementById('measureBtn').onclick=function(){
 var UMAP_CACHE='fp-user-maps-v1', UMAP_META='fp-user-maps-v1', UMAP_TYPES={1:'Vector',2:'PNG',3:'JPG',4:'WEBP',5:'AVIF'};
 var UMAP_MIME={2:'image/png',3:'image/jpeg',4:'image/webp',5:'image/avif'};
 var userMaps=[];
+/* one Layer-menu entry "MAP" = the map selected in the left MAP box (m.on = selected) */
+var umapGroup=L.layerGroup();
+try{if(localStorage.getItem('fp-user-maps-grp')!=='0')umapGroup.addTo(map);}catch(e){umapGroup.addTo(map);}
+layerCtl.addOverlay(umapGroup,'<span style="color:#7ee081;font-weight:600">MAP</span>');
+umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}});
+umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}});
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
 function umapSave(){
@@ -8373,17 +8379,10 @@ function umapLayer(m,pm){
   return new UMapRaster({pm:pm,mime:UMAP_MIME[m.type]||'image/png',pane:'userMaps',opacity:m.opacity,
     tileSize:256,minNativeZoom:m.minZ,maxNativeZoom:m.maxZ,maxZoom:22,bounds:b,keepBuffer:1});
 }
-function umapLabel(m){return '<span style="color:#7ee081;font-weight:600">🗺 '+esc(m.name)+'</span>';}
 function umapAttach(m,file){
   var pm=new pmtiles.PMTiles(new pmtiles.FileSource(file));
   m.layer=umapLayer(m,pm);
-  m.layer.on('add',function(){
-    userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);}); /* one MAP at a time */
-    if(!m.on){m.on=true;umapSave();umapRender();}
-  });
-  m.layer.on('remove',function(){if(m.on){m.on=false;umapSave();umapRender();}});
-  layerCtl.addOverlay(m.layer,umapLabel(m));
-  if(m.on)m.layer.addTo(map);
+  if(m.on)umapGroup.addLayer(m.layer);
 }
 function umapReadHeader(file){
   return file.slice(0,7).arrayBuffer().then(function(ab){
@@ -8424,7 +8423,7 @@ function umapZoom(m){
 }
 function umapDelete(m){
   if(!confirm('ลบแผนที่ "'+m.name+'" ออกจากเครื่อง?'))return;
-  if(m.layer){map.removeLayer(m.layer);layerCtl.removeLayer(m.layer);}
+  if(m.layer)umapGroup.removeLayer(m.layer);
   userMaps=userMaps.filter(function(x){return x!==m;});
   umapSave();umapRender();
   if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return c.delete(umapKey(m.id));}).catch(function(){});
@@ -8460,9 +8459,9 @@ function umapRender(status){
 }
 function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
 function umapShow(m){
-  userMaps.forEach(function(x){if(x!==m&&x.layer&&map.hasLayer(x.layer))map.removeLayer(x.layer);});
-  if(m&&m.layer&&!map.hasLayer(m.layer))m.layer.addTo(map);
-  umapRender();
+  userMaps.forEach(function(x){x.on=(x===m);if(x.layer&&x!==m)umapGroup.removeLayer(x.layer);});
+  if(m&&m.layer){umapGroup.addLayer(m.layer);if(!map.hasLayer(umapGroup))umapGroup.addTo(map);}
+  umapSave();umapRender();
 }
 document.getElementById('umapSel').onchange=function(){
   var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
