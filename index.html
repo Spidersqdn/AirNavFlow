@@ -759,6 +759,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .rtaf-popup{max-height:55vh;overflow:auto}
 .rtaf-sec{margin:6px 0 2px;font-weight:700;color:#1f6fb2;border-bottom:1px solid #ccd}
 .rtaf-row{margin:3px 0 5px;font-size:12px;line-height:1.35}
+.rtalbl span{border-color:#9ccc65;transform:translate(-12px,-50%);font-size:11px}
+.rtalbl span:before{content:'';display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#9ccc65;vertical-align:1px}
+.rtalbl.unit span{border-color:#ffb74d}.rtalbl.unit span:before{background:#ffb74d}
 #status{position:absolute;left:10px;bottom:10px;z-index:900;background:rgba(55,60,67,.90);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:12px var(--mono);color:var(--text);max-width:calc(100% - 20px)}
 .pl{font-size:11px;color:var(--mute);font-family:var(--sans)}
 .wp-rmk{font-weight:400;font-style:italic;opacity:.85}
@@ -3859,6 +3862,7 @@ mtbPane.style.zIndex=340;
 mtbPane.style.pointerEvents='none';
 var mtbLayer=L.layerGroup();
 var rtafLayer=L.layerGroup();   /* RTAF POC, filled by loadRtafPoc() */
+var rtaLayer=L.layerGroup();    /* สนามบิน ทบ., filled by loadRtaAirfields() */
 (function(){
   var col={};
   MTB_DB.mtb.forEach(function(m){col[m.id]=m.c;});
@@ -5287,6 +5291,7 @@ var layerCtl=L.control.layers(
    'เส้นจังหวัด':provLayer,
    'มทบ.':mtbLayer,
    '<span style="color:#3fa9f5;font-weight:600">RTAF POC</span>':rtafLayer,
+   '<span style="color:#9ccc65;font-weight:600">สนามบิน ทบ.</span>':rtaLayer,
    'สนามบิน':aptLayer,
    'VFR BKK <span style="color:#72e4f5;font-weight:600">A/C</span> &amp; <span style="color:#ffd36a;font-weight:600">Helicopter</span> Wpt':vfrRptGroup,
    '<span style="color:#ff1a1a;font-weight:600">VTP</span> · <span style="color:#ff944d;font-weight:600">VTR</span> · <span style="color:#ffcc00;font-weight:600">VTD</span> · <span style="color:#b388ff;font-weight:600">VTTRA</span>':airspaceGroup,
@@ -9055,6 +9060,50 @@ function loadMtbFile(){
 loadAdInfoFile();
 loadRwyFile();
 
+/* MGRS (WGS84) -> [lat,lng]; e.g. "47PPS7676053459". null if invalid. */
+function mgrsToLatLng(s){
+  var m=String(s||'').toUpperCase().replace(/\s+/g,'').match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z])([A-HJ-NP-V])(\d*)$/);
+  if(!m||m[5].length%2)return null;
+  var zone=+m[1],band=m[2],d=m[5],h=d.length/2;
+  if(zone<1||zone>60)return null;
+  var e=h?+d.substr(0,h)*Math.pow(10,5-h):0, n=h?+d.substr(h)*Math.pow(10,5-h):0;
+  var cols=['STUVWXYZ','ABCDEFGH','JKLMNPQR'][zone%3], ci=cols.indexOf(m[3]);
+  var rows='ABCDEFGHJKLMNPQRSTUV', ri=rows.indexOf(m[4]);
+  if(ci<0||ri<0)return null;
+  if(zone%2===0)ri=(ri-5+20)%20;
+  e+=(ci+1)*1e5; n+=ri*1e5;
+  var bi='CDEFGHJKLMNPQRSTUVWX'.indexOf(band), latMin=-80+bi*8, latMax=band==='X'?84:latMin+8, south=band<'N';
+  function inv(E,N){
+    var a=6378137,f=1/298.257223563,k0=.9996,e2=f*(2-f),ep2=e2/(1-e2),x=E-5e5,y=south?N-1e7:N;
+    var M=y/k0,mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+    var p=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)+(151*Math.pow(e1,3)/96)*Math.sin(6*mu)+(1097*Math.pow(e1,4)/512)*Math.sin(8*mu);
+    var C=ep2*Math.cos(p)*Math.cos(p),T=Math.tan(p)*Math.tan(p),Nn=a/Math.sqrt(1-e2*Math.sin(p)*Math.sin(p)),R=a*(1-e2)/Math.pow(1-e2*Math.sin(p)*Math.sin(p),1.5),D=x/(Nn*k0);
+    var lat=p-(Nn*Math.tan(p)/R)*(D*D/2-(5+3*T+10*C-4*C*C-9*ep2)*Math.pow(D,4)/24+(61+90*T+298*C+45*T*T-252*ep2-3*C*C)*Math.pow(D,6)/720);
+    var lng=(D-(1+2*T+C)*Math.pow(D,3)/6+(5-2*C+28*T-3*C*C+8*ep2+24*T*T)*Math.pow(D,5)/120)/Math.cos(p);
+    return [lat*180/Math.PI,(zone-1)*6-180+3+lng*180/Math.PI];
+  }
+  for(var k=0;k<5;k++){var N=(south?n:n%2e6)+k*2e6,ll=inv(e,N);if(ll[0]>=latMin-0.5&&ll[0]<=latMax+0.5)return ll;}
+  return null;
+}
+
+/* สนามบิน ทบ. layer: data/สนามบิน ทบ.txt (ประเภท | ชื่อ | MGRS | หน่วย) */
+function loadRtaAirfields(){
+  fetchDataTxt('สนามบิน ทบ').then(parseDataTxt).then(function(rows){
+    rtaLayer.clearLayers();
+    rows.forEach(function(f){
+      var ll=mgrsToLatLng(f[2]);if(!ll)return;
+      var unit=/หน่วย/.test(f[0]||''), c=unit?'#ef8f00':'#5b8c2a';
+      var h='<div class="airspace-popup"><h4 style="color:'+c+'"><b>'+esc(f[1]||'-')+'</b></h4><div>'+
+        '<b>ประเภท:</b> '+esc(f[0]||'-')+'<br>'+
+        '<b>หน่วย:</b> '+esc(f[3]||'-')+'<br>'+
+        '<b>MGRS:</b> '+esc((f[2]||'').toUpperCase())+'<br>'+
+        '<b>Lat/Long:</b> '+formatDDM(ll[0],true)+' '+formatDDM(ll[1],false)+'</div></div>';
+      L.marker(ll,{icon:L.divIcon({className:'mtblbl rtalbl'+(unit?' unit':''),html:'<span>'+esc(f[1]||'')+'</span>'}),keyboard:false})
+        .bindPopup(h,{maxWidth:300}).addTo(rtaLayer);
+    });
+  }).catch(function(){});
+}
+
 /* RTAF POC layer: data/ผบ.ฝูง.txt + data/CSAR.txt, one pin per base (ICAO) */
 function loadRtafPoc(){
   var bases={},order=[];
@@ -9141,6 +9190,7 @@ initElev();
 loadAutoNotam();
 loadMtbFile();
 loadRtafPoc();
+loadRtaAirfields();
 /* Reload the daily file when the app comes back to the foreground after 3 h (new day's NOTAM). */
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible'&&Date.now()-notamAutoAt>3*3600e3)loadAutoNotam();
