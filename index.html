@@ -762,6 +762,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .rtalbl span{border-color:#9ccc65;transform:translate(-12px,-50%);font-size:11px}
 .rtalbl span:before{content:'';display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#9ccc65;vertical-align:1px}
 .rtalbl.unit span{border-color:#ffb74d}.rtalbl.unit span:before{background:#ffb74d}
+.rtalbl.camp span{border-color:#ce93d8}.rtalbl.camp span:before{background:#ce93d8}
 #status{position:absolute;left:10px;bottom:10px;z-index:900;background:rgba(55,60,67,.90);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:12px var(--mono);color:var(--text);max-width:calc(100% - 20px)}
 .pl{font-size:11px;color:var(--mute);font-family:var(--sans)}
 .wp-rmk{font-weight:400;font-style:italic;opacity:.85}
@@ -9086,19 +9087,20 @@ function mgrsToLatLng(s){
   return null;
 }
 
-/* สนามบิน ทบ. layer: data/สนามบิน ทบ.txt (ประเภท | ชื่อ | MGRS | หน่วย) */
+/* สนามบิน ทบ. layer: data/สนามบิน ทบ.txt (ประเภท | ชื่อ | MGRS or lat,long | หน่วย) */
 function loadRtaAirfields(){
   fetchDataTxt('สนามบิน ทบ').then(parseDataTxt).then(function(rows){
     rtaLayer.clearLayers();
     rows.forEach(function(f){
-      var ll=mgrsToLatLng(f[2]);if(!ll)return;
-      var unit=/หน่วย/.test(f[0]||''), c=unit?'#ef8f00':'#5b8c2a';
+      var dd=(f[2]||'').match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+      var ll=dd?[+dd[1],+dd[2]]:mgrsToLatLng(f[2]);if(!ll)return;
+      var kind=/ค่าย/.test(f[0]||'')?'camp':/หน่วย/.test(f[0]||'')?'unit':'', c={camp:'#8e44ad',unit:'#ef8f00'}[kind]||'#5b8c2a';
       var h='<div class="airspace-popup"><h4 style="color:'+c+'"><b>'+esc(f[1]||'-')+'</b></h4><div>'+
         '<b>ประเภท:</b> '+esc(f[0]||'-')+'<br>'+
         '<b>หน่วย:</b> '+esc(f[3]||'-')+'<br>'+
-        '<b>MGRS:</b> '+esc((f[2]||'').toUpperCase())+'<br>'+
+        (dd?'':'<b>MGRS:</b> '+esc((f[2]||'').toUpperCase())+'<br>')+
         '<b>Lat/Long:</b> '+formatDDM(ll[0],true)+' '+formatDDM(ll[1],false)+'</div></div>';
-      L.marker(ll,{icon:L.divIcon({className:'mtblbl rtalbl'+(unit?' unit':''),html:'<span>'+esc(f[1]||'')+'</span>'}),keyboard:false})
+      L.marker(ll,{icon:L.divIcon({className:'mtblbl rtalbl'+(kind?' '+kind:''),html:'<span>'+esc(f[1]||'')+'</span>'}),keyboard:false})
         .bindPopup(h,{maxWidth:300}).addTo(rtaLayer);
     });
   }).catch(function(){});
