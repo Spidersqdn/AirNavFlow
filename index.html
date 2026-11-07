@@ -766,6 +766,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #status{position:absolute;left:10px;bottom:10px;z-index:900;background:rgba(55,60,67,.90);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:12px var(--mono);color:var(--text);max-width:calc(100% - 20px)}
 .pl{font-size:11px;color:var(--mute);font-family:var(--sans)}
 .wp-rmk{font-weight:400;font-style:italic;opacity:.85}
+.wp-coord{font-size:11px;color:var(--mute);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.35;white-space:nowrap}
+.wp-editor .wp-coord,.offroute-tooltip .wp-coord,.mapinfo-popup .wp-coord{color:inherit;opacity:.85;margin:2px 0 4px}
 .ap h4{margin:0 0 4px;font-size:14px}.ap div{font-size:12px;line-height:1.5}.ap button{margin-top:6px;background:#f5b335;color:#1a1200;border:none;font-weight:600;padding:5px 10px}
 #windy{position:absolute;right:10px;bottom:44px;width:min(440px,calc(100% - 20px));height:min(360px,58%);z-index:950;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:none;flex-direction:column;overflow:hidden}
 #windy.on{display:flex}
@@ -4698,6 +4700,7 @@ function openOffRouteEditor(marker,p,index){
   var popupHtml=
     '<div class="wp-editor">'+
       '<h4>Edit OFF-ROUTE Wpt '+(index+1)+'</h4>'+
+      wpCoordHtml(editPoint)+
       '<label>Name<input id="offEditName" type="text" value="'+esc(p.name||'')+'"></label>'+
       '<label>หมายเหตุ / Remark<input id="offEditRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
       '<div class="wp-edit-tabs offroute-tabs">'+
@@ -4892,7 +4895,7 @@ function drawOffRouteMarkers(){
     });
 
     m.bindTooltip(
-      '<span class="offroute-tooltip">'+esc(label)+(p.remark?'<br>'+esc(p.remark):'')+
+      '<span class="offroute-tooltip">'+esc(label)+(p.remark?'<br>'+esc(p.remark):'')+wpCoordHtml(displayPoint)+
       (isMapEdit?'<br>DRAG TO MOVE • Save to confirm':'')+
       '</span>',
       {direction:'top',offset:[0,-10]}
@@ -5651,7 +5654,7 @@ function drawLines(){
     h+='<tr><td data-edit-wp="'+i+'" style="cursor:pointer"><span class="dot">'+(i+1)+'</span>'+
       (p.name?'<b>'+esc(p.name)+'</b>':(i===0?'ต้นทาง':''))+
       (p.remark?' <span class="wp-rmk">('+esc(p.remark)+')</span>':'')+
-      (p.place?'<div class="pl">'+esc(p.place)+'</div>':'')+'</td>'+
+      (p.place?'<div class="pl">'+esc(p.place)+'</div>':'')+wpCoordHtml(p)+'</td>'+
       '<td>'+(lg?fmtD(lg.d):'')+'</td>'+
       '<td>'+(lg?String(Math.round(lg.c)%360).padStart(3,'0')+'°':'')+'</td>'+
       '<td>'+(lg&&spd>0?fmtT(lg.d/spd):'')+'</td>'+
@@ -5713,6 +5716,7 @@ function openWaypointEditor(marker,p,index){
   var popupHtml=
     '<div class="wp-editor">'+
       '<h4>Edit Waypoint '+(index+1)+'</h4>'+
+      wpCoordHtml(editPoint)+
       '<label>Name<input id="editWpName" type="text" value="'+esc(p.name||'')+'"></label>'+
       '<label>หมายเหตุ / Remark<input id="editWpRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
       '<div class="wp-edit-tabs route-tabs">'+
@@ -8231,7 +8235,8 @@ function showMapPointInfo(ll,opt){
   mapInfoMarker=L.circleMarker([p.lat,p.lng],{radius:6,color:'#ffb000',weight:2,fillColor:'#ffb000',fillOpacity:.5}).addTo(map);
   var html='<div class="mapinfo-popup'+(opt.onMap?' mi-onmap':'')+'"><h4>'+esc(opt.title||'MAP POINT')+'</h4>'+
     (opt.sub?'<div>'+esc(opt.sub)+'</div>':'')+
-    '<div><b>Lat/Long:</b> '+esc(formatDDM(p.lat,true))+' / '+esc(formatDDM(p.lng,false))+'</div>'+
+    '<div><b>Lat/Long:</b> '+esc(wpCoordText(p))+'</div>'+
+    '<div><b>MGRS:</b> '+esc(latLngToMgrs(p.lat,p.lng))+'</div>'+
     '<div><b>Radial/DME:</b> '+rd+'</div>'+
     '<div><b>Elevation:</b> <span class="mi-elev">…</span></div>'+
     '<div class="mi-btns"><button type="button" class="mi-route">Add ROUTE</button>'+
@@ -9060,6 +9065,40 @@ function loadMtbFile(){
 
 loadAdInfoFile();
 loadRwyFile();
+
+/* [lat,lng] -> MGRS (WGS84, 1 m), e.g. "47P PS 76760 53459". '' outside 80S-84N. */
+function latLngToMgrs(lat,lng){
+  if(!isFinite(lat)||!isFinite(lng)||lat<-80||lat>84)return '';
+  lng=((lng+540)%360)-180;
+  var zone=Math.floor((lng+180)/6)+1;
+  if(lat>=56&&lat<64&&lng>=3&&lng<12)zone=32;
+  if(lat>=72){if(lng>=0&&lng<9)zone=31;else if(lng>=9&&lng<21)zone=33;else if(lng>=21&&lng<33)zone=35;else if(lng>=33&&lng<42)zone=37;}
+  var a=6378137,f=1/298.257223563,k0=.9996,e2=f*(2-f),ep2=e2/(1-e2);
+  var p=lat*Math.PI/180,l0=((zone-1)*6-180+3)*Math.PI/180,dl=lng*Math.PI/180-l0;
+  var Nn=a/Math.sqrt(1-e2*Math.sin(p)*Math.sin(p)),T=Math.tan(p)*Math.tan(p),C=ep2*Math.cos(p)*Math.cos(p),A=Math.cos(p)*dl;
+  var M=a*((1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)*p-(3*e2/8+3*e2*e2/32+45*e2*e2*e2/1024)*Math.sin(2*p)+(15*e2*e2/256+45*e2*e2*e2/1024)*Math.sin(4*p)-(35*e2*e2*e2/3072)*Math.sin(6*p));
+  var E=k0*Nn*(A+(1-T+C)*Math.pow(A,3)/6+(5-18*T+T*T+72*C-58*ep2)*Math.pow(A,5)/120)+5e5;
+  var N=k0*(M+Nn*Math.tan(p)*(A*A/2+(5-T+9*C+4*C*C)*Math.pow(A,4)/24+(61-58*T+T*T+600*C-330*ep2)*Math.pow(A,6)/720));
+  if(lat<0)N+=1e7;
+  var band='CDEFGHJKLMNPQRSTUVWX'.charAt(Math.min(19,Math.floor((lat+80)/8)));
+  var e100=Math.floor(E/1e5),col=['STUVWXYZ','ABCDEFGH','JKLMNPQR'][zone%3].charAt(e100-1);
+  var ri=Math.floor(N/1e5)%20;if(zone%2===0)ri=(ri+5)%20;
+  var row='ABCDEFGHJKLMNPQRSTUV'.charAt(ri);
+  function d5(v){return String(Math.floor(v+1e-4)%100000).padStart(5,'0');}
+  return zone+band+' '+col+row+' '+d5(E)+' '+d5(N);
+}
+/* Waypoint coordinate display: DDM "N13°54.75' E100°36.45'" + MGRS */
+function ddmShort(v,isLat){
+  var hem=isLat?(v>=0?'N':'S'):(v>=0?'E':'W'),av=Math.abs(v),d=Math.floor(av),m=Math.round((av-d)*6000)/100;
+  if(m>=60){d+=1;m=0;}
+  return hem+String(d).padStart(isLat?2:3,'0')+'°'+m.toFixed(2).padStart(5,'0')+"'";
+}
+function wpCoordText(p){return ddmShort(p.lat,true)+' '+ddmShort(p.lng,false);}
+function wpCoordHtml(p,cls){
+  if(!p||!isFinite(p.lat)||!isFinite(p.lng))return '';
+  var g=latLngToMgrs(p.lat,p.lng);
+  return '<div class="wp-coord'+(cls?' '+cls:'')+'">'+esc(wpCoordText(p))+(g?'<br>MGRS '+esc(g):'')+'</div>';
+}
 
 /* MGRS (WGS84) -> [lat,lng]; e.g. "47PPS7676053459". null if invalid. */
 function mgrsToLatLng(s){
