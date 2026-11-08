@@ -7765,7 +7765,7 @@ function buildSlide(f){
     box(y,64*S);ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2*S;ctx.strokeRect(TX+1*S,y+1*S,TW-2*S,64*S-2*S);
     ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font=F('400',27);TC('ENROUTE / DIST / ALT / SPEED / ETE',TX+TW/2,y+32*S,TW-20*S,1);
     y+=70*S;box(y,116*S);
-    ctx.fillStyle='#fff';ctx.font=F('500',26);TC('เส้นทางบิน',TX+TW/2,y+33*S,TW-24*S,1);
+    ctx.fillStyle='#fff';ctx.font=F('500',26);TC(f.title||'เส้นทางบิน',TX+TW/2,y+33*S,TW-24*S,1);
     TC(routeTh,TX+TW/2,y+83*S,TW-24*S,1);
     y+=116*S;var rows=[['ระยะทาง',unit(f.dist,'ไมล์ทะเล')],['ความสูงบิน',unit(f.alt,'ฟุต')],['MSA',unit(f.msa,'ฟุต')],['ความเร็ว',unit(f.speed,'นอต')],['ใช้เวลา',unit(f.ete,'นาที')]];
     var RH=46*S;box(y,rows.length*RH+16*S);
@@ -7773,12 +7773,15 @@ function buildSlide(f){
     ctx.textAlign='left';ctx.font=F('400',25);
     rows.forEach(function(r,i){var yy=y+8*S+RH*(i+0.5);ctx.fillStyle='#fff';TC(r[0],TX+16*S,yy,TW*0.4);TC(r[1],TX+TW*0.44,yy,TW*0.54);});
     y+=rows.length*RH+16*S+6*S;box(y,62*S);
-    ctx.fillStyle='#fff';TC('เส้นทางบิน : '+(f.code||'-'),TX+16*S,y+31*S,TW-30*S);
+    ctx.fillStyle='#fff';
+    if(f.foot)TC(f.foot,TX+TW/2,y+31*S,TW-30*S,1);   /* own text: centred in the box */
+    else TC('เส้นทางบิน : '+(f.code||'-'),TX+16*S,y+31*S,TW-30*S);
     return cv;
   });
 }
-var SL_FIELDS=[['route','เส้นทางบิน (ชื่อไทย)',1],['dist','ระยะทาง (NM)'],['alt','ความสูงบิน (ft)'],['msa','MSA (ft)'],
-  ['speed','ความเร็ว (kt)'],['ete','ใช้เวลา (นาที)'],['code','เส้นทางบิน (ICAO)']];
+var SL_FIELDS=[['title','หัวข้อ (แทนคำว่า เส้นทางบิน · ว่าง = เส้นทางบิน)',1],['route','เส้นทางบิน (ชื่อไทย)',1],['dist','ระยะทาง (NM)'],['alt','ความสูงบิน (ft)'],['msa','MSA (ft)'],
+  ['speed','ความเร็ว (kt)'],['ete','ใช้เวลา (นาที)'],['code','เส้นทางบิน (ICAO)'],
+  ['foot','บรรทัดล่าง (แทน เส้นทางบิน : ICAO · กรอกแล้วจัดกึ่งกลางกล่อง)',1]];
 function slAuto(){   /* starting values; time = route time + 5 min, rounded to the nearest 5 (ends in 0 or 5) */
   var tot=mmProfSamples(pts).tot,spd=num('speed'),dep=pts[0],arr=pts[pts.length-1];
   return {route:slPtName(dep)+' - '+slPtName(arr),dist:String(Math.round(tot)),speed:spd>0?String(Math.round(spd)):'',
