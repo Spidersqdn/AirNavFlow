@@ -1739,7 +1739,7 @@ td .wp-delete{
     <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
     <button type="button" id="umapZoomBtn">Zoom</button>
   </div>
-  <label class="umap-keep"><input type="checkbox" id="umapKeep"> เก็บแผนที่ที่เปิดดูไว้ใช้ offline</label>
+  <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
   <div class="umap-btns">
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
     <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
@@ -8372,7 +8372,7 @@ var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
 function umapSave(){
   try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.map(function(m){
-    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,on:m.on,stored:m.stored};
+    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,on:m.on,stored:m.stored,linked:m.linked};
   })));}catch(e){}
 }
 var UMapRaster=L.GridLayer.extend({
@@ -8409,6 +8409,55 @@ function umapReadHeader(file){
     return new pmtiles.PMTiles(new pmtiles.FileSource(file)).getHeader();
   });
 }
+/* direct link to the file on disk (no copy): File System Access handle kept in IndexedDB.
+   Chrome/Edge (desktop, Android) only; Safari/iPad has no handles -> file is read in place for this session
+   and the list remembers the name so one tap re-picks it after the app is reopened. */
+var UMAP_FSA=typeof window.showOpenFilePicker==='function';
+function umapIdb(mode,fn){
+  return new Promise(function(res,rej){
+    if(!window.indexedDB){rej(new Error('idb'));return;}
+    var q=indexedDB.open('fp-user-maps',1);
+    q.onupgradeneeded=function(){q.result.createObjectStore('handles');};
+    q.onerror=function(){rej(q.error);};
+    q.onsuccess=function(){
+      var db=q.result,tx,r;
+      try{tx=db.transaction('handles',mode);r=fn(tx.objectStore('handles'));}catch(e){db.close();rej(e);return;}
+      tx.oncomplete=function(){db.close();res(r&&r.result);};
+      tx.onerror=function(){db.close();rej(tx.error);};
+    };
+  });
+}
+function umapPickFile(){
+  if(UMAP_FSA){
+    return window.showOpenFilePicker({multiple:false}).then(function(hs){
+      var h=hs[0];return h.getFile().then(function(f){f._fsaHandle=h;return f;});
+    });
+  }
+  return new Promise(function(res){
+    var inp=document.getElementById('importMapFile');
+    inp.onchange=function(){var f=inp.files&&inp.files[0];inp.value='';if(f)res(f);};
+    inp.click();
+  });
+}
+function umapPending(m){return !m.layer;}
+/* a remembered map whose file is not open yet: ask permission (handle) or re-pick the file */
+function umapReopen(m){
+  var p;
+  if(m.linked&&m.handle){
+    p=m.handle.requestPermission({mode:'read'}).then(function(st){
+      if(st!=='granted')throw new Error('perm');return m.handle.getFile();
+    });
+  }else{
+    alert('เลือกไฟล์ "'+m.name+'.pmtiles" จากที่อยู่เดิม');
+    p=umapPickFile().then(function(f){
+      if(f._fsaHandle){m.handle=f._fsaHandle;m.linked=true;umapIdb('readwrite',function(o){return o.put(m.handle,m.id);}).catch(function(){});}
+      return f;
+    });
+  }
+  return p.then(function(f){
+    return umapReadHeader(f).then(function(){m.file=f;m.bytes=f.size;umapAttach(m,f);umapShow(m);umapZoom(m);});
+  }).catch(function(e){if(!e||e.name!=='AbortError')umapRender('เปิดไฟล์ไม่ได้: '+(e&&e.message||e));else umapRender();});
+}
 function importUserMap(file){
   if(typeof pmtiles==='undefined'){alert('PMTiles library unavailable.');return;}
   var st=document.getElementById('umapStatus');
@@ -8416,12 +8465,13 @@ function importUserMap(file){
   umapReadHeader(file).then(function(h){
     if(!UMAP_TYPES[h.tileType])throw new Error('type');
     var m={id:Date.now().toString(36),name:file.name.replace(/\.pmtiles$/i,''),bytes:file.size,type:h.tileType,
-      minZ:h.minZoom||0,maxZ:h.maxZoom||14,bounds:[h.minLon,h.minLat,h.maxLon,h.maxLat],opacity:h.tileType===1?0.8:1,on:true,stored:false};
+      minZ:h.minZoom||0,maxZ:h.maxZoom||14,bounds:[h.minLon,h.minLat,h.maxLon,h.maxLat],opacity:h.tileType===1?0.8:1,on:true,stored:false,linked:!!file._fsaHandle};
     if(!(isFinite(m.bounds[0])&&m.bounds[2]>m.bounds[0]&&m.bounds[3]>m.bounds[1]))m.bounds=null;
     userMaps.push(m);
     umapAttach(m,file);
     umapZoom(m);
     m.file=file;
+    if(file._fsaHandle){m.handle=file._fsaHandle;umapIdb('readwrite',function(o){return o.put(m.handle,m.id);}).catch(function(){m.linked=false;umapSave();umapRender();});}
     umapShow(m);
     return (umapKeepOn()?umapStore(m):Promise.resolve()).then(function(){umapSave();umapRender();});
   }).catch(function(e){
@@ -8445,27 +8495,40 @@ function umapDelete(m){
   userMaps=userMaps.filter(function(x){return x!==m;});
   umapSave();umapRender();
   if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return c.delete(umapKey(m.id));}).catch(function(){});
+  umapIdb('readwrite',function(o){return o.delete(m.id);}).catch(function(){});
 }
 function loadUserMaps(){
   var list;try{list=JSON.parse(localStorage.getItem(UMAP_META)||'[]')||[];}catch(e){list=[];}
-  if(!list.length||!('caches' in window)||typeof pmtiles==='undefined')return;
-  caches.open(UMAP_CACHE).then(function(c){
+  if(!list.length||typeof pmtiles==='undefined')return;
+  var cacheP=('caches' in window)?caches.open(UMAP_CACHE).catch(function(){return null;}):Promise.resolve(null);
+  cacheP.then(function(c){
     return Promise.all(list.map(function(m){
-      return c.match(umapKey(m.id)).then(function(r){return r?r.blob():null;}).then(function(blob){
-        if(!blob)return;
-        m.stored=true;userMaps.push(m);
-        try{umapAttach(m,new File([blob],m.name+'.pmtiles'));}catch(e){}
+      userMaps.push(m);m.layer=null;
+      var wasOn=m.on;m.on=false;
+      var fromCache=c?c.match(umapKey(m.id)).then(function(r){return r?r.blob():null;}):Promise.resolve(null);
+      return fromCache.then(function(blob){
+        if(blob){m.stored=true;m.on=wasOn;try{umapAttach(m,new File([blob],m.name+'.pmtiles'));}catch(e){}return;}
+        m.stored=false;
+        if(!m.linked)return; /* read-in-place map (Safari): wait for a re-pick */
+        return umapIdb('readonly',function(o){return o.get(m.id);}).then(function(h){
+          if(!h){m.linked=false;return;}
+          m.handle=h;
+          return h.queryPermission({mode:'read'}).then(function(st){
+            if(st!=='granted')return; /* needs a tap (permission) */
+            return h.getFile().then(function(f){m.file=f;m.bytes=f.size;m.on=wasOn;umapAttach(m,f);});
+          });
+        }).catch(function(){});
       });
     }));
   }).then(function(){umapSave();umapRender();}).catch(function(){});
 }
-function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')!=='0';}catch(e){return true;}}
+function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')==='1';}catch(e){return false;}} /* default: no copy, read the file in place */
 function umapRender(status){
   var sel=document.getElementById('umapSel');if(!sel)return;
   var cur=userMaps.filter(function(m){return m.on;})[0];
   var mb=function(b){return (b/1048576).toFixed(b<10485760?1:0)+' MB';};
   sel.innerHTML='<option value="">— ไม่แสดง —</option>'+userMaps.map(function(m){
-    return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+'</option>';
+    return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+(umapPending(m)?' (แตะเพื่อเปิดไฟล์)':'')+'</option>';
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapDelBtn').disabled=!userMaps.length;
@@ -8473,7 +8536,7 @@ function umapRender(status){
   document.getElementById('umapKeep').checked=umapKeepOn();
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
-  else st.textContent=cur?UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ+' · '+mb(cur.bytes)+(cur.stored?' · offline ✓':' · ยังไม่เก็บลงเครื่อง'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
+  else st.textContent=cur?UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
 }
 function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
 function umapShow(m){
@@ -8483,6 +8546,7 @@ function umapShow(m){
 }
 document.getElementById('umapSel').onchange=function(){
   var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
+  if(m&&umapPending(m)){umapRender();umapReopen(m);return;}
   umapShow(m);if(m)umapZoom(m);
 };
 document.getElementById('umapOp').oninput=function(){
@@ -8502,11 +8566,8 @@ document.getElementById('umapKeep').onchange=function(){
   var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
   if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
 };
-document.getElementById('importMapBtn').onclick=function(){document.getElementById('importMapFile').click();};
-document.getElementById('importMapFile').onchange=function(){
-  var f=this.files&&this.files[0];
-  this.value='';
-  if(f)importUserMap(f);
+document.getElementById('importMapBtn').onclick=function(){
+  umapPickFile().then(importUserMap).catch(function(e){if(e&&e.name!=='AbortError')alert('เปิดไฟล์ไม่ได้: '+(e.message||e));});
 };
 loadUserMaps();umapRender();
 
