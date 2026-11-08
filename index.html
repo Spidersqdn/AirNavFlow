@@ -1161,6 +1161,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-btns{display:flex;gap:8px}.umap-btns .umap-import{flex:2;width:auto;margin:0}
 .umap-del{flex:1;margin:0;padding:10px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);font:600 14px system-ui,sans-serif;cursor:pointer}
 .umap-del:disabled{opacity:.35;cursor:default}
+.umap-clear{width:100%;margin-top:8px;padding:7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mute);font:600 12px system-ui,sans-serif;cursor:pointer}
+.umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
@@ -1744,6 +1746,7 @@ td .wp-delete{
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
     <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
   </div>
+  <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
   <input id="importMapFile" type="file" hidden>
   <div class="umap-status" id="umapStatus"></div>
 </section>
@@ -8507,7 +8510,7 @@ function loadUserMaps(){
       var wasOn=m.on;m.on=false;
       var fromCache=c?c.match(umapKey(m.id)).then(function(r){return r?r.blob():null;}):Promise.resolve(null);
       return fromCache.then(function(blob){
-        if(blob){m.stored=true;m.on=wasOn;try{umapAttach(m,new File([blob],m.name+'.pmtiles'));}catch(e){}return;}
+        if(blob){m.stored=true;m.fromCache=true;m.on=wasOn;try{umapAttach(m,new File([blob],m.name+'.pmtiles'));}catch(e){}return;}
         m.stored=false;
         if(!m.linked)return; /* read-in-place map (Safari): wait for a re-pick */
         return umapIdb('readonly',function(o){return o.get(m.id);}).then(function(h){
@@ -8532,6 +8535,9 @@ function umapRender(status){
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapDelBtn').disabled=!userMaps.length;
+  var cb=0,cn=0;userMaps.forEach(function(m){if(m.stored){cn++;cb+=m.bytes||0;}});
+  var clr=document.getElementById('umapClearBtn');
+  clr.disabled=!cn;clr.textContent='🧹 ล้าง cache แผนที่'+(cn?' ('+cn+' ไฟล์, '+mb(cb)+')':'');
   if(cur)document.getElementById('umapOp').value=cur.opacity;
   document.getElementById('umapKeep').checked=umapKeepOn();
   var st=document.getElementById('umapStatus');
@@ -8561,6 +8567,21 @@ document.getElementById('umapDelBtn').onclick=function(){
     m=userMaps[(parseInt(a,10)||0)-1];
   }
   if(m)umapDelete(m);
+};
+/* clear map cache: drop every map file copied into the app; the list keeps the names (tap to re-open from the file) */
+document.getElementById('umapClearBtn').onclick=function(){
+  var n=userMaps.filter(function(m){return m.stored;}).length;
+  if(!n||!confirm('ล้าง cache แผนที่? (ลบไฟล์แผนที่ที่ก็อปไว้ในแอพ '+n+' ไฟล์ — ชื่อยังอยู่ใน list แตะเพื่อเปิดจากไฟล์เดิม)'))return;
+  var p=('caches' in window)?caches.delete(UMAP_CACHE):Promise.resolve();
+  p.catch(function(){}).then(function(){
+    userMaps.forEach(function(m){
+      if(!m.stored)return;
+      m.stored=false;
+      if(m.fromCache){if(m.layer)umapGroup.removeLayer(m.layer);m.layer=null;m.on=false;m.fromCache=false;}
+    });
+    try{localStorage.setItem('fp-user-maps-keep','0');}catch(e){}
+    umapSave();umapRender('✓ ล้าง cache แผนที่แล้ว');
+  });
 };
 document.getElementById('umapKeep').onchange=function(){
   var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
