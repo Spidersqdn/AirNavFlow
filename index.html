@@ -7773,15 +7773,12 @@ function buildSlide(f){
     ctx.textAlign='left';ctx.font=F('400',25);
     rows.forEach(function(r,i){var yy=y+8*S+RH*(i+0.5);ctx.fillStyle='#fff';TC(r[0],TX+16*S,yy,TW*0.4);TC(r[1],TX+TW*0.44,yy,TW*0.54);});
     y+=rows.length*RH+16*S+6*S;box(y,62*S);
-    ctx.fillStyle='#fff';
-    if(f.foot)TC(f.foot,TX+TW/2,y+31*S,TW-30*S,1);   /* own text: centred in the box */
-    else TC('เส้นทางบิน : '+(f.code||'-'),TX+16*S,y+31*S,TW-30*S);
+    ctx.fillStyle='#fff';TC('เส้นทางบิน : '+(f.code||'-'),TX+16*S,y+31*S,TW-30*S);
     return cv;
   });
 }
 var SL_FIELDS=[['title','หัวข้อ (แทนคำว่า เส้นทางบิน · ว่าง = เส้นทางบิน)',1],['route','เส้นทางบิน (ชื่อไทย)',1],['dist','ระยะทาง (NM)'],['alt','ความสูงบิน (ft)'],['msa','MSA (ft)'],
-  ['speed','ความเร็ว (kt)'],['ete','ใช้เวลา (นาที)'],['code','เส้นทางบิน (ICAO)'],
-  ['foot','บรรทัดล่าง (แทน เส้นทางบิน : ICAO · กรอกแล้วจัดกึ่งกลางกล่อง)',1]];
+  ['speed','ความเร็ว (kt)'],['ete','ใช้เวลา (นาที)'],['code','เส้นทางบิน (ICAO)']];
 function slAuto(){   /* starting values; time = route time + 5 min, rounded to the nearest 5 (ends in 0 or 5) */
   var tot=mmProfSamples(pts).tot,spd=num('speed'),dep=pts[0],arr=pts[pts.length-1];
   return {route:slPtName(dep)+' - '+slPtName(arr),dist:String(Math.round(tot)),speed:spd>0?String(Math.round(spd)):'',
