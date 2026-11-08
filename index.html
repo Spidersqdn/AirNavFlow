@@ -6107,13 +6107,33 @@ function setGpsTrack(on){
       if(gpsTrackFirst){gpsTrackFirst=false;map.setView(ll,Math.max(map.getZoom(),13));}
     },1000);
     btn.classList.add('active');
+    gpsWakeLockOn();
   }else{
     if(gpsTrackWatch!==null)navigator.geolocation.clearWatch(gpsTrackWatch);
     if(gpsTrackTimer)clearInterval(gpsTrackTimer);
     gpsTrackWatch=gpsTrackTimer=null;
     btn.classList.remove('active');
+    gpsWakeLockOff();
   }
 }
+
+/* Keep the screen awake while GPS TRACK is on (Screen Wake Lock API; silently skipped where unsupported) */
+var gpsWakeLock=null;
+function gpsWakeLockOn(){
+  if(gpsWakeLock||!('wakeLock' in navigator)||document.visibilityState!=='visible')return;
+  navigator.wakeLock.request('screen').then(function(l){
+    if(gpsTrackTimer===null){l.release();return;}
+    gpsWakeLock=l;
+    l.addEventListener('release',function(){if(gpsWakeLock===l)gpsWakeLock=null;});
+  }).catch(function(){});
+}
+function gpsWakeLockOff(){
+  if(gpsWakeLock){var l=gpsWakeLock;gpsWakeLock=null;l.release().catch(function(){});}
+}
+/* The browser drops the lock when the app is hidden; take it again on return if tracking is still on */
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&gpsTrackTimer!==null)gpsWakeLockOn();
+});
 
 function clearMeasurement(){
   if(measureRAF){
