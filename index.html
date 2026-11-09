@@ -6234,6 +6234,7 @@ function navTrackAddFix(pos){
     if(gs==null||gs<0){var h=(p.t-last.t)/3600000;navTrackGs=h>0?d/h:navTrackGs;}
     navTrackNm+=d;
   }
+  p.gs=navTrackGs; /* kt at this fix (GPS speed, else derived) for the speed profile */
   navTrackPts.push(p);
   navTrackLine.addLatLng([p.lat,p.lng]);
 }
@@ -6336,8 +6337,34 @@ function navTrackExport(){
   document.body.appendChild(bg);
 }
 /* A4 portrait image of the flown track (same base map / contours / header style as MINI MAP) */
+var NAV_TITLE_KEY='fp-track-title';
+function navTrackTitle(){try{return localStorage.getItem(NAV_TITLE_KEY)||'FLIGHT TRACK';}catch(e){return 'FLIGHT TRACK';}}
+/* Profile strip (value vs flight time) for the track image: altitude or ground speed */
+function navDrawProfile(ctx,x0,y0,w,h,vals,label,unit,color,S,FONT){
+  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,w,h);
+  ctx.fillStyle='#2f3338';ctx.font='600 '+(15*S)+'px '+FONT;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(label,x0+14*S,y0+24*S);
+  var L=x0+70*S,R=x0+w-20*S,T=y0+36*S,B=y0+h-26*S;
+  var tp=navTrackPts,t0=tp[0].t,t1=tp[tp.length-1].t,tsp=Math.max(1,t1-t0);
+  var pv=tp.map(function(p,i){return {t:p.t,v:vals[i]};}).filter(function(o){return o.v!=null&&isFinite(o.v);});
+  ctx.strokeStyle='#c9ced4';ctx.lineWidth=1*S;ctx.strokeRect(L,T,R-L,B-T);
+  if(pv.length<2){ctx.fillStyle='#8a9098';ctx.font='500 '+(14*S)+'px '+FONT;ctx.textAlign='center';ctx.fillText('NO DATA',(L+R)/2,(T+B)/2+5*S);return;}
+  var mn=Math.min.apply(null,pv.map(function(o){return o.v;})),mx=Math.max.apply(null,pv.map(function(o){return o.v;}));
+  var step=Math.pow(10,Math.floor(Math.log10(Math.max(1,mx-mn||mx||1))));
+  mn=Math.max(0,Math.floor(mn/step)*step);mx=Math.ceil(mx/step)*step;if(mx<=mn)mx=mn+step;
+  function X(t){return L+(t-t0)/tsp*(R-L);}function Y(v){return B-(v-mn)/(mx-mn)*(B-T);}
+  ctx.fillStyle='#5b6168';ctx.font='500 '+(12*S)+'px '+FONT;ctx.textAlign='right';
+  [mn,(mn+mx)/2,mx].forEach(function(v){var y=Y(v);ctx.fillText(Math.round(v)+'',L-6*S,y+4*S);ctx.strokeStyle='#e3e6ea';ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(R,y);ctx.stroke();});
+  ctx.textAlign='left';ctx.fillText(unit,x0+14*S,B);
+  ctx.textAlign='center';
+  for(var k=0;k<=4;k++){var t=t0+tsp*k/4,d=new Date(t);ctx.fillText(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),X(t),B+18*S);}
+  ctx.beginPath();pv.forEach(function(o,i){if(i)ctx.lineTo(X(o.t),Y(o.v));else ctx.moveTo(X(o.t),Y(o.v));});
+  ctx.lineTo(X(pv[pv.length-1].t),B);ctx.lineTo(X(pv[0].t),B);ctx.closePath();ctx.globalAlpha=.18;ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1;
+  ctx.beginPath();pv.forEach(function(o,i){if(i)ctx.lineTo(X(o.t),Y(o.v));else ctx.moveTo(X(o.t),Y(o.v));});
+  ctx.strokeStyle=color;ctx.lineWidth=3*S;ctx.lineJoin='round';ctx.stroke();
+}
 function buildTrackImage(){
-  var S=2,W=900*S,H=Math.round(900*Math.SQRT2)*S,HEAD=118*S,FOOT=110*S,MH=H-HEAD-FOOT;
+  var S=2,W=900*S,H=Math.round(900*Math.SQRT2)*S,HEAD=118*S,FOOT=110*S,PH=170*S,MH=H-HEAD-FOOT-2*PH;
   var FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
   var tp=navTrackPts,minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   tp.forEach(function(p){var q=mmWorld(p.lat,p.lng,0);minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
@@ -6362,7 +6389,10 @@ function buildTrackImage(){
     var a=tp[0],b=tp[tp.length-1],MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     var d0=new Date(a.t),hm=function(t){var d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
     ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
-    ctx.font='600 '+(46*S)+'px '+FONT;ctx.fillText('FLIGHT TRACK',24*S,62*S);
+    var ttl=navTrackTitle(),tfs=46*S;ctx.font='600 '+tfs+'px '+FONT;
+    var tmax=W-24*S-(HEAD+10*S),tw0=ctx.measureText(ttl).width;
+    if(tw0>tmax){tfs=Math.max(24*S,Math.floor(tfs*tmax/tw0));ctx.font='600 '+tfs+'px '+FONT;}
+    ctx.fillText(ttl,24*S,62*S);
     ctx.font='500 '+(17*S)+'px '+FONT;
     ctx.fillText(d0.getDate()+' '+MON[d0.getMonth()]+' '+d0.getFullYear()+'   '+hm(a.t)+' - '+hm(b.t)+' (LOCAL)',24*S,98*S);
     if(logo){var lh=HEAD-14*S,lw=logo.width*lh/logo.height;ctx.drawImage(logo,W-16*S-lw,7*S,lw,lh);}
@@ -6391,6 +6421,9 @@ function buildTrackImage(){
     var ft=String(Math.floor(sec/3600)).padStart(2,'0')+':'+String(Math.floor(sec/60)%60).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
     var alts=tp.map(function(p){return p.alt;}).filter(function(v){return v!=null&&isFinite(v);});
     var cells=[['DISTANCE',navTrackNm.toFixed(1)+' NM'],['FLIGHT TIME',ft],['MAX ALTITUDE',alts.length?Math.round(Math.max.apply(null,alts)*3.28084)+' FT':'---'],['POINTS',String(tp.length)]];
+    navDrawProfile(ctx,0,HEAD+MH,W,PH,tp.map(function(p){return p.alt!=null?p.alt*3.28084:null;}),'ALTITUDE PROFILE','FT','#2f7fd1',S,FONT);
+    navDrawProfile(ctx,0,HEAD+MH+PH,W,PH,tp.map(function(p){return p.gs;}),'SPEED PROFILE (GPS GROUND SPEED)','KT','#d0342c',S,FONT);
+    ctx.fillStyle='#c9ced4';ctx.fillRect(0,HEAD+MH+PH,W,1*S);
     var y0=H-FOOT,cw=W/cells.length;
     ctx.fillStyle='#2f3338';ctx.fillRect(0,y0,W,FOOT);
     cells.forEach(function(c,i){
@@ -6405,7 +6438,7 @@ function showTrackImage(cv){
   var old=document.getElementById('miniMapModal');if(old)old.remove();
   var fname=navTrackFileName('png'),url=cv.toDataURL('image/png');
   var d=document.createElement('div');d.id='miniMapModal';
-  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>FLIGHT TRACK</b><span>'+
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><input id="mmTrackTitle" type="text" maxlength="60" placeholder="ชื่อหัวรูป" style="flex:1;min-width:0;padding:5px 8px;font:600 14px system-ui,sans-serif;border-radius:6px;border:1px solid #666d76;background:#15181c;color:#fff"><span style="white-space:nowrap">'+
     '<button type="button" id="mmSave">บันทึก PNG</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
@@ -6414,6 +6447,17 @@ function showTrackImage(cv){
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
   d.addEventListener('click',function(e){if(e.target===d)d.remove();});
+  /* title: typed name replaces "FLIGHT TRACK"; remembered on this device, image redrawn after a short pause */
+  var ti=document.getElementById('mmTrackTitle'),tt=null;
+  ti.value=navTrackTitle();
+  ti.oninput=function(){
+    clearTimeout(tt);tt=setTimeout(function(){
+      try{if(ti.value.trim())localStorage.setItem(NAV_TITLE_KEY,ti.value.trim());else localStorage.removeItem(NAV_TITLE_KEY);}catch(e){}
+      buildTrackImage().then(function(c2){
+        cv=c2;url=c2.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
+      }).catch(function(){});
+    },700);
+  };
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
   };
