@@ -1268,7 +1268,20 @@ td .wp-delete{
   flex-wrap:wrap;
 }
 .wp-add-row .wp-add{
-  flex:1 1 150px;
+  flex:1 1 0;
+  min-width:0;
+  white-space:normal;
+  line-height:1.2;
+  padding-left:4px;
+  padding-right:4px;
+}
+.wp-add.backtrack-add{
+  background:#1f7a8c;
+  border-color:#2a95aa;
+  color:#fff;
+}
+.wp-add.backtrack-add:hover{
+  background:#2690a5;
 }
 .wp-add.offroute-add{
   background:#626870;
@@ -1642,6 +1655,7 @@ body.panel-hidden #panel{display:none}
     </div>
     <div class="wp-add-row">
       <button type="button" class="wp-add" id="wpAddAirport">Add ROUTE</button>
+      <button type="button" class="wp-add backtrack-add" title="Fly back the same way: add the route waypoints again in reverse order">BACK TRACK</button>
       <button type="button" class="wp-add offroute-add" id="wpAddAirportOffRoute">Add Off-ROUTE W.Pt</button>
     </div>
     <div class="wp-help">Search by ICAO code, airport name, or province from the built-in airport database.</div>
@@ -1664,6 +1678,7 @@ body.panel-hidden #panel{display:none}
     </div>
     <div class="wp-add-row">
       <button type="button" class="wp-add" id="wpAddLatLon">Add ROUTE</button>
+      <button type="button" class="wp-add backtrack-add" title="Fly back the same way: add the route waypoints again in reverse order">BACK TRACK</button>
       <button type="button" class="wp-add offroute-add" id="wpAddLatLonOffRoute">Add Off-ROUTE W.Pt</button>
     </div>
     <div class="wp-help">Use Degrees Decimal Minutes (DDM), e.g. 13°54.750'N / 100°36.400'E.</div>
@@ -1689,6 +1704,7 @@ body.panel-hidden #panel{display:none}
     </div>
     <div class="wp-add-row">
       <button type="button" class="wp-add" id="wpAddRadial">Add ROUTE</button>
+      <button type="button" class="wp-add backtrack-add" title="Fly back the same way: add the route waypoints again in reverse order">BACK TRACK</button>
       <button type="button" class="wp-add offroute-add" id="wpAddRadialOffRoute">Add Off-ROUTE W.Pt</button>
     </div>
     <div class="wp-help">Uses airport coordinates as the reference point. Radial is measured clockwise from true north for map planning.</div>
@@ -4971,6 +4987,19 @@ function drawOffRouteMarkers(){
   });
 }
 
+/* BACK TRACK: append the route's waypoints again in reverse order (last point is the turn point, not repeated) */
+function addBackTrack(){
+  if(pts.length<2){alert('BACK TRACK: route needs at least 2 waypoints.');return false;}
+  var back=pts.slice(0,-1).reverse().map(function(p){
+    return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:p.refIcao||''};
+  });
+  pendingInsertIndex=null;
+  if(typeof updateInsertModeBanner==='function')updateInsertModeBanner();
+  Array.prototype.push.apply(pts,back);
+  refresh();
+  st.textContent='BACK TRACK: added '+back.length+' waypoint(s) back to '+(back[back.length-1].name||'start');
+  return true;
+}
 function addPt(lat,lng,name,refIcao,remark){
   var p={
     lat:lat,
@@ -8818,6 +8847,7 @@ document.getElementById('wpAddAirport').onclick=function(){
   map.flyTo([ap[4],ap[5]],Math.max(map.getZoom(),9));
 };
 
+document.querySelectorAll('.backtrack-add').forEach(function(b){b.onclick=function(){addBackTrack();};});
 document.getElementById('wpAddAirportOffRoute').onclick=function(){
   var q=document.getElementById('wpAirportQuery').value;
   var ap=findAirportByQuery(q);
