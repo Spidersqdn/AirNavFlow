@@ -826,6 +826,15 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 }
 
 
+/* NAVIGATION TRACKING panel (above the elevation profile) */
+.nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
+.nav-track-head{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+.nav-track .actions{padding:0}
+.nav-track-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.nav-track-stats div{border:1px solid var(--line);border-radius:6px;background:#2f3338;padding:5px 6px;text-align:center}
+.nav-track-stats small{display:block;font:9px var(--mono);color:var(--mute);white-space:nowrap}
+.nav-track-stats b{display:block;font:600 14px var(--mono);color:var(--cyan);white-space:nowrap}
+
 .elevation-profile{
   padding:12px 18px 14px;
   border-bottom:1px solid var(--line);
@@ -1725,6 +1734,20 @@ body.panel-hidden #panel{display:none}
   <button id="gpsBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; map is free to pan)">GPS TRACK</button>
   <input id="importKmzFile" type="file" hidden>
 </div>
+
+<section class="nav-track">
+  <div class="nav-track-head">NAVIGATION TRACKING</div>
+  <div class="actions">
+    <button id="navTrackBtn" type="button" title="Toggle GPS tracking (same as GPS TRACK)">TRACKING</button>
+    <button id="navPrstPosBtn" type="button" title="Center the map on the present position">PRST POS</button>
+    <button id="navRouteBtn" type="button" title="Show / hide the track flown so far">ROUTE</button>
+  </div>
+  <div class="nav-track-stats">
+    <div><small>DISTANCE</small><b id="navDist">0.0 NM</b></div>
+    <div><small>GROUND SPEED</small><b id="navGs">--- KT</b></div>
+    <div><small>FLIGHT TIME</small><b id="navTime">00:00:00</b></div>
+  </div>
+</section>
 
 <section class="elevation-profile">
   <div class="elevation-profile-head">
@@ -6151,6 +6174,7 @@ function setGpsTrack(on){
     gpsTrackFix=null;gpsTrackFirst=true;
     gpsTrackWatch=navigator.geolocation.watchPosition(function(pos){
       gpsTrackFix=pos;
+      navTrackAddFix(pos);
     },function(err){
       if(err && err.code===1){
         setGpsTrack(false);
@@ -6164,14 +6188,65 @@ function setGpsTrack(on){
       if(gpsTrackFirst){gpsTrackFirst=false;map.setView(ll,Math.max(map.getZoom(),13));}
     },1000);
     btn.classList.add('active');
+    navTrackStart();
     gpsWakeLockOn();
   }else{
     if(gpsTrackWatch!==null)navigator.geolocation.clearWatch(gpsTrackWatch);
     if(gpsTrackTimer)clearInterval(gpsTrackTimer);
     gpsTrackWatch=gpsTrackTimer=null;
     btn.classList.remove('active');
+    navTrackStop();
     gpsWakeLockOff();
   }
+}
+
+/* NAVIGATION TRACKING: flown track, distance, ground speed and flight time while tracking is on.
+   The track keeps growing across TRACKING off/on and is cleared when the app is reloaded. */
+var navTrackPts=[],navTrackNm=0,navTrackMs=0,navTrackSince=null,navTrackGs=null,navTrackTick=null,navRouteShown=false;
+var navTrackLine=L.polyline([],{color:'#ff3fb4',weight:3,opacity:.9,interactive:false});
+function navTrackStart(){
+  document.getElementById('navTrackBtn').classList.add('active');
+  navTrackSince=Date.now();navTrackGs=null;
+  navTrackTick=setInterval(navTrackRender,1000);
+  navTrackRender();
+}
+function navTrackStop(){
+  document.getElementById('navTrackBtn').classList.remove('active');
+  if(navTrackSince!==null)navTrackMs+=Date.now()-navTrackSince;
+  navTrackSince=null;navTrackGs=null;
+  if(navTrackTick)clearInterval(navTrackTick);
+  navTrackTick=null;
+  navTrackRender();
+}
+function navTrackAddFix(pos){
+  var p={lat:pos.coords.latitude,lng:pos.coords.longitude,t:pos.timestamp||Date.now()};
+  var last=navTrackPts[navTrackPts.length-1];
+  var gs=pos.coords.speed;
+  if(gs!=null&&gs>=0)navTrackGs=gs*1.943844; /* m/s -> kt */
+  if(last){
+    var d=dist(last,p);
+    if(d<0.005)return; /* ignore jitter under ~10 m */
+    if(gs==null||gs<0){var h=(p.t-last.t)/3600000;navTrackGs=h>0?d/h:navTrackGs;}
+    navTrackNm+=d;
+  }
+  navTrackPts.push(p);
+  navTrackLine.addLatLng([p.lat,p.lng]);
+}
+function navTrackRender(){
+  var ms=navTrackMs+(navTrackSince!==null?Date.now()-navTrackSince:0);
+  var sec=Math.floor(ms/1000),pad=function(n){return(n<10?'0':'')+n;};
+  document.getElementById('navDist').textContent=navTrackNm.toFixed(1)+' NM';
+  document.getElementById('navGs').textContent=navTrackGs==null?'--- KT':Math.round(navTrackGs)+' KT';
+  document.getElementById('navTime').textContent=pad(Math.floor(sec/3600))+':'+pad(Math.floor(sec/60)%60)+':'+pad(sec%60);
+}
+function navPresentPosition(){
+  if(gpsTrackFix){map.setView([gpsTrackFix.coords.latitude,gpsTrackFix.coords.longitude],map.getZoom());return;}
+  locateCurrentPosition(true);
+}
+function navToggleRoute(){
+  navRouteShown=!navRouteShown;
+  if(navRouteShown)navTrackLine.addTo(map);else map.removeLayer(navTrackLine);
+  document.getElementById('navRouteBtn').classList.toggle('active',navRouteShown);
 }
 
 /* Keep the screen awake while GPS TRACK is on (Screen Wake Lock API; silently skipped where unsupported) */
@@ -8430,6 +8505,11 @@ document.getElementById('wClose').onclick=function(){
 document.getElementById('gpsBtn').onclick=function(){
   setGpsTrack(gpsTrackTimer===null);
 };
+document.getElementById('navTrackBtn').onclick=function(){
+  setGpsTrack(gpsTrackTimer===null);
+};
+document.getElementById('navPrstPosBtn').onclick=navPresentPosition;
+document.getElementById('navRouteBtn').onclick=navToggleRoute;
 
 document.getElementById('measureBtn').onclick=function(){
   setMeasureMode(!measureActive);
