@@ -829,7 +829,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 /* NAVIGATION TRACKING panel (above the elevation profile) */
 .nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
 .nav-track-head{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
-.nav-track .actions{padding:0;grid-template-columns:repeat(4,minmax(0,1fr))}
+.nav-track .actions{padding:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.nav-track .actions button{width:100%;padding-left:2px;padding-right:2px}
 .nav-track-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
 .nav-track-stats div{border:1px solid var(--line);border-radius:6px;background:#2f3338;padding:5px 2px;text-align:center;min-width:0}
 .nav-track-stats small{display:block;font:9px var(--mono);color:var(--mute);white-space:nowrap}
@@ -1740,10 +1741,11 @@ body.panel-hidden #panel{display:none}
 <section class="nav-track">
   <div class="nav-track-head">NAVIGATION TRACKING</div>
   <div class="actions">
-    <button id="navTrackBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; screen kept awake)">TRACKING</button>
-    <button id="navPrstPosBtn" type="button" title="Center the map on the present position">PRST POS</button>
+    <button id="navTrackBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; screen kept awake)">TRACK</button>
+    <button id="navPrstPosBtn" type="button" title="Center the map on the present position">PPOS</button>
     <button id="navRouteBtn" type="button" title="Show / hide the track flown so far">ROUTE</button>
     <button id="navResetBtn" type="button" title="Clear the flown track, distance and flight time">RESET</button>
+    <button id="navExportBtn" type="button" title="Export the flown track as KMZ / KML / GPX / CSV or an image">EXPORT</button>
   </div>
   <div class="nav-track-stats">
     <div><small>DISTANCE</small><b id="navDist">0.0 NM</b></div>
@@ -6221,7 +6223,7 @@ function navTrackStop(){
   navTrackRender();
 }
 function navTrackAddFix(pos){
-  var p={lat:pos.coords.latitude,lng:pos.coords.longitude,t:pos.timestamp||Date.now()};
+  var p={lat:pos.coords.latitude,lng:pos.coords.longitude,t:pos.timestamp||Date.now(),alt:pos.coords.altitude};
   var last=navTrackPts[navTrackPts.length-1];
   var gs=pos.coords.speed;
   if(gs!=null&&gs>=0)navTrackGs=gs*1.943844; /* m/s -> kt */
@@ -6232,6 +6234,7 @@ function navTrackAddFix(pos){
     if(gs==null||gs<0){var h=(p.t-last.t)/3600000;navTrackGs=h>0?d/h:navTrackGs;}
     navTrackNm+=d;
   }
+  p.gs=navTrackGs; /* kt at this fix (GPS speed, else derived) for the speed profile */
   navTrackPts.push(p);
   navTrackLine.addLatLng([p.lat,p.lng]);
 }
@@ -6253,6 +6256,219 @@ function navTrackReset(){
   if(navTrackSince!==null)navTrackSince=Date.now();
   navTrackLine.setLatLngs([]);
   navTrackRender();
+}
+/* ---- NAVIGATION TRACKING > EXPORT: flown track as KMZ / KML / GPX / CSV, or an A4 image like MINI MAP ---- */
+function navTrackStamp(t){
+  var d=new Date(t),p=function(n){return(n<10?'0':'')+n;};
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes());
+}
+function navTrackFileName(ext){return 'Flight_Track_'+navTrackStamp(navTrackPts[0].t)+'.'+ext;}
+function navTrackIso(t){return new Date(t).toISOString().replace(/\.\d{3}Z$/,'Z');}
+function navTrackKml(){
+  var c=navTrackPts.map(function(p){return p.lng.toFixed(7)+','+p.lat.toFixed(7)+','+(p.alt!=null?p.alt.toFixed(1):'0');}).join(' ');
+  var a=navTrackPts[0],b=navTrackPts[navTrackPts.length-1];
+  function pm(nm,p){return '<Placemark><name>'+nm+'</name><Point><coordinates>'+p.lng.toFixed(7)+','+p.lat.toFixed(7)+',0</coordinates></Point></Placemark>';}
+  var name='Flight Track '+navTrackStamp(a.t);
+  return '<?xml version="1.0" encoding="UTF-8"?>'+
+    '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>'+xmlEsc(name)+'</name>'+
+    '<Style id="trackStyle"><LineStyle><color>ffb43fff</color><width>4</width></LineStyle></Style>'+
+    pm('START',a)+pm('END',b)+
+    '<Placemark><name>'+xmlEsc(name)+'</name><styleUrl>#trackStyle</styleUrl>'+
+    '<LineString><tessellate>1</tessellate><altitudeMode>'+(a.alt!=null?'absolute':'clampToGround')+'</altitudeMode>'+
+    '<coordinates>'+c+'</coordinates></LineString></Placemark></Document></kml>';
+}
+function navTrackGpx(){
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<gpx version="1.1" creator="AirNavFlow" xmlns="http://www.topografix.com/GPX/1/1">\n'+
+    '<trk><name>Flight Track '+navTrackStamp(navTrackPts[0].t)+'</name><trkseg>\n'+
+    navTrackPts.map(function(p){
+      return '<trkpt lat="'+p.lat.toFixed(7)+'" lon="'+p.lng.toFixed(7)+'">'+(p.alt!=null?'<ele>'+p.alt.toFixed(1)+'</ele>':'')+'<time>'+navTrackIso(p.t)+'</time></trkpt>';
+    }).join('\n')+'\n</trkseg></trk>\n</gpx>\n';
+}
+function navTrackCsv(){
+  var rows=[['seq','time_utc','lat','lon','lat_ddm','lon_ddm','alt_ft']];
+  navTrackPts.forEach(function(p,i){rows.push([i+1,navTrackIso(p.t),p.lat.toFixed(6),p.lng.toFixed(6),formatDDM(p.lat,true),formatDDM(p.lng,false),p.alt!=null?Math.round(p.alt*3.28084):'']);});
+  return '\ufeff'+rows.map(function(r){return r.map(csvCell).join(',');}).join('\r\n')+'\r\n';
+}
+function navTrackBlob(fmt){
+  if(fmt==='kml')return Promise.resolve(new Blob([navTrackKml()],{type:'application/vnd.google-earth.kml+xml'}));
+  if(fmt==='gpx')return Promise.resolve(new Blob([navTrackGpx()],{type:'application/gpx+xml'}));
+  if(fmt==='csv')return Promise.resolve(new Blob([navTrackCsv()],{type:'text/csv;charset=utf-8'}));
+  if(typeof JSZip==='undefined')return Promise.reject(new Error('KMZ library unavailable'));
+  var zip=new JSZip();zip.file('doc.kml',navTrackKml());
+  return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+}
+function navTrackDownload(fmt){
+  navTrackBlob(fmt).then(function(blob){
+    var a=document.createElement('a'),url=URL.createObjectURL(blob);
+    a.href=url;a.download=navTrackFileName(fmt);
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+  }).catch(function(){alert('Unable to export '+fmt.toUpperCase()+'.');});
+}
+function navTrackExport(){
+  if(navTrackPts.length<2){alert('ยังไม่มีเส้นทางที่ TRACK ไว้ (ต้องมีอย่างน้อย 2 จุด)');return;}
+  var bg=document.createElement('div');
+  bg.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  var box=document.createElement('div');
+  box.style.cssText='background:#3a3f46;color:#fff;border:1px solid #666d76;border-radius:10px;padding:16px;max-width:360px;width:100%;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+  bg.appendChild(box);
+  function close(){if(bg.parentNode)document.body.removeChild(bg);}
+  function btn(label,fn,primary){
+    var b=document.createElement('button');b.type='button';b.textContent=label;
+    b.style.cssText='display:block;width:100%;margin:0;padding:10px;border-radius:8px;border:1px solid '+(primary?'#f5b335':'#666d76')+';background:'+(primary?'#f5b335':'transparent')+';color:'+(primary?'#1a1200':'#fff')+';font:600 14px system-ui,sans-serif;cursor:pointer';
+    b.onclick=fn;return b;
+  }
+  var t=document.createElement('div');t.style.cssText='margin-bottom:10px;font-weight:600';
+  t.textContent='EXPORT TRACK ('+navTrackNm.toFixed(1)+' NM, '+navTrackPts.length+' จุด)';
+  box.appendChild(t);
+  var fr=document.createElement('div');fr.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px';
+  ['kmz','kml','gpx','csv'].forEach(function(f){fr.appendChild(btn(f.toUpperCase(),function(){close();navTrackDownload(f);}));});
+  box.appendChild(fr);
+  var img=btn('รูปภาพ (IMAGE)',function(){
+    img.disabled=true;img.textContent='กำลังสร้าง…';
+    buildTrackImage().then(function(cv){close();showTrackImage(cv);}).catch(function(err){
+      close();alert('สร้างรูปภาพไม่สำเร็จ ('+(err&&err.message||err)+')');
+    });
+  },true);
+  img.style.marginBottom='6px';box.appendChild(img);
+  box.appendChild(btn('ยกเลิก',close));
+  bg.onclick=function(e){if(e.target===bg)close();};
+  document.body.appendChild(bg);
+}
+/* A4 portrait image of the flown track (same base map / contours / header style as MINI MAP) */
+var NAV_TITLE_KEY='fp-track-title';
+function navTrackTitle(){try{return localStorage.getItem(NAV_TITLE_KEY)||'FLIGHT TRACK';}catch(e){return 'FLIGHT TRACK';}}
+/* Profile strip (value vs flight time) for the track image: altitude or ground speed */
+function navDrawProfile(ctx,x0,y0,w,h,vals,label,unit,color,S,FONT){
+  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,w,h);
+  ctx.fillStyle='#2f3338';ctx.font='600 '+(15*S)+'px '+FONT;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(label,x0+14*S,y0+24*S);
+  var L=x0+70*S,R=x0+w-20*S,T=y0+36*S,B=y0+h-26*S;
+  var tp=navTrackPts,t0=tp[0].t,t1=tp[tp.length-1].t,tsp=Math.max(1,t1-t0);
+  var pv=tp.map(function(p,i){return {t:p.t,v:vals[i]};}).filter(function(o){return o.v!=null&&isFinite(o.v);});
+  ctx.strokeStyle='#c9ced4';ctx.lineWidth=1*S;ctx.strokeRect(L,T,R-L,B-T);
+  if(pv.length<2){ctx.fillStyle='#8a9098';ctx.font='500 '+(14*S)+'px '+FONT;ctx.textAlign='center';ctx.fillText('NO DATA',(L+R)/2,(T+B)/2+5*S);return;}
+  var mn=Math.min.apply(null,pv.map(function(o){return o.v;})),mx=Math.max.apply(null,pv.map(function(o){return o.v;}));
+  var step=Math.pow(10,Math.floor(Math.log10(Math.max(1,mx-mn||mx||1))));
+  mn=Math.max(0,Math.floor(mn/step)*step);mx=Math.ceil(mx/step)*step;if(mx<=mn)mx=mn+step;
+  function X(t){return L+(t-t0)/tsp*(R-L);}function Y(v){return B-(v-mn)/(mx-mn)*(B-T);}
+  ctx.fillStyle='#5b6168';ctx.font='500 '+(12*S)+'px '+FONT;ctx.textAlign='right';
+  [mn,(mn+mx)/2,mx].forEach(function(v){var y=Y(v);ctx.fillText(Math.round(v)+'',L-6*S,y+4*S);ctx.strokeStyle='#e3e6ea';ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(R,y);ctx.stroke();});
+  ctx.textAlign='left';ctx.fillText(unit,x0+14*S,B);
+  ctx.textAlign='center';
+  for(var k=0;k<=4;k++){var t=t0+tsp*k/4,d=new Date(t);ctx.fillText(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),X(t),B+18*S);}
+  ctx.beginPath();pv.forEach(function(o,i){if(i)ctx.lineTo(X(o.t),Y(o.v));else ctx.moveTo(X(o.t),Y(o.v));});
+  ctx.lineTo(X(pv[pv.length-1].t),B);ctx.lineTo(X(pv[0].t),B);ctx.closePath();ctx.globalAlpha=.18;ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1;
+  ctx.beginPath();pv.forEach(function(o,i){if(i)ctx.lineTo(X(o.t),Y(o.v));else ctx.moveTo(X(o.t),Y(o.v));});
+  ctx.strokeStyle=color;ctx.lineWidth=3*S;ctx.lineJoin='round';ctx.stroke();
+}
+function buildTrackImage(){
+  var S=2,W=900*S,H=Math.round(900*Math.SQRT2)*S,HEAD=118*S,FOOT=110*S,PH=170*S,MH=H-HEAD-FOOT-2*PH;
+  var FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
+  var tp=navTrackPts,minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  tp.forEach(function(p){var q=mmWorld(p.lat,p.lng,0);minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
+  var spanX=Math.max(maxX-minX,1e-5),spanY=Math.max(maxY-minY,1e-5);
+  var z=Math.log2(Math.min(W*0.8/spanX,MH*0.8/spanY));z=Math.max(5,Math.min(z,13.5));
+  var sc=Math.pow(2,z),cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
+  var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
+  function px(p){var q=mmWorld(p.lat,p.lng,z);return {x:q.x-cxW+W/2,y:q.y-cyW+MH/2+HEAD};}
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var ctx=cv.getContext('2d');
+  var mapCv=document.createElement('canvas');mapCv.width=W;mapCv.height=MH;
+  var mctx=mapCv.getContext('2d'),logo=null;
+  var fontsReady=(document.fonts&&document.fonts.load)?document.fonts.load('600 36px Sarabun','Aก่ำ').catch(function(){}):Promise.resolve();
+  return fontsReady.then(function(){return mmDrawBase(mctx,W,MH,cxW,cyW,z,center);})
+  .then(function(){return mmDrawContours(mctx,W,MH,cxW,cyW,z,S);})
+  .then(function(){return mmLoadImg('icons/sqn201.png',4000).then(function(im){logo=im;});})
+  .then(function(){
+    ctx.drawImage(mapCv,0,HEAD);
+    ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);
+    /* header */
+    ctx.fillStyle='#6f2a93';ctx.fillRect(0,0,W,HEAD);
+    var a=tp[0],b=tp[tp.length-1],MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var d0=new Date(a.t),hm=function(t){var d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
+    ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    var ttl=navTrackTitle(),tfs=46*S;ctx.font='600 '+tfs+'px '+FONT;
+    var tmax=W-24*S-(HEAD+10*S),tw0=ctx.measureText(ttl).width;
+    if(tw0>tmax){tfs=Math.max(24*S,Math.floor(tfs*tmax/tw0));ctx.font='600 '+tfs+'px '+FONT;}
+    ctx.fillText(ttl,24*S,62*S);
+    ctx.font='500 '+(17*S)+'px '+FONT;
+    ctx.fillText(d0.getDate()+' '+MON[d0.getMonth()]+' '+d0.getFullYear()+'   '+hm(a.t)+' - '+hm(b.t)+' (LOCAL)',24*S,98*S);
+    if(logo){var lh=HEAD-14*S,lw=logo.width*lh/logo.height;ctx.drawImage(logo,W-16*S-lw,7*S,lw,lh);}
+    /* planned route (if any), thin dashed, for reference */
+    if(pts.length>1){
+      ctx.save();ctx.setLineDash([10*S,8*S]);ctx.strokeStyle='rgba(47,51,56,.7)';ctx.lineWidth=2*S;ctx.beginPath();
+      pts.forEach(function(p,i){var q=px(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});
+      ctx.stroke();ctx.restore();
+    }
+    /* flown track */
+    ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();tp.forEach(function(p,i){var q=px(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});
+    ctx.strokeStyle='#fff';ctx.lineWidth=9*S;ctx.stroke();
+    ctx.strokeStyle='#ff3fb4';ctx.lineWidth=5*S;ctx.stroke();ctx.restore();
+    function mark(p,col,label){
+      var q=px(p);
+      ctx.beginPath();ctx.arc(q.x,q.y,9*S,0,2*Math.PI);ctx.fillStyle=col;ctx.fill();ctx.lineWidth=3*S;ctx.strokeStyle='#fff';ctx.stroke();
+      ctx.font='700 '+(18*S)+'px '+FONT;var w=ctx.measureText(label).width,bx=Math.min(W-w-16*S,Math.max(4*S,q.x+14*S)),by=q.y-14*S;
+      ctx.fillStyle='rgba(255,255,255,.92)';ctx.fillRect(bx-5*S,by-20*S,w+10*S,27*S);
+      ctx.fillStyle='#1a1a1a';ctx.textAlign='left';ctx.fillText(label,bx,by);
+    }
+    mark(a,'#1f9d55','START '+hm(a.t));
+    mark(b,'#d0342c','END '+hm(b.t));
+    /* footer: totals */
+    var ms=navTrackMs+(navTrackSince!==null?Date.now()-navTrackSince:0),sec=Math.floor(ms/1000);
+    var ft=String(Math.floor(sec/3600)).padStart(2,'0')+':'+String(Math.floor(sec/60)%60).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+    var alts=tp.map(function(p){return p.alt;}).filter(function(v){return v!=null&&isFinite(v);});
+    var cells=[['DISTANCE',navTrackNm.toFixed(1)+' NM'],['FLIGHT TIME',ft],['MAX ALTITUDE',alts.length?Math.round(Math.max.apply(null,alts)*3.28084)+' FT':'---'],['POINTS',String(tp.length)]];
+    navDrawProfile(ctx,0,HEAD+MH,W,PH,tp.map(function(p){return p.alt!=null?p.alt*3.28084:null;}),'ALTITUDE PROFILE','FT','#2f7fd1',S,FONT);
+    navDrawProfile(ctx,0,HEAD+MH+PH,W,PH,tp.map(function(p){return p.gs;}),'SPEED PROFILE (GPS GROUND SPEED)','KT','#d0342c',S,FONT);
+    ctx.fillStyle='#c9ced4';ctx.fillRect(0,HEAD+MH+PH,W,1*S);
+    var y0=H-FOOT,cw=W/cells.length;
+    ctx.fillStyle='#2f3338';ctx.fillRect(0,y0,W,FOOT);
+    cells.forEach(function(c,i){
+      ctx.textAlign='center';ctx.fillStyle='#c0c5cc';ctx.font='500 '+(16*S)+'px '+FONT;ctx.fillText(c[0],cw*i+cw/2,y0+40*S);
+      ctx.fillStyle='#f5b335';ctx.font='700 '+(30*S)+'px '+FONT;ctx.fillText(c[1],cw*i+cw/2,y0+84*S);
+      if(i){ctx.fillStyle='#666d76';ctx.fillRect(cw*i,y0+18*S,1*S,FOOT-36*S);}
+    });
+    return cv;
+  });
+}
+function showTrackImage(cv){
+  var old=document.getElementById('miniMapModal');if(old)old.remove();
+  var fname=navTrackFileName('png'),url=cv.toDataURL('image/png');
+  var d=document.createElement('div');d.id='miniMapModal';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><input id="mmTrackTitle" type="text" maxlength="60" placeholder="ชื่อหัวรูป" style="flex:1;min-width:0;padding:5px 8px;font:600 14px system-ui,sans-serif;border-radius:6px;border:1px solid #666d76;background:#15181c;color:#fff"><span style="white-space:nowrap">'+
+    '<button type="button" id="mmSave">บันทึก PNG</button> '+
+    (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
+    '<button type="button" id="mmClose">✕</button></span></div>'+
+    '<div class="mm-img"><img alt="Flight track" src="'+url+'"></div>'+
+    '<p class="mm-note">ขนาด A4 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้</p></div>';
+  document.body.appendChild(d);
+  document.getElementById('mmClose').onclick=function(){d.remove();};
+  d.addEventListener('click',function(e){if(e.target===d)d.remove();});
+  /* title: typed name replaces "FLIGHT TRACK"; remembered on this device, image redrawn after a short pause */
+  var ti=document.getElementById('mmTrackTitle'),tt=null;
+  ti.value=navTrackTitle();
+  ti.oninput=function(){
+    clearTimeout(tt);tt=setTimeout(function(){
+      try{if(ti.value.trim())localStorage.setItem(NAV_TITLE_KEY,ti.value.trim());else localStorage.removeItem(NAV_TITLE_KEY);}catch(e){}
+      buildTrackImage().then(function(c2){
+        cv=c2;url=c2.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
+      }).catch(function(){});
+    },700);
+  };
+  document.getElementById('mmSave').onclick=function(){
+    var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  };
+  var sh=document.getElementById('mmShare');
+  if(sh)sh.onclick=function(){
+    cv.toBlob(function(blob){
+      var f=new File([blob],fname,{type:'image/png'});
+      if(navigator.canShare({files:[f]}))navigator.share({files:[f],title:fname}).catch(function(){});
+      else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
+    },'image/png');
+  };
 }
 function navToggleRoute(){
   navRouteShown=!navRouteShown;
@@ -8519,6 +8735,7 @@ document.getElementById('navTrackBtn').onclick=function(){
 document.getElementById('navPrstPosBtn').onclick=navPresentPosition;
 document.getElementById('navRouteBtn').onclick=navToggleRoute;
 document.getElementById('navResetBtn').onclick=navTrackReset;
+document.getElementById('navExportBtn').onclick=navTrackExport;
 
 document.getElementById('measureBtn').onclick=function(){
   setMeasureMode(!measureActive);
