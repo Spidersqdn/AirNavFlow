@@ -1577,6 +1577,13 @@ td .wp-delete{
   color:#1a1200;
 }
 
+/* Hide-menu bar: collapse the side panel so the map gets the full screen */
+#panelToggle{position:absolute;z-index:1001;left:0;top:50%;transform:translateY(-50%);width:22px;height:72px;padding:0;margin:0;border:1px solid var(--line);border-left:none;border-radius:0 8px 8px 0;background:rgba(58,63,70,.92);color:var(--amber);font:bold 14px/1 var(--sans);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.4);-webkit-tap-highlight-color:transparent}
+#panelToggle:active{background:var(--panel2)}
+body.panel-hidden #panel{display:none}
+@media (orientation:portrait){
+  #panelToggle{left:50%;top:auto;bottom:0;transform:translateX(-50%);width:72px;height:22px;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0}
+}
 </style>
 </head>
 <body>
@@ -1692,14 +1699,14 @@ td .wp-delete{
 <div class="actions">
   <button id="undo">BACK</button>
   <button id="clear">CLEAR ROUTE</button>
-  <button id="gpsBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; map is free to pan)">GPS TRACK</button>
+  <button id="measureBtn" type="button">RULER</button>
   <button id="exportMiniMap" type="button" title="Export a mini map (PNG) of the route">MINI MAP</button>
   <button id="flightLogBtn" type="button" title="Pilot mission data card (PNG)">MSN CARD</button>
   <button id="wBtn" type="button">WINDY</button>
   <button id="slideBtn" type="button" title="Mission overview slide 16:9 (PNG)">SLIDE</button>
   <button id="exportKmz" type="button" title="Export route as KMZ / KML / GPX / CSV">EXPORT</button>
   <button id="importKmz" type="button" title="Import route / waypoints from KMZ, KML, GPX or CSV (e.g. Google Earth)">IMPORT</button>
-  <button id="measureBtn" type="button">RULER</button>
+  <button id="gpsBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; map is free to pan)">GPS TRACK</button>
   <input id="importKmzFile" type="file" hidden>
 </div>
 
@@ -1774,6 +1781,7 @@ td .wp-delete{
 
 <div id="mapwrap">
   <div id="map"></div>
+  <button id="panelToggle" type="button" title="ซ่อน/แสดงเมนู" aria-label="ซ่อน/แสดงเมนู" aria-expanded="true"></button>
   <div id="status">กด On MAP เพื่อเพิ่ม waypoint • กดค้างที่แผนที่เพื่อดูข้อมูลจุด</div>
   <div id="windy">
     <header><span>Windy</span><span><button id="wDep" class="wPos" type="button">DEPARTURE</button> <button id="wSync" class="wPos" type="button">MidWay</button> <button id="wDest" class="wPos" type="button">DESTINATION</button> <button id="wClose" type="button">✕</button></span></header>
@@ -3772,6 +3780,29 @@ function setOfflineSource(source){
 }
 
 var map=L.map('map',{center:[13.5,101],zoom:6,layers:[sat],worldCopyJump:true});
+/* Hide-menu bar: toggle the side panel; state remembered in localStorage */
+(function(){
+  var KEY='fp-panel-hidden-v1',btn=document.getElementById('panelToggle');
+  if(!btn)return;
+  var portrait=window.matchMedia?window.matchMedia('(orientation:portrait)'):null;
+  function label(){
+    var hidden=document.body.classList.contains('panel-hidden'),pt=portrait&&portrait.matches;
+    btn.textContent=hidden?(pt?'▲':'▶'):(pt?'▼':'◀');
+    btn.title=hidden?'แสดงเมนู':'ซ่อนเมนู';
+    btn.setAttribute('aria-expanded',hidden?'false':'true');
+  }
+  function apply(hidden,save){
+    document.body.classList.toggle('panel-hidden',!!hidden);
+    label();
+    if(save){try{localStorage.setItem(KEY,hidden?'1':'0');}catch(e){}}
+    setTimeout(function(){try{map.invalidateSize();}catch(e){}},50);
+  }
+  var init=false;try{init=localStorage.getItem(KEY)==='1';}catch(e){}
+  apply(init,false);
+  btn.addEventListener('click',function(e){e.stopPropagation();apply(!document.body.classList.contains('panel-hidden'),true);});
+  L.DomEvent.disableClickPropagation(btn);
+  if(portrait){if(portrait.addEventListener)portrait.addEventListener('change',label);else if(portrait.addListener)portrait.addListener(label);}
+})();
 var terrainPane=map.createPane('terrainTop');
 terrainPane.style.zIndex=450;
 terrainPane.style.pointerEvents='none';
