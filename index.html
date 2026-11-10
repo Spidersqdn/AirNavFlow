@@ -7456,7 +7456,7 @@ function buildMiniMap(opt){
   var REC=opt&&opt.layers?[]:null;
   function DB(c,b,lines,pad,align,border,col){
     if(!REC){mmDrawBox(c,b,lines,pad,align,border);return;}
-    REC.push({k:'box',x:b.x,y:b.y,w:b.w,h:b.h,pad:pad,border:border||2,col:col||'#111',lines:lines.map(function(l,i){
+    REC.push({k:'box',src:b,x:b.x,y:b.y,w:b.w,h:b.h,pad:pad,border:border||2,col:col||'#111',lines:lines.map(function(l,i){
       return {t:l.t||'',sz:l.sz,b:/^[6-9]00 /.test(l.f||''),c:l.c||'#111',u:l.u||'',lh:l.lh,ctr:!(align==='left'&&!(i===0&&l.center))};})});
   }
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
@@ -7496,8 +7496,9 @@ function buildMiniMap(opt){
     return mmElevFt(pts.concat(prof.pts)).then(function(e){elevFt=e.slice(0,pts.length);profFt=e.slice(pts.length);});
   }).then(function(){
     var HF=H;H=HF-PROF;   /* from here on H = bottom of the map area; the profile strip sits below it */
-    ctx.drawImage(mapCv,0,HEAD);
-    ctx.fillStyle='rgba(255,255,255,.28)';ctx.fillRect(0,HEAD,W,MH);   /* fade like a printed strip chart */
+    mctx.fillStyle='rgba(255,255,255,.28)';mctx.fillRect(0,0,W,MH);   /* fade like a printed strip chart */
+    if(REC)cv.mmBase={url:mapCv.toDataURL('image/jpeg',0.9),y:HEAD,h:MH};   /* PPT: base map is its own picture behind everything */
+    else ctx.drawImage(mapCv,0,HEAD);
 
     /* ---- title bar ---- */
     ctx.fillStyle='#6f2a93';ctx.fillRect(0,0,W,HEAD);
@@ -7705,7 +7706,7 @@ function buildMiniMap(opt){
     }
 
     /* ---- waypoint circles ---- */
-    function ring(q,r){ctx.beginPath();ctx.arc(q.x,q.y,r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();ctx.lineWidth=4*S;ctx.strokeStyle='#111';ctx.stroke();}
+    function ring(q,r){if(REC){REC.push({k:'ring',x:q.x-r,y:q.y-r,w:2*r,h:2*r,cx:q.x,cy:q.y,lw:4*S});return;}ctx.beginPath();ctx.arc(q.x,q.y,r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();ctx.lineWidth=4*S;ctx.strokeStyle='#111';ctx.stroke();}
     /* runway symbol (from data/RWY.txt) at airports, magnified so it stays readable; plain ring otherwise */
     function runwaySym(id,q){
       var rw=RWY_INFO[id],ap=APX[id];if(!rw||!rw.length||!ap)return false;
@@ -7819,7 +7820,11 @@ function buildMiniMap(opt){
       boxes.push(placed);
       /* leader line when the box ended up far from its point */
       var bx=Math.max(placed.x,Math.min(q.x,placed.x+placed.w)),by=Math.max(placed.y,Math.min(q.y,placed.y+placed.h));
-      if(Math.hypot(bx-q.x,by-q.y)>(small?16:30)*S){ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);}
+      if(Math.hypot(bx-q.x,by-q.y)>(small?16:30)*S){
+        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:placed,lw:1.5*S});
+        else{ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
+        leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);
+      }
       DB(ctx,placed,lines,pad,align,(small?1.5:2)*S);
       return true;
     }
@@ -7955,7 +7960,8 @@ function buildMiniMap(opt){
         var b=it.b,q=it.q,bx,by;
         if((q.y<b.y||q.y>b.y+b.h)&&q.x>b.x-40*S&&q.x<b.x+b.w+40*S){bx=Math.max(b.x+6*S,Math.min(q.x,b.x+b.w-6*S));by=q.y<b.y?b.y:b.y+b.h;}   /* point above / below: leave from the top / bottom edge */
         else{bx=b.x+b.w/2<q.x?b.x+b.w:b.x;by=Math.max(b.y+6*S,Math.min(q.y,b.y+b.h-6*S));}
-        ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();
+        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:b,lw:1.5*S});
+        else{ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
         leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);
       });
       items.forEach(function(it){
@@ -8051,12 +8057,12 @@ function showMiniMap(cv){
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
   };
-  /* PowerPoint: one A5 portrait slide; map as a picture, info boxes / tags / HDG bars / title as movable, editable text boxes */
+  /* PowerPoint: one A5 portrait slide; background map and route/symbols as 2 pictures, waypoint circles, leader lines (glued), info boxes / tags / HDG bars / title as movable, editable shapes */
   var pb=document.getElementById('mmPpt');
   pb.onclick=function(){
     var pn=fname.replace(/\.png$/,'.pptx');pb.disabled=true;
     buildMiniMap({skip:mmOffSkip(),layers:true}).then(function(c2){   /* same sheet, boxes as separate editable shapes */
-      return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),c2.mmShapes,c2.mmW);
+      return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),c2.mmShapes,c2.mmW,c2.mmBase);
     }).then(function(blob){
       var a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=pn;document.body.appendChild(a);a.click();a.remove();
       setTimeout(function(){URL.revokeObjectURL(u);},30000);
@@ -8079,7 +8085,7 @@ function mmRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat
 function mmTitle(){try{var o=JSON.parse(localStorage.getItem('fp-mm-title')||'null');if(o&&o.k===mmRouteKey()&&o.t)return o.t;}catch(e){}return mmTitleDef();}
 function mmTitleSave(t){try{t=(t||'').trim();if(t&&t!==mmTitleDef())localStorage.setItem('fp-mm-title',JSON.stringify({k:mmRouteKey(),t:t}));else localStorage.removeItem('fp-mm-title');}catch(e){}}
 /* PowerPoint (.pptx) with one A5 portrait slide holding a PNG full-page (built with the bundled JSZip, works offline) */
-function mmPptxBlob(pngDataUrl,title,shapes,SW){
+function mmPptxBlob(pngDataUrl,title,shapes,SW,base){
   var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
   var R='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
@@ -8089,7 +8095,7 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW){
   var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
   var z=new JSZip();
   z.file('[Content_Types].xml',X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
-    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'+
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'+
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>'+
     '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>'+
@@ -8110,12 +8116,15 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW){
   z.file('ppt/slideLayouts/slideLayout1.xml',X+'<p:sldLayout '+NS+' type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>'+tree+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>');
   z.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels',rels([['slideMaster','../slideMasters/slideMaster1.xml']]));
   z.file('ppt/slides/slide1.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+
-    '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+xe(title||'MINI MAP')+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
+    (base?'<p:pic><p:nvPicPr><p:cNvPr id="3" name="Background map"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
+      '<p:blipFill><a:blip r:embed="rId3"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
+      '<p:spPr><a:xfrm><a:off x="0" y="'+Math.round(base.y*CX/(SW||1800))+'"/><a:ext cx="'+CX+'" cy="'+Math.round(base.h*CX/(SW||1800))+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':'')+
+    '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+(base?'Route and symbols':xe(title||'MINI MAP'))+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
     '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
     '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+CX+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'+
     mmPptxShapes(shapes||[],CX/(SW||1800))+
     '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
-  z.file('ppt/slides/_rels/slide1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image1.png']]));
+  z.file('ppt/slides/_rels/slide1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image1.png']].concat(base?[['image','../media/image2.jpeg']]:[])));
   var C=function(n,v){return '<a:'+n+'><a:srgbClr val="'+v+'"/></a:'+n+'>';};
   var F='<a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/>';
   var fill='<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',ln='<a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>';
@@ -8127,6 +8136,7 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW){
     '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>'+
     '<a:bgFillStyleLst>'+fill+fill+fill+'</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>');
   z.file('ppt/media/image1.png',pngDataUrl.split(',')[1],{base64:true});
+  if(base)z.file('ppt/media/image2.jpeg',base.url.split(',')[1],{base64:true});
   return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});
 }
 /* recorded MINI MAP boxes -> PowerPoint text boxes (movable, editable). k = EMU per canvas px.
@@ -8145,13 +8155,40 @@ function mmPptxShapes(list,k){
       '<a:endParaRPr lang="th-TH" sz="'+P(l.sz)+'" dirty="0"><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:endParaRPr></a:p>';
   }
   function sp(name,o,fill,ln,ins,anchor,paras,rot){
-    id++;
+    var id=o.id;
     return '<p:sp><p:nvSpPr><p:cNvPr id="'+id+'" name="'+xe(name)+' '+id+'"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm'+(rot?' rot="'+Math.round(rot*60000)+'"':'')+'><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
       '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'+(fill?'<a:solidFill><a:srgbClr val="'+fill+'"/></a:solidFill>':'<a:noFill/>')+
       (ln?'<a:ln w="'+E(ln[0])+'"><a:solidFill><a:srgbClr val="'+ln[1]+'"/></a:solidFill></a:ln>':'<a:ln><a:noFill/></a:ln>')+'</p:spPr>'+
       '<p:txBody><a:bodyPr wrap="none" lIns="'+E(ins)+'" tIns="'+E(ins)+'" rIns="'+E(ins)+'" bIns="'+E(ins)+'" anchor="'+anchor+'" rtlCol="0"><a:noAutofit/></a:bodyPr><a:lstStyle/>'+paras+'</p:txBody></p:sp>';
   }
-  return list.map(function(o){
+  list.forEach(function(o,i){o.id=id+i;});
+  function ring(o){   /* waypoint circle: movable / resizable ellipse */
+    return '<p:sp><p:nvSpPr><p:cNvPr id="'+o.id+'" name="Waypoint '+o.id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
+      '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"><a:alpha val="35000"/></a:srgbClr></a:solidFill><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:ln></p:spPr></p:sp>';
+  }
+  /* leader line: a connector glued to its waypoint circle and its box, so it follows when either is moved */
+  function lead(o){
+    var st=null,en=null;
+    list.forEach(function(r){
+      if(r.k==='ring'&&Math.abs(r.cx-o.x1)<1&&Math.abs(r.cy-o.y1)<1)st=r;
+      if(r.k==='box'&&r.src===o.b)en=r;
+    });
+    var x1=o.x1,y1=o.y1,x2=o.x2,y2=o.y2,si=0,ei=0;
+    if(st){   /* start on the circle's edge, at the nearest of its 8 connection points */
+      var a=Math.atan2(y2-y1,x2-x1),k8=Math.round(a/(Math.PI/4)),r0=st.w/2;
+      var ang=k8*Math.PI/4;x1=st.cx+Math.cos(ang)*r0;y1=st.cy+Math.sin(ang)*r0;
+      si=[6,5,4,3,2,1,0,7][((k8%8)+8)%8];   /* ellipse sites: 0 top, 1 top-left, 2 left, 3 bottom-left, 4 bottom, 5 bottom-right, 6 right, 7 top-right */
+    }
+    if(en){ei=Math.abs(y2-en.y)<1?0:Math.abs(y2-en.y-en.h)<1?2:Math.abs(x2-en.x)<1?1:3;}   /* rect sites: 0 top, 1 left, 2 bottom, 3 right */
+    var fh=x2<x1,fv=y2<y1;
+    return '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="'+o.id+'" name="Leader '+o.id+'"/><p:cNvCxnSpPr>'+(st?'<a:stCxn id="'+st.id+'" idx="'+si+'"/>':'')+(en?'<a:endCxn id="'+en.id+'" idx="'+ei+'"/>':'')+'</p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr>'+
+      '<p:spPr><a:xfrm'+(fh?' flipH="1"':'')+(fv?' flipV="1"':'')+'><a:off x="'+E(Math.min(x1,x2))+'" y="'+E(Math.min(y1,y2))+'"/><a:ext cx="'+E(Math.abs(x2-x1))+'" cy="'+E(Math.abs(y2-y1))+'"/></a:xfrm>'+
+      '<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:ln></p:spPr></p:cxnSp>';
+  }
+  var order={lead:0,ring:1};
+  return list.slice().sort(function(a,b){return (a.k in order?order[a.k]:2)-(b.k in order?order[b.k]:2);}).map(function(o){
+    if(o.k==='lead')return lead(o);
+    if(o.k==='ring')return ring(o);
     if(o.k==='box')return sp('Box',o,'FFFFFF',[o.border,hex(o.col)],o.pad,o.mid?'ctr':'t',o.lines.map(para).join(''));
     if(o.k==='leg')return sp('HDG',o,'1F2FD6',null,0,'ctr',para({t:o.t,sz:o.sz,b:true,c:'#fff',lh:o.h*0.9,ctr:true}),o.rot);
     return sp('Title',o,null,null,0,o.anchor==='b'?'b':'t',para({t:o.t,sz:o.sz,b:o.b,c:o.c,lh:o.sz*1.2,ctr:false}));
