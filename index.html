@@ -1178,10 +1178,15 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 /* CHART: chart images (PNG/JPG/PDF page) read from a folder - viewer + georeferenced overlay */
-.chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--cyan);background:transparent;color:var(--cyan);font:600 13px system-ui,sans-serif;cursor:pointer}
+.chart-panel{--orange:#ff8a2a}
+.chart-panel .umap-head{color:var(--orange)}
+#chartSel{border-color:var(--orange)!important}
+.chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
+.chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
 .chart-btn:disabled{opacity:.35;cursor:default}
-.chart-import{border-color:var(--cyan);background:var(--cyan);color:#06222a}
+.chart-import{border-color:var(--orange);background:var(--orange);color:#2a1200}
 .chart-onmap:has(input:disabled){opacity:.45}
+.chart-panel #chartZoomBtn{border-color:var(--orange);color:var(--orange)}
 #chartViewer{position:fixed;inset:0;z-index:6000;background:#1d2024;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 #chartViewer .cv-bar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);color:var(--text)}
 #chartViewer .cv-bar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 14px system-ui,sans-serif}
@@ -1811,23 +1816,6 @@ body.panel-hidden #panel{display:none}
   </div>
 </section>
 
-<section class="umap-panel">
-  <div class="umap-head">MAP</div>
-  <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
-  <div class="umap-row" id="umapRow" hidden>
-    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
-    <button type="button" id="umapZoomBtn">Zoom</button>
-  </div>
-  <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
-  <div class="umap-btns">
-    <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
-    <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
-  </div>
-  <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
-  <input id="importMapFile" type="file" hidden>
-  <div class="umap-status" id="umapStatus"></div>
-</section>
-
 <section class="umap-panel chart-panel">
   <div class="umap-head">CHART</div>
   <select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select>
@@ -1846,6 +1834,23 @@ body.panel-hidden #panel{display:none}
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
+</section>
+
+<section class="umap-panel">
+  <div class="umap-head">MAP</div>
+  <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
+  <div class="umap-row" id="umapRow" hidden>
+    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
+    <button type="button" id="umapZoomBtn">Zoom</button>
+  </div>
+  <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
+  <div class="umap-btns">
+    <button type="button" id="importMapBtn" class="umap-import" title="Import your own map file (.pmtiles), shown above the offline map">📁 IMPORT MAP</button>
+    <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
+  </div>
+  <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
+  <input id="importMapFile" type="file" hidden>
+  <div class="umap-status" id="umapStatus"></div>
 </section>
 
 <section class="offline-panel">
