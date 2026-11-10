@@ -12,6 +12,11 @@ VTBL | ศูนย์ปืนฯ | 612 MHz
 VTBL | CTZ | 12 NM
 VTBL | VTBH | 122.1
 VTBL | MORSE | LB LOB
+# VTBH สระพรานนาค (ข้อมูลจาก SPD 10 NOV 2026)
+VTBH | TWR | 122.1 / 234.5
+VTBH | NDB | 242 [SP]
+VTBH | DVOR | 117.3 [SPN]
+VTBH | MORSE | SP SPN
 VTBD | GND | 121.9 / 257.8
 VTBD | TWR | 118.1 / 236.6
 VTBD | APP | 125.8 / 262.5
@@ -23,7 +28,7 @@ VTBD | ATIS | 126.4 / 344.6
 VTBD | CTZ | 35 NM
 VTBD | MORSE | IBKK IDMG
 # ---- ข้อมูลด้านล่างคัดจาก eAIP AD 2.18/2.19 (AIRAC 29 OCT 2026) เมื่อ 2 NOV 2026 [Unverified: ตรวจกับ AIP ก่อนใช้] ----
-# ไม่พบใน eAIP: VTBH, VTUP, VTBI (ใส่เองได้)
+# ไม่พบใน eAIP: VTUP, VTBI (ใส่เองได้)
 VTBS | APP | 119.1 / 120.3 / 125.8
 VTBS | TWR | 118.2 / 262.5
 VTBS | GND | 121.65 / 275.8
