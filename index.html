@@ -8046,8 +8046,43 @@ function buildMiniMap(opt){
   });
 }
 
+/* SPD: MINI MAP window shows the sheet and the waypoint table side by side (A4 landscape, same layout as the PPT) */
+function mmWithTable(sheet){
+  var SH=sheet.height,SW=sheet.width,W=Math.round(SH*Math.SQRT2),cv=document.createElement('canvas');cv.width=W;cv.height=SH;cv.mmOffs=sheet.mmOffs;
+  var c=cv.getContext('2d'),HEAD=236,S=2,FN='"TH SarabunPSK","TH Sarabun New",Sarabun,sans-serif';
+  c.fillStyle='#fff';c.fillRect(0,0,W,SH);
+  c.drawImage(sheet,0,0);
+  var x0=SW+20*S,x1=W-12*S,TW=x1-x0;
+  c.drawImage(sheet,0,0,SW-HEAD,HEAD,x0-4*S,0,x1-x0+16*S-HEAD,HEAD);   /* same title bar: title + UPDATE */
+  c.drawImage(sheet,SW-HEAD,0,HEAD,HEAD,x1+12*S-HEAD,0,HEAD,HEAD);   /* badge undistorted at the right end */
+  var rows=mmTableRows(offRoutePts||[]),hd=['Waypoint','Coordinate','Radial / DME','Landmark'],keys=['n','coord','rad','lm'];
+  var top=HEAD+14*S,avail=SH-top-14*S,n=rows.length+1,rh=Math.max(24*S,Math.min(56*S,Math.floor(avail/n))),fs0=Math.min(28*S,rh*0.62);
+  function tw(t,b){c.font=(b?'700 ':'400 ')+'100px '+FN;return c.measureText(String(t||'')).width/100;}
+  var need=keys.map(function(k,j){var m=tw(hd[j],true);rows.forEach(function(r){m=Math.max(m,tw(r[k]));});return Math.max(m,0.01);});
+  var tot=need.reduce(function(a,b){return a+b;},0),cw=need.map(function(v){return Math.max(0.12,v/tot);}),ct=cw.reduce(function(a,b){return a+b;},0);
+  cw=cw.map(function(v){return TW*v/ct;});
+  var pad=8*S,colFs=keys.map(function(k,j){var m=fs0;rows.forEach(function(r){if(r[k])m=Math.min(m,(cw[j]-2*pad)/tw(r[k]));});return Math.max(9*S,m);});
+  var hFs=Math.min(fs0,Math.max.apply(null,colFs)*1.15);
+  function cellTx(t,x,y,w,fs,b,col,u){
+    if(!t)return;fs=Math.min(fs,(w-2*pad)/tw(t,b));c.font=(b?'700 ':'400 ')+fs+'px '+FN;c.fillStyle=col;c.textAlign='left';c.textBaseline='middle';
+    var ww=c.measureText(t).width,tx=x+(w-ww)/2,ty=y+rh/2;c.fillText(t,tx,ty);
+    if(u)c.fillRect(tx,ty+fs*0.42,ww,Math.max(1,fs*0.05));
+  }
+  function row(y,fill,cells){
+    var x=x0;cells.forEach(function(cl,j){c.fillStyle=fill;c.fillRect(x,y,cw[j],rh);c.strokeStyle='#fff';c.lineWidth=1.5*S;c.strokeRect(x,y,cw[j],rh);
+      cellTx(cl[0],x,y,cw[j],cl[1],cl[2],cl[3],cl[4]);x+=cw[j];});
+  }
+  row(top,'#4472c4',hd.map(function(h){return [h,hFs,true,'#fff',false];}));
+  rows.forEach(function(r,i){
+    var col='#'+r.c;
+    row(top+rh*(i+1),i%2?'#e9edf6':'#d0d8ee',[[r.n,colFs[0],false,col,true],[r.coord,colFs[1],false,'#111',false],[r.rad,colFs[2],false,'#111',false],[r.lm,colFs[3],false,col,!!r.lm]]);
+  });
+  c.strokeStyle='#111';c.lineWidth=3*S;c.strokeRect(0,0,W,SH);
+  return cv;
+}
 function showMiniMap(cv){
   var old=document.getElementById('miniMapModal');if(old)old.remove();
+  cv=mmWithTable(cv);
   var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
   var fname='MiniMap_'+dep+'_'+arr+'.png';
   var url=cv.toDataURL('image/png');
@@ -8064,7 +8099,7 @@ function showMiniMap(cv){
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
     '<div class="mm-img"><img alt="Mini map" src="'+url+'"></div>'+
-    '<p class="mm-note">ขนาด A4 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
+    '<p class="mm-note">A4 แนวนอน: MINI MAP + ตาราง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
@@ -8075,7 +8110,7 @@ function showMiniMap(cv){
     clearTimeout(tt);tt=setTimeout(function(){
       mmTitleSave(ti.value);
       buildMiniMap({skip:mmOffSkip()}).then(function(c2){
-        cv=c2;url=c2.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
+        cv=mmWithTable(c2);url=cv.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
       }).catch(function(){});
     },700);
   };
