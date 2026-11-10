@@ -1,6 +1,6 @@
 # Publishes the app to GitHub Pages (small: ~2 MB).
 # The big offline files (thailand.pmtiles, elevation.pmtiles) are built and served by the
-# separate repo Spidersqdn/DataBase at https://spidersqdn.github.io/DataBase/
+# separate repo Spidersqdn/DataBase at https://spidersqdn.github.io/DataBase/AirNavFlow/
 # File name kept: notam-import.yml starts this workflow by name.
 # One-time setup: repo Settings > Pages > Source = "GitHub Actions".
 name: Deploy app
