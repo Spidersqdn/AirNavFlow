@@ -9404,9 +9404,12 @@ function umapBuiltinOpen(m){
     return pm.getHeader().then(function(h){
       m.minZ=h.minZoom;m.maxZ=h.maxZoom;m.bytes=blob?blob.size:0;
       m.bounds=[h.minLon,h.minLat,h.maxLon,h.maxLat];
+      return pm.getMetadata().catch(function(){return null;}).then(function(md){
+      m.frame=md&&Array.isArray(md.frame)&&md.frame.length>2?md.frame:null; /* map frame [lon,lat]: only inside it is made transparent */
       m.layer=umapLayer(m,pm);
       if(!blob&&umapKeepOn())umapBuiltinCopy(m);
       return m;
+      });
     });
   });
 }
@@ -9428,13 +9431,16 @@ function umapSave(){
 var UMapRaster=L.GridLayer.extend({
   createTile:function(c,done){
     var key=this.options.keyWhite&&this.options.keyWhite();
-    if(key){ /* white paper -> transparent, per tile */
+    if(key){ /* white paper -> transparent, per tile (inside the map frame only; legends outside stay white) */
       var cv=document.createElement('canvas');cv.width=cv.height=256;
-      var mm=this.options.mime;
+      var mm=this.options.mime,fr=this.options.frame&&this.options.frame(),map=this._map,poly=null;
+      if(fr&&map){var o=L.point(c.x*256,c.y*256);poly=fr.map(function(q){return map.project(L.latLng(q[1],q[0]),c.z).subtract(o);});}
       this.options.pm.getZxy(c.z,c.x,c.y).then(function(r){
         if(!r||!r.data){done(null,cv);return;}
         var u=URL.createObjectURL(new Blob([r.data],{type:mm})),im=new Image();
-        im.onload=function(){URL.revokeObjectURL(u);var x=cv.getContext('2d');x.drawImage(im,0,0,256,256);try{whiteToAlpha(x,256,256);}catch(e){}done(null,cv);};
+        im.onload=function(){URL.revokeObjectURL(u);var x=cv.getContext('2d');x.drawImage(im,0,0,256,256);try{whiteToAlpha(x,256,256);}catch(e){}
+          if(poly){x.save();x.beginPath();x.rect(-1,-1,258,258);poly.forEach(function(p,i){i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y);});x.closePath();x.clip('evenodd');x.clearRect(-1,-1,258,258);x.drawImage(im,0,0,256,256);x.restore();}
+          done(null,cv);};
         im.onerror=function(){URL.revokeObjectURL(u);done(null,cv);};
         im.src=u;
       }).catch(function(){done(null,cv);});
@@ -9458,7 +9464,7 @@ function umapLayer(m,pm){
     return protomapsL.leafletLayer({url:pm,flavor:'light',lang:'th',maxDataZoom:m.maxZ||14,pane:'userMaps',opacity:m.opacity});
   }
   return new UMapRaster({pm:pm,mime:UMAP_MIME[m.type]||'image/png',pane:'userMaps',opacity:m.opacity,
-    keyWhite:m.builtin?function(){return m.bgClear!==false;}:null,
+    keyWhite:m.builtin?function(){return m.bgClear!==false;}:null,frame:function(){return m.frame;},
     tileSize:256,minNativeZoom:m.minZ,maxNativeZoom:m.maxZ,maxZoom:22,bounds:b,keepBuffer:1});
 }
 /* enroute chart as a MAP: PDF page / image read in place, georeferenced with grid points (shares CHART's viewer + overlay) */
