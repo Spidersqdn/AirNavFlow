@@ -9388,7 +9388,7 @@ var UMAP_BUILTIN=[{id:'aip-enroute',name:'ENROUTE (AIP)',file:'enroute.pmtiles',
 function umapBuiltinInit(){
   var st;try{st=JSON.parse(localStorage.getItem('fp-user-maps-bi')||'{}')||{};}catch(e){st={};}
   UMAP_BUILTIN.slice().reverse().forEach(function(d){
-    var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
+    var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,bgClear:s.bgClear,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
     userMaps.unshift(m);
     if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m);}).catch(function(){});
   });
@@ -9404,9 +9404,12 @@ function umapBuiltinOpen(m){
     return pm.getHeader().then(function(h){
       m.minZ=h.minZoom;m.maxZ=h.maxZoom;m.bytes=blob?blob.size:0;
       m.bounds=[h.minLon,h.minLat,h.maxLon,h.maxLat];
+      return pm.getMetadata().catch(function(){return null;}).then(function(md){
+      m.frame=md&&Array.isArray(md.frame)&&md.frame.length>2?md.frame:null; /* map frame [lon,lat]: only inside it is made transparent */
       m.layer=umapLayer(m,pm);
       if(!blob&&umapKeepOn())umapBuiltinCopy(m);
       return m;
+      });
     });
   });
 }
@@ -9420,13 +9423,29 @@ function umapBuiltinCopy(m){
     .then(function(){m._copying=false;});
 }
 function umapSave(){
-  try{var bi={};userMaps.forEach(function(m){if(m.builtin)bi[m.id]={on:m.on,opacity:m.opacity,stored:m.stored};});localStorage.setItem('fp-user-maps-bi',JSON.stringify(bi));}catch(e){}
+  try{var bi={};userMaps.forEach(function(m){if(m.builtin)bi[m.id]={on:m.on,opacity:m.opacity,stored:m.stored,bgClear:m.bgClear};});localStorage.setItem('fp-user-maps-bi',JSON.stringify(bi));}catch(e){}
   try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.filter(function(m){return !m.builtin;}).map(function(m){
     return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,bgClear:m.bgClear,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
   })));}catch(e){}
 }
 var UMapRaster=L.GridLayer.extend({
   createTile:function(c,done){
+    var key=this.options.keyWhite&&this.options.keyWhite();
+    if(key){ /* white paper -> transparent, per tile (inside the map frame only; legends outside stay white) */
+      var cv=document.createElement('canvas');cv.width=cv.height=256;
+      var mm=this.options.mime,fr=this.options.frame&&this.options.frame(),map=this._map,poly=null;
+      if(fr&&map){var o=L.point(c.x*256,c.y*256);poly=fr.map(function(q){return map.project(L.latLng(q[1],q[0]),c.z).subtract(o);});}
+      this.options.pm.getZxy(c.z,c.x,c.y).then(function(r){
+        if(!r||!r.data){done(null,cv);return;}
+        var u=URL.createObjectURL(new Blob([r.data],{type:mm})),im=new Image();
+        im.onload=function(){URL.revokeObjectURL(u);var x=cv.getContext('2d');x.drawImage(im,0,0,256,256);try{whiteToAlpha(x,256,256);}catch(e){}
+          if(poly){x.save();x.beginPath();x.rect(-1,-1,258,258);poly.forEach(function(p,i){i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y);});x.closePath();x.clip('evenodd');x.clearRect(-1,-1,258,258);x.drawImage(im,0,0,256,256);x.restore();}
+          done(null,cv);};
+        im.onerror=function(){URL.revokeObjectURL(u);done(null,cv);};
+        im.src=u;
+      }).catch(function(){done(null,cv);});
+      return cv;
+    }
     var img=document.createElement('img'),mime=this.options.mime;
     img.alt='';img.setAttribute('role','presentation');
     this.options.pm.getZxy(c.z,c.x,c.y).then(function(r){
@@ -9445,6 +9464,7 @@ function umapLayer(m,pm){
     return protomapsL.leafletLayer({url:pm,flavor:'light',lang:'th',maxDataZoom:m.maxZ||14,pane:'userMaps',opacity:m.opacity});
   }
   return new UMapRaster({pm:pm,mime:UMAP_MIME[m.type]||'image/png',pane:'userMaps',opacity:m.opacity,
+    keyWhite:m.builtin?function(){return m.bgClear!==false;}:null,frame:function(){return m.frame;},
     tileSize:256,minNativeZoom:m.minZ,maxNativeZoom:m.maxZ,maxZoom:22,bounds:b,keepBuffer:1});
 }
 /* enroute chart as a MAP: PDF page / image read in place, georeferenced with grid points (shares CHART's viewer + overlay) */
@@ -9493,7 +9513,7 @@ function chartFindFrame(im){
   if(L[0]<0.02*W&&R[0]>0.98*W&&Math.min(L[1],R[1])<0.02*H)return null; /* only the sheet border: key everything */
   return [L[0]/k,Math.min(L[1],R[1])/k,(R[0]+1)/k,Math.max(L[2],R[2])/k];
 }
-function umapBgOn(m){return umapIsImg(m)&&m.bgClear!==false;}
+function umapBgOn(m){return (umapIsImg(m)||m.builtin)&&m.bgClear!==false;}
 function umapClearUrl(m){
   if(m._clearFor===m.url&&m.urlClear)return Promise.resolve(m.urlClear);
   var src=m.url;
@@ -9690,7 +9710,7 @@ function umapRender(status){
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
-  document.getElementById('umapBgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapBgRow').hidden=!(cur&&(umapIsImg(cur)||cur.builtin));
   document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
   document.getElementById('umapDelBtn').disabled=!userMaps.length;
   document.getElementById('umapDelAllBtn').disabled=!userMaps.some(function(m){return !m.builtin;});
@@ -9720,7 +9740,9 @@ document.getElementById('umapOp').oninput=function(){
   var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
 };
 document.getElementById('umapBg').onchange=function(){
-  var m=umapCur();if(!m||!umapIsImg(m))return;m.bgClear=this.checked;umapSave();umapImgRefresh(m);
+  var m=umapCur();if(!m)return;
+  if(m.builtin){m.bgClear=this.checked;umapSave();if(m.layer&&m.layer.redraw)m.layer.redraw();return;}
+  if(!umapIsImg(m))return;m.bgClear=this.checked;umapSave();umapImgRefresh(m);
 };
 document.getElementById('umapViewBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,false);});};
 document.getElementById('umapGeoBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,true);});};
