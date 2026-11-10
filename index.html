@@ -7497,7 +7497,7 @@ function buildMiniMap(opt){
     var dep=pts[0].name||'START',arr=pts[pts.length-1].name||'END';
     ctx.fillStyle='#fff';ctx.textBaseline='alphabetic';ctx.textAlign='left';
     /* title: long titles shrink so they never run under the badge */
-    var ttl=dep+' - '+arr,tfs=46*S;
+    var ttl=mmTitle(),tfs=46*S;   /* typed title (MINI MAP window), else "DEP - ARR" */
     ctx.font='600 '+tfs+'px '+FONT;
     var tmax=W-24*S-(HEAD+10*S),tw0=ctx.measureText(ttl).width;
     if(tw0>tmax){tfs=Math.max(24*S,Math.floor(tfs*tmax/tw0));ctx.font='600 '+tfs+'px '+FONT;}
@@ -7994,7 +7994,7 @@ function showMiniMap(cv){
     '<label><input type="checkbox" id="mmWptAll"'+(nOn===offList.length?' checked':'')+'> <b>ทั้งหมด</b></label>'+
     offList.map(function(p,i){return '<label><input type="checkbox" data-i="'+i+'"'+(skipSet[mmOffKey(p)]?'':' checked')+'> '+esc(p.name||('WPt '+(i+1)))+'</label>';}).join('')+
     '</div></details> ':'';
-  d.innerHTML='<div class="mm-card"><div class="mm-bar"><b>MINI MAP</b><span>'+wpt+
+  d.innerHTML='<div class="mm-card"><div class="mm-bar"><input id="mmTitleIn" type="text" maxlength="60" placeholder="'+esc(mmTitleDef())+'" style="flex:1;min-width:0;padding:5px 8px;font:600 14px system-ui,sans-serif;border-radius:6px;border:1px solid #666d76;background:#15181c;color:#fff"><span style="white-space:nowrap">'+wpt+
     '<button type="button" id="mmSave">บันทึก PNG</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
@@ -8003,6 +8003,17 @@ function showMiniMap(cv){
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
+  /* title: typed text replaces "DEP - ARR" on the sheet; kept for this route on this device, sheet redrawn after a short pause */
+  var ti=document.getElementById('mmTitleIn'),tt=null;
+  ti.value=mmTitle();
+  ti.oninput=function(){
+    clearTimeout(tt);tt=setTimeout(function(){
+      mmTitleSave(ti.value);
+      buildMiniMap({skip:mmOffSkip()}).then(function(c2){
+        cv=c2;url=c2.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
+      }).catch(function(){});
+    },700);
+  };
   /* WPt list: tick / untick each off-route waypoint; remembered on this device, sheet redrawn after a short pause */
   var wd=document.getElementById('mmWpt'),wt=null;
   if(wd){
@@ -8035,6 +8046,11 @@ function showMiniMap(cv){
 }
 
 var mmWptOpen=false;
+/* MINI MAP title: default "DEP - ARR"; a typed title is kept per route (a new route starts from the default again) */
+function mmTitleDef(){return (pts[0]&&pts[0].name||'START')+' - '+(pts.length&&pts[pts.length-1].name||'END');}
+function mmRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join(';');}
+function mmTitle(){try{var o=JSON.parse(localStorage.getItem('fp-mm-title')||'null');if(o&&o.k===mmRouteKey()&&o.t)return o.t;}catch(e){}return mmTitleDef();}
+function mmTitleSave(t){try{t=(t||'').trim();if(t&&t!==mmTitleDef())localStorage.setItem('fp-mm-title',JSON.stringify({k:mmRouteKey(),t:t}));else localStorage.removeItem('fp-mm-title');}catch(e){}}
 function mmOffKey(p){return (p.name||'')+'|'+(+p.lat).toFixed(4)+'|'+(+p.lng).toFixed(4);}
 function mmOffSkip(){try{var a=JSON.parse(localStorage.getItem('fp-mm-offx')||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
 function exportMiniMap(){
