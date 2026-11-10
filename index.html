@@ -3873,6 +3873,21 @@ var topo=L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png',{
 
 /* ---- Offline basemap: OpenStreetMap vector tiles in one PMTiles file (map/thailand.pmtiles) ---- */
 var OFFLINE_MAP_URL='map/thailand.pmtiles', OFFLINE_CACHE='fp-offline-map-v1';
+/* Big map files live in a separate repo/site (Spidersqdn/AirNavFlow-map) so each app deploy stays small.
+   OFFLINE_MAP_URL / ELEV_URL stay as the Cache Storage keys (already-downloaded maps keep working).
+   mapSrc() tries the map site first, then the old map/ folder of this site. */
+var MAP_SITE='https://spidersqdn.github.io/AirNavFlow-map/', mapSrcMemo={};
+function mapSrc(name){
+  if(mapSrcMemo[name])return mapSrcMemo[name];
+  var local='map/'+name;
+  var p=fetch(MAP_SITE+name,{method:'HEAD',cache:'no-store'}).then(function(r){
+    if(r.ok)return MAP_SITE+name;
+    throw 0;
+  }).catch(function(){return local;});
+  mapSrcMemo[name]=p;
+  p.then(function(u){if(u===local)setTimeout(function(){delete mapSrcMemo[name];},60000);});
+  return p;
+}
 var offlineBase=L.layerGroup(), offlineInner=null, offlinePM=null, offlineMaxZ=12;
 var offlineState={stored:false,bytes:0,savedAt:0,onServer:null,busy:false};
 
@@ -10461,7 +10476,7 @@ function renderOfflineInfo(msg){
       (offlineState.savedAt?' (โหลดเมื่อ '+new Date(offlineState.savedAt).toLocaleDateString('th-TH')+')':'')+
       '<br>ใช้ได้แม้ไม่มีสัญญาณ: เลือกชั้น "แผนที่ออฟไลน์ (OSM)" + ปุ่ม GPS';
   }else if(offlineState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (map/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (AirNavFlow-map/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
   }else{
     info.textContent='ยังไม่ได้โหลดแผนที่ลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi ก่อนออกบิน';
   }
@@ -10486,7 +10501,7 @@ function downloadOfflineMap(){
   var bar=document.getElementById('offlineBar'),fill=bar.firstElementChild;
   bar.classList.add('on');fill.style.width='0';
   renderOfflineInfo('กำลังดาวน์โหลด…');
-  fetch(OFFLINE_MAP_URL,{cache:'no-store'}).then(function(res){
+  mapSrc('thailand.pmtiles').then(function(u){return fetch(u,{cache:'no-store'});}).then(function(res){
     if(!res.ok)throw new Error('HTTP '+res.status);
     var total=Number(res.headers.get('content-length'))||0,got=0,chunks=[];
     var reader=res.body.getReader();
@@ -10520,7 +10535,7 @@ function deleteOfflineMap(){
   if(!confirm('ลบแผนที่ออฟไลน์ออกจากเครื่อง?'))return;
   caches.delete(OFFLINE_CACHE).then(function(){
     offlineState.stored=false;offlineState.bytes=0;offlineState.savedAt=0;
-    if(navigator.onLine)return setOfflineSource(OFFLINE_MAP_URL).catch(function(){});
+    if(navigator.onLine)return mapSrc('thailand.pmtiles').then(setOfflineSource).catch(function(){});
   }).then(function(){renderOfflineInfo();});
 }
 function initOfflineMap(){
@@ -10530,7 +10545,7 @@ function initOfflineMap(){
       map.removeLayer(sat);offlineBase.addTo(map);
       return;
     }
-    return setOfflineSource(OFFLINE_MAP_URL).then(function(){offlineState.onServer=true;})
+    return mapSrc('thailand.pmtiles').then(setOfflineSource).then(function(){offlineState.onServer=true;})
       .catch(function(){offlineState.onServer=navigator.onLine?false:null;});
   }).then(function(){renderOfflineInfo();});
 }
@@ -10555,7 +10570,7 @@ function renderElevInfo(msg){
       (elevState.savedAt?' (โหลดเมื่อ '+new Date(elevState.savedAt).toLocaleDateString('th-TH')+')':'')+
       '<br>กราฟความสูง + Highest ELEV ใช้ได้แม้ไม่มีสัญญาณ เปิดชั้น "เส้นชั้นความสูง (Contour ft)" ได้';
   }else if(elevState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์ความสูงบนเว็บไซต์ (map/elevation.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์ความสูงบนเว็บไซต์ (AirNavFlow-map/elevation.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
   }else{
     info.textContent='ยังไม่ได้โหลดข้อมูลความสูงลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi';
   }
@@ -10580,7 +10595,7 @@ function downloadElev(){
   var bar=document.getElementById('elevBar'),fill=bar.firstElementChild;
   bar.classList.add('on');fill.style.width='0';
   renderElevInfo('กำลังดาวน์โหลด…');
-  fetch(ELEV_URL,{cache:'no-store'}).then(function(res){
+  mapSrc('elevation.pmtiles').then(function(u){return fetch(u,{cache:'no-store'});}).then(function(res){
     if(!res.ok)throw new Error('HTTP '+res.status);
     var total=Number(res.headers.get('content-length'))||0,got=0,chunks=[],reader=res.body.getReader();
     function pump(){
@@ -10612,14 +10627,14 @@ function deleteElev(){
   caches.delete(ELEV_CACHE).then(function(){
     elevState.stored=false;elevState.bytes=0;elevState.savedAt=0;
     elevPM=null;elevTiles.clear();contourTiles.clear();contourLayer.redraw();
-    if(navigator.onLine)return setElevSource(ELEV_URL).catch(function(){});
+    if(navigator.onLine)return mapSrc('elevation.pmtiles').then(setElevSource).catch(function(){});
   }).then(function(){renderElevInfo();});
 }
 function initElev(){
   renderElevInfo();
   useStoredElev().then(function(stored){
     if(stored)return;
-    return setElevSource(ELEV_URL).then(function(){elevState.onServer=true;})
+    return mapSrc('elevation.pmtiles').then(setElevSource).then(function(){elevState.onServer=true;})
       .catch(function(){elevState.onServer=navigator.onLine?false:null;});
   }).then(function(){renderElevInfo();});
 }
