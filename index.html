@@ -3873,10 +3873,10 @@ var topo=L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png',{
 
 /* ---- Offline basemap: OpenStreetMap vector tiles in one PMTiles file (map/thailand.pmtiles) ---- */
 var OFFLINE_MAP_URL='map/thailand.pmtiles', OFFLINE_CACHE='fp-offline-map-v1';
-/* Big map files live in a separate repo/site (Spidersqdn/AirNavFlow-map) so each app deploy stays small.
+/* Big map files live in a separate repo/site (Spidersqdn/DataBase) so each app deploy stays small.
    OFFLINE_MAP_URL / ELEV_URL stay as the Cache Storage keys (already-downloaded maps keep working).
    mapSrc() tries the map site first, then the old map/ folder of this site. */
-var MAP_SITE='https://spidersqdn.github.io/AirNavFlow-map/', mapSrcMemo={};
+var MAP_SITE='https://spidersqdn.github.io/DataBase/', mapSrcMemo={};
 function mapSrc(name){
   if(mapSrcMemo[name])return mapSrcMemo[name];
   var local='map/'+name;
@@ -10476,7 +10476,7 @@ function renderOfflineInfo(msg){
       (offlineState.savedAt?' (โหลดเมื่อ '+new Date(offlineState.savedAt).toLocaleDateString('th-TH')+')':'')+
       '<br>ใช้ได้แม้ไม่มีสัญญาณ: เลือกชั้น "แผนที่ออฟไลน์ (OSM)" + ปุ่ม GPS';
   }else if(offlineState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (AirNavFlow-map/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (DataBase/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
   }else{
     info.textContent='ยังไม่ได้โหลดแผนที่ลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi ก่อนออกบิน';
   }
@@ -10570,7 +10570,7 @@ function renderElevInfo(msg){
       (elevState.savedAt?' (โหลดเมื่อ '+new Date(elevState.savedAt).toLocaleDateString('th-TH')+')':'')+
       '<br>กราฟความสูง + Highest ELEV ใช้ได้แม้ไม่มีสัญญาณ เปิดชั้น "เส้นชั้นความสูง (Contour ft)" ได้';
   }else if(elevState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์ความสูงบนเว็บไซต์ (AirNavFlow-map/elevation.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์ความสูงบนเว็บไซต์ (DataBase/elevation.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
   }else{
     info.textContent='ยังไม่ได้โหลดข้อมูลความสูงลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi';
   }
