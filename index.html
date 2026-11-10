@@ -7525,7 +7525,7 @@ function buildMiniMap(opt){
     else ctx.drawImage(mapCv,0,HEAD);
 
     /* ---- title bar ---- */
-    if(REC)REC.push({k:'rect',name:'Title bar',x:0,y:0,w:W,h:HEAD,fill:'6F2A93'});
+    if(REC)REC.push({k:'rect',hd:1,name:'Title bar',x:0,y:0,w:W,h:HEAD,fill:'6F2A93'});
     else{ctx.fillStyle='#6f2a93';ctx.fillRect(0,0,W,HEAD);}
     var dep=pts[0].name||'START',arr=pts[pts.length-1].name||'END';
     ctx.fillStyle='#fff';ctx.textBaseline='alphabetic';ctx.textAlign='left';
@@ -7537,15 +7537,15 @@ function buildMiniMap(opt){
     var now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     var upd='UPDATE  '+now.getDate()+' '+MON[now.getMonth()]+' '+now.getFullYear();
     if(REC){
-      REC.push({k:'text',x:20*S,y:8*S,w:tmax,h:66*S,t:ttl,sz:tfs,b:true,c:'#fff',anchor:'b'});
-      REC.push({k:'text',x:20*S,y:76*S,w:tmax,h:30*S,t:upd,sz:17*S,b:false,c:'#fff',anchor:'t'});
+      REC.push({k:'text',hd:1,x:20*S,y:8*S,w:tmax,h:66*S,t:ttl,sz:tfs,b:true,c:'#fff',anchor:'b'});
+      REC.push({k:'text',hd:1,upd:1,x:20*S,y:76*S,w:tmax,h:30*S,t:upd,sz:17*S,b:false,c:'#fff',anchor:'t'});
     }else{
       ctx.textAlign='left';ctx.fillText(ttl,24*S,62*S);
       ctx.font='500 '+(17*S)+'px '+FONT;ctx.fillText(upd,24*S,98*S);
     }
     if(logo){   /* squadron badge, top-right corner */
       var lh2=HEAD-14*S,lw2=logo.width*lh2/logo.height;
-      if(REC)REC.push({k:'pic',name:'Badge',x:W-16*S-lw2,y:7*S,w:lw2,h:lh2,url:(function(){var c=document.createElement('canvas');c.width=Math.round(lw2);c.height=Math.round(lh2);c.getContext('2d').drawImage(logo,0,0,c.width,c.height);return c.toDataURL('image/png');})()});
+      if(REC)REC.push({k:'pic',hd:1,name:'Badge',x:W-16*S-lw2,y:7*S,w:lw2,h:lh2,url:(function(){var c=document.createElement('canvas');c.width=Math.round(lw2);c.height=Math.round(lh2);c.getContext('2d').drawImage(logo,0,0,c.width,c.height);return c.toDataURL('image/png');})()});
       else ctx.drawImage(logo,W-16*S-lw2,7*S,lw2,lh2);
     }
 
@@ -8039,7 +8039,7 @@ function buildMiniMap(opt){
       ctx.restore();
     }
     if(REC)layerPic('North arrow',NA.x,NA.y,NA.w,NA.h,northArrow);else northArrow();
-    ctx.strokeStyle='#111';ctx.lineWidth=3*S;ctx.strokeRect(0,0,W,HF);
+    if(!REC){ctx.strokeStyle='#111';ctx.lineWidth=3*S;ctx.strokeRect(0,0,W,HF);}   /* PPT: frame is an outline shape */
     cv.mmOffs=offCand.map(function(o){return o.p;});   /* off-route points that fall inside this sheet (for the WPt list) */
     if(REC){cv.mmShapes=REC;cv.mmW=W;cv.mmH=HF;}
     return cv;
@@ -8135,7 +8135,14 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base,SH,rows){
   var R='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
   var CX=10692000,CY=7560000;   /* A4 landscape (SPD): MINI MAP on the left, waypoint table on the right */
   SW=SW||1800;SH=SH||2546;
-  var K=CY/SH,MW=Math.round(SW*K);   /* EMU per sheet px; the portrait sheet fills the slide height */
+  var HH=432000;   /* SPD: title bars 1.2 cm high on both sides */
+  var hd=(shapes||[]).filter(function(o){return o.hd;});shapes=(shapes||[]).filter(function(o){return !o.hd;});
+  var HEAD0=base?base.y:0,K=base?(CY-HH)/(SH-HEAD0):CY/SH,MW=Math.round(SW*K);   /* EMU per sheet px below the title bar; the sheet fills the slide height */
+  if(base){   /* move the sheet body up under the shorter title bar */
+    var dy=HH/K-HEAD0;
+    shapes.forEach(function(o){['y','cy','y1','y2'].forEach(function(f){if(o[f]!=null)o[f]+=dy;});if(o.pts)o.pts=o.pts.map(function(q){return {x:q.x,y:q.y+dy};});});
+  }
+  var updT=(hd.filter(function(o){return o.upd;})[0]||{}).t||'',badge=hd.filter(function(o){return o.k==='pic';})[0];
   function xe(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function rels(list){return X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+list.map(function(r,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+(r[0].indexOf('http')===0?r[0]:R+r[0])+'" Target="'+r[1]+'"/>';}).join('')+'</Relationships>';}
   var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
@@ -8164,11 +8171,14 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base,SH,rows){
   z.file('ppt/slides/slide1.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+
     (base?'<p:pic><p:nvPicPr><p:cNvPr id="3" name="Background map"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
       '<p:blipFill><a:blip r:embed="rId3"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
-      '<p:spPr><a:xfrm><a:off x="0" y="'+Math.round(base.y*K)+'"/><a:ext cx="'+MW+'" cy="'+Math.round(base.h*K)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':'')+
-    '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+(base?'Frame':xe(title||'MINI MAP'))+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
+      '<p:spPr><a:xfrm><a:off x="0" y="'+HH+'"/><a:ext cx="'+MW+'" cy="'+Math.round(base.h*K)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':
+    '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+xe(title||'MINI MAP')+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
     '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
-    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+MW+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'+
-    mmPptxShapes(shapes||[],K,media)+mmPptxTable(MW+90000,CX-90000,CY,title,rows||[],X)+
+    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+MW+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>')+
+    (base?mmPptxHead(6,0,MW,HH,title,updT,badge)+(badge?mmPptxBadge(7,badge,MW,HH,media):''):'')+
+    mmPptxShapes(shapes,K,media)+
+    (base?'<p:sp><p:nvSpPr><p:cNvPr id="8" name="Frame"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+MW+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="'+Math.round(6*K)+'"><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:ln></p:spPr></p:sp>':'')+
+    mmPptxTable(MW+90000,CX-90000,CY,title,rows||[],base?HH:0,updT,badge,media)+
     '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
   z.file('ppt/slides/_rels/slide1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image1.png'],['image',base?'../media/image2.jpeg':'../media/image1.png']].concat(media.map(function(u,i){return ['image','../media/image'+(i+3)+'.png'];}))));
   media.forEach(function(u,i){z.file('ppt/media/image'+(i+3)+'.png',u.split(',')[1],{base64:true});});
@@ -8189,21 +8199,44 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base,SH,rows){
 /* recorded MINI MAP boxes -> PowerPoint text boxes (movable, editable). k = EMU per canvas px.
    Font: TH SarabunPSK (SPD); sizes follow the sheet */
 /* right half of the landscape slide: purple title bar + editable PowerPoint table (Waypoint | Coordinate | Radial / DME | Landmark) */
-function mmPptxTable(x0,x1,CY,title,rows){
-  var FN='TH SarabunPSK',W=x1-x0,top=60000,hh=560000,ty=top+hh+60000,avail=CY-ty-60000;
+/* purple title bar (same look on the MINI MAP and table sides): title + UPDATE line, left aligned, editable */
+function mmPptxHead(id,x,w,h,title,upd,badge){   /* badge: leave room for it on the right */
+  var FN='TH SarabunPSK';
+  function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function p(t,sz,b){return '<a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="85000"/></a:lnSpc></a:pPr><a:r><a:rPr lang="th-TH" sz="'+sz+'" b="'+(b?1:0)+'" dirty="0"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(t)+'</a:t></a:r></a:p>';}
+  return '<p:sp><p:nvSpPr><p:cNvPr id="'+id+'" name="Title bar '+id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+x+'" y="0"/><a:ext cx="'+w+'" cy="'+h+'"/></a:xfrm>'+
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="6F2A93"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr>'+
+    '<p:txBody><a:bodyPr wrap="square" lIns="108000" tIns="0" rIns="'+(badge?Math.round((h-50000)*badge.w/badge.h)+160000:108000)+'" bIns="0" anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/>'+p(title||'MINI MAP',2200,true)+(upd?p(upd,1000,false):'')+'</p:txBody></p:sp>';
+}
+function mmPptxBadge(id,b,MW,HH,media){   /* squadron badge at the right end of a title bar (MW = its right edge) */
+  media.push(b.url);var rid='rId'+(media.length+3),h=HH-50000,w=Math.round(h*b.w/b.h);
+  return '<p:pic><p:nvPicPr><p:cNvPr id="'+id+'" name="Badge"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="'+rid+'"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
+    '<p:spPr><a:xfrm><a:off x="'+(MW-w-60000)+'" y="25000"/><a:ext cx="'+w+'" cy="'+h+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+}
+function mmPptxTable(x0,x1,CY,title,rows,HH,upd,badge,media){
+  var FN='TH SarabunPSK',W=x1-x0,top=HH?0:60000,hh=HH||560000,ty=top+hh+60000,avail=CY-ty-60000;
   function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   var n=rows.length+1,rh=Math.max(180000,Math.min(420000,Math.floor(avail/n))),fs=Math.round(Math.min(14,rh/12700*0.55)*100);   /* TH SarabunPSK 14 pt keeps a coordinate on one line */
   function run(t,sz,b,c,u){return '<a:r><a:rPr lang="th-TH" sz="'+sz+'" b="'+(b?1:0)+'"'+(u?' u="sng"':'')+' dirty="0"><a:solidFill><a:srgbClr val="'+c+'"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(t)+'</a:t></a:r>';}
   var ln=function(t){return '<a:'+t+' w="9525"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:'+t+'>';};
-  function cell(t,fill,c,b,u){return '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/>'+(t?run(t,fs,b,c,u):'')+'<a:endParaRPr lang="th-TH" sz="'+fs+'"/></a:p></a:txBody>'+
+  /* SPD: every cell on one line -> shrink that cell's font until the text fits its column (measured in TH SarabunPSK when the device has it, else Sarabun, which is wider = safe) */
+  var mc=document.createElement('canvas').getContext('2d'),ci=0;
+  function fit(t,b,w){mc.font=(b?'700 ':'400 ')+'100px "TH SarabunPSK","TH Sarabun New",Sarabun,sans-serif';var em=mc.measureText(String(t)).width/100;if(!em)return fs;return Math.max(700,Math.min(fs,Math.floor((w-91440-40000)/12700/em*100)));}
+  function cell(t,fill,c,b,u){var j=ci++%4,w=cw[j];return '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/>'+(t?run(t,b?Math.min(fit(t,b,w),Math.round(Math.max.apply(null,colFs)*1.15)):colFs[j],b,c,u):'')+'<a:endParaRPr lang="th-TH" sz="'+fs+'"/></a:p></a:txBody>'+
     '<a:tcPr marL="45720" marR="45720" marT="0" marB="0" anchor="ctr">'+ln('lnL')+ln('lnR')+ln('lnT')+ln('lnB')+'<a:solidFill><a:srgbClr val="'+fill+'"/></a:solidFill></a:tcPr></a:tc>';}
-  var cw=[0.20,0.38,0.20,0.22].map(function(f){return Math.round(W*f);});
-  var tr='<a:tr h="'+rh+'">'+['Waypoint','Coordinate','Radial / DME','Landmark'].map(function(h){return cell(h,'4472C4','FFFFFF',true);}).join('')+'</a:tr>';
+  /* column widths follow the longest text in each column (at least 12 % each), so long names keep a readable size */
+  var hdrs=['Waypoint','Coordinate','Radial / DME','Landmark'],keys=['n','coord','rad','lm'];
+  var need=keys.map(function(k,j){var m=0;mc.font='700 100px "TH SarabunPSK","TH Sarabun New",Sarabun,sans-serif';m=mc.measureText(hdrs[j]).width;
+    mc.font='400 100px "TH SarabunPSK","TH Sarabun New",Sarabun,sans-serif';rows.forEach(function(r){m=Math.max(m,mc.measureText(String(r[k]||'')).width);});return Math.max(m,1);});
+  var tot=need.reduce(function(a,b){return a+b;},0),cw=need.map(function(v){return Math.max(0.12,v/tot);});
+  var ct=cw.reduce(function(a,b){return a+b;},0);cw=cw.map(function(v){return Math.round(W*v/ct);});
+  var colFs=keys.map(function(k,j){var m=fs;rows.forEach(function(r){if(r[k])m=Math.min(m,fit(r[k],false,cw[j]));});return m;});   /* one size per column = tidy */
+  var tr='<a:tr h="'+rh+'">'+hdrs.map(function(h){return cell(h,'4472C4','FFFFFF',true);}).join('')+'</a:tr>';
   rows.forEach(function(r,i){
     var f=i%2?'E9EDF6':'D0D8EE';
     tr+='<a:tr h="'+rh+'">'+cell(r.n,f,r.c,false,true)+cell(r.coord,f,'111111')+cell(r.rad,f,'111111')+cell(r.lm,f,r.c,false,!!r.lm)+'</a:tr>';
   });
-  var hdr='<p:sp><p:nvSpPr><p:cNvPr id="4" name="Table title"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+x0+'" y="'+top+'"/><a:ext cx="'+W+'" cy="'+hh+'"/></a:xfrm>'+
+  var hdr=HH?mmPptxHead(4,x0,W,hh,title,upd,badge)+(badge?mmPptxBadge(9,badge,x1,hh,media):''):'<p:sp><p:nvSpPr><p:cNvPr id="4" name="Table title"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+x0+'" y="'+top+'"/><a:ext cx="'+W+'" cy="'+hh+'"/></a:xfrm>'+
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="6F2A93"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr>'+
     '<p:txBody><a:bodyPr wrap="square" anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/>'+run(title||'MINI MAP',2800,true,'FFFFFF')+'</a:p></p:txBody></p:sp>';
   return hdr+'<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Waypoint table"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>'+
@@ -8225,7 +8258,7 @@ function mmTableRows(offs){
 }
 function mmPptxShapes(list,k,media){
   media=media||[];
-  var id=10,FN='TH SarabunPSK',FK=1.25;   /* SPD: TH SarabunPSK; its glyphs are small for their point size, so sizes are scaled up to fill the boxes like the sheet */
+  var id=10,FN='TH SarabunPSK',FK=0.95;   /* SPD: TH SarabunPSK; its glyphs are small for their point size, so sizes are scaled up to fill the boxes like the sheet */
   function E(v){return Math.round(v*k);}
   function P(px){return Math.max(100,Math.round(px*k/12700*FK*100));}   /* hundredths of a point */
   function hex(c){c=String(c||'#111').replace('#','');if(c.length===3)c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];return c.toUpperCase();}
