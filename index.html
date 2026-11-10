@@ -1167,7 +1167,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
 #umapSel,#chartSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
 .umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
-.umap-row[hidden]{display:none}
+.umap-row[hidden],.umap-btns[hidden]{display:none}
 .umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
 .umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
 .umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
@@ -1178,6 +1178,10 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 /* CHART: chart images (PNG/JPG/PDF page) read from a folder - viewer + georeferenced overlay */
+.map-panel .umap-head{color:var(--amber)}
+.map-panel #umapSel{border-color:var(--amber)}
+.map-panel input[type=checkbox],.map-panel input[type=range]{accent-color:var(--amber)}
+.map-panel .chart-btn,.map-panel #umapZoomBtn,.map-panel .umap-del,.map-panel .umap-clear{border-color:var(--amber);color:var(--amber);background:transparent}
 .chart-panel{--orange:#ff8a2a}
 .chart-panel .umap-head{color:var(--orange)}
 #chartSel{border-color:var(--orange)!important}
@@ -1846,7 +1850,7 @@ body.panel-hidden #panel{display:none}
   <div class="umap-status" id="chartStatus"></div>
 </section>
 
-<section class="umap-panel">
+<section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
   <div class="umap-row" id="umapRow" hidden>
@@ -1854,13 +1858,14 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="umapZoomBtn">Zoom</button>
   </div>
   <div class="umap-btns" id="umapImgRow" style="margin-top:6px" hidden>
-    <button type="button" id="umapViewBtn" class="chart-btn" style="border-color:var(--cyan);color:var(--cyan)" title="Open the map image full screen">👁 ดู</button>
-    <button type="button" id="umapGeoBtn" class="chart-btn" style="border-color:var(--cyan);color:var(--cyan)" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 ตั้งพิกัด</button>
+    <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen">👁 VIEW</button>
+    <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
   </div>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
-  <div class="umap-btns">
-    <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
-    <button type="button" id="umapDelBtn" class="umap-del" title="Delete an imported map from this device">🗑 ลบ MAP</button>
+  <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
+  <div class="umap-btns" style="margin-top:8px">
+    <button type="button" id="umapDelBtn" class="umap-del" title="Delete one imported map from this device">🗑 DELETE MAP</button>
+    <button type="button" id="umapDelAllBtn" class="umap-del" title="Delete every imported map from this device">🗑 CLEAR MAPs</button>
   </div>
   <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
   <input id="importMapFile" type="file" hidden>
@@ -9576,7 +9581,7 @@ function umapRender(status){
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
-  document.getElementById('umapDelBtn').disabled=!userMaps.length;
+  document.getElementById('umapDelBtn').disabled=document.getElementById('umapDelAllBtn').disabled=!userMaps.length;
   var cb=0,cn=0;userMaps.forEach(function(m){if(m.stored){cn++;cb+=m.bytes||0;}});
   var clr=document.getElementById('umapClearBtn');
   clr.disabled=!cn;clr.textContent='🧹 ล้าง cache แผนที่'+(cn?' ('+cn+' ไฟล์, '+mb(cb)+')':'');
@@ -9611,6 +9616,15 @@ document.getElementById('umapDelBtn').onclick=function(){
     m=userMaps[(parseInt(a,10)||0)-1];
   }
   if(m)umapDelete(m);
+};
+/* CLEAR MAPs: delete every imported map (list, copies in the app, saved file links) */
+document.getElementById('umapDelAllBtn').onclick=function(){
+  if(!userMaps.length||!confirm('ลบ MAP ทั้งหมด '+userMaps.length+' แผนที่ ออกจากเครื่อง?\n(ไฟล์ต้นฉบับในเครื่องไม่ถูกลบ)'))return;
+  userMaps.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
+  var ids=userMaps.map(function(m){return m.id;});
+  userMaps=[];umapSave();umapRender('✓ ลบ MAP ทั้งหมดแล้ว');
+  if('caches' in window)caches.delete(UMAP_CACHE).catch(function(){});
+  ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
 /* clear map cache: drop every map file copied into the app; the list keeps the names (tap to re-open from the file) */
 document.getElementById('umapClearBtn').onclick=function(){
