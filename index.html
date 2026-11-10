@@ -1839,8 +1839,8 @@ body.panel-hidden #panel{display:none}
   <div class="umap-head">CHART</div>
   <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
   <div class="umap-btns" style="margin-top:6px">
-    <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 ดูชาร์ต</button>
-    <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 ตั้งพิกัด</button>
+    <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW CHARTs</button>
+    <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHARTs</button>
   </div>
   <label class="umap-keep chart-onmap"><input type="checkbox" id="chartOnMap"> ซ้อนบนแผนที่</label>
   <div class="umap-row" id="chartRow" hidden>
@@ -1848,8 +1848,8 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="chartZoomBtn">Zoom</button>
   </div>
   <div class="umap-btns" style="margin-top:6px">
-    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose the folder that holds your charts (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📁 เลือกโฟลเดอร์ CHART</button>
-    <button type="button" id="chartReloadBtn" class="chart-btn" style="flex:1" title="Read the folder again (new or renamed chart files)">🔄 รีเฟรช</button>
+    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose the folder that holds your charts (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📁 SELECT CHART FOLDER</button>
+    <button type="button" id="chartReloadBtn" class="chart-btn" style="flex:1" title="Read the folder again (new or renamed chart files)">🔄 Refresh</button>
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
@@ -9897,7 +9897,7 @@ function chartRender(status){
     document.getElementById('chartPgPrev').disabled=c.page<=1;document.getElementById('chartPgNext').disabled=c.page>=c.pages;}
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
-  document.getElementById('importChartBtn').textContent=pend?'🔓 เปิดโฟลเดอร์ "'+chartDir.name+'"':charts.length?'📁 เปลี่ยนโฟลเดอร์ CHART':'📁 เลือกโฟลเดอร์ CHART';
+  document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN FOLDER "'+chartDir.name+'"':charts.length?'📁 CHANGE CHART FOLDER':'📁 SELECT CHART FOLDER';
   var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!!c.onMap;
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
