@@ -1167,7 +1167,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
 #umapSel,#chartSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
 .umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
-.umap-row[hidden],.umap-btns[hidden]{display:none}
+.umap-row[hidden],.umap-btns[hidden],.umap-keep[hidden]{display:none}
 .umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
 .umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
 .umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
@@ -1867,6 +1867,7 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen">👁 VIEW</button>
     <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
   </div>
+  <label class="umap-keep" id="umapBgRow" hidden><input type="checkbox" id="umapBg"> พื้นหลังโปร่งใส (ในกรอบแผนที่ / legend คงพื้นขาว)</label>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
   <div class="umap-btns map-3btn">
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
@@ -9381,9 +9382,47 @@ umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}});
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
+/* maps built into the app: served from the DataBase site (spidersqdn.github.io/DataBase/AirNavFlow/).
+   ENROUTE (AIP): the AIP Thailand enroute chart, georeferenced + transparent, as WEBP tiles (built by DataBase's workflow) */
+var UMAP_BUILTIN=[{id:'aip-enroute',name:'ENROUTE (AIP)',file:'enroute.pmtiles',type:4,minZ:5,maxZ:10,opacity:0.85}];
+function umapBuiltinInit(){
+  var st;try{st=JSON.parse(localStorage.getItem('fp-user-maps-bi')||'{}')||{};}catch(e){st={};}
+  UMAP_BUILTIN.slice().reverse().forEach(function(d){
+    var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
+    userMaps.unshift(m);
+    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m);}).catch(function(){});
+  });
+}
+function umapBuiltinOpen(m){
+  if(m.layer)return Promise.resolve(m);
+  if(typeof pmtiles==='undefined')return Promise.reject(new Error('lib'));
+  var url=MAP_SITE+m.file;
+  var cp=('caches' in window)?caches.open(UMAP_CACHE).then(function(c){return c.match(umapKey(m.id));}).then(function(r){return r?r.blob():null;}).catch(function(){return null;}):Promise.resolve(null);
+  return cp.then(function(blob){
+    m.stored=!!blob;
+    var pm=new pmtiles.PMTiles(blob?new pmtiles.FileSource(new File([blob],m.file)):url);
+    return pm.getHeader().then(function(h){
+      m.minZ=h.minZoom;m.maxZ=h.maxZoom;m.bytes=blob?blob.size:0;
+      m.bounds=[h.minLon,h.minLat,h.maxLon,h.maxLat];
+      m.layer=umapLayer(m,pm);
+      if(!blob&&umapKeepOn())umapBuiltinCopy(m);
+      return m;
+    });
+  });
+}
+/* copy the built-in map into the app (offline): whole file into Cache Storage */
+function umapBuiltinCopy(m){
+  if(m.stored||m._copying||!('caches' in window))return;
+  m._copying=true;umapRender('กำลังก็อป '+m.name+' ลงเครื่อง…');
+  fetch(MAP_SITE+m.file,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();})
+    .then(function(b){m.file0=m.file;m.file=new File([b],m.file0);m.bytes=b.size;return umapStore(m).then(function(){m.file=m.file0;});})
+    .catch(function(e){umapRender('ก็อปไม่สำเร็จ: '+((e&&e.message)||e));})
+    .then(function(){m._copying=false;});
+}
 function umapSave(){
-  try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.map(function(m){
-    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
+  try{var bi={};userMaps.forEach(function(m){if(m.builtin)bi[m.id]={on:m.on,opacity:m.opacity,stored:m.stored};});localStorage.setItem('fp-user-maps-bi',JSON.stringify(bi));}catch(e){}
+  try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.filter(function(m){return !m.builtin;}).map(function(m){
+    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,bgClear:m.bgClear,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
   })));}catch(e){}
 }
 var UMapRaster=L.GridLayer.extend({
@@ -9420,10 +9459,68 @@ function umapImgBounds(m){
   var b=m.gcp&&m.gcp.length>=2&&m.w&&chartBounds(m);
   m.bounds=b&&b.isValid()?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;
 }
+/* white -> transparent ("colour to alpha"): white paper disappears, lines and colours keep their look on top of the map */
+function whiteToAlpha(ctx,W,H,rc){
+  var X0=0,Y0=0,X1=W,Y1=H;
+  if(rc){X0=Math.max(0,Math.floor(rc[0]));Y0=Math.max(0,Math.floor(rc[1]));X1=Math.min(W,Math.ceil(rc[2]));Y1=Math.min(H,Math.ceil(rc[3]));}
+  if(X1<=X0||Y1<=Y0)return;
+  var d=ctx.getImageData(X0,Y0,X1-X0,Y1-Y0),a=d.data;
+  for(var i=0;i<a.length;i+=4){
+    var r=a[i],g=a[i+1],b=a[i+2],al=Math.max(255-r,255-g,255-b);
+    if(al<=6){a[i+3]=0;continue;}
+    var f=255/al;
+    a[i]=255-(255-r)*f;a[i+1]=255-(255-g)*f;a[i+2]=255-(255-b)*f;a[i+3]=al*a[i+3]/255;
+  }
+  ctx.putImageData(d,X0,Y0);
+}
+/* map frame of a chart sheet = the two long vertical frame lines (>75% of the sheet height); legends outside it stay white */
+function chartFindFrame(im){
+  var W0=im.naturalWidth,H0=im.naturalHeight,k=Math.min(1,3000/Math.max(W0,H0)),W=Math.round(W0*k),H=Math.round(H0*k);
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(im,0,0,W,H);
+  var a=ctx.getImageData(0,0,W,H).data,cols=[];
+  for(var x=0;x<W;x++){
+    var best=0,bs=0,cur=0,st=0;
+    for(var y=0;y<H;y++){
+      var i=(y*W+x)*4;
+      if(a[i]*0.3+a[i+1]*0.59+a[i+2]*0.11<160){if(!cur)st=y;cur++;if(cur>best){best=cur;bs=st;}}else cur=0;
+    }
+    if(best>0.75*H)cols.push([x,bs,bs+best]);
+  }
+  if(cols.length<2)return null;
+  var L=cols[0],R=cols[cols.length-1];
+  if(R[0]-L[0]<0.3*W)return null;
+  if(L[0]<0.02*W&&R[0]>0.98*W&&Math.min(L[1],R[1])<0.02*H)return null; /* only the sheet border: key everything */
+  return [L[0]/k,Math.min(L[1],R[1])/k,(R[0]+1)/k,Math.max(L[2],R[2])/k];
+}
+function umapBgOn(m){return umapIsImg(m)&&m.bgClear!==false;}
+function umapClearUrl(m){
+  if(m._clearFor===m.url&&m.urlClear)return Promise.resolve(m.urlClear);
+  var src=m.url;
+  return new Promise(function(res,rej){
+    var im=new Image();
+    im.onload=function(){
+      var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;
+      var ctx=cv.getContext('2d');ctx.drawImage(im,0,0);
+      try{m.frame=chartFindFrame(im);}catch(e){m.frame=null;}
+      whiteToAlpha(ctx,cv.width,cv.height,m.frame);
+      cv.toBlob(function(b){
+        if(m.urlClear)URL.revokeObjectURL(m.urlClear);
+        m.urlClear=URL.createObjectURL(b);m._clearFor=src;res(m.urlClear);
+      },'image/png');
+    };
+    im.onerror=rej;im.src=src;
+  });
+}
 function umapImgRefresh(m){
   if(!m.layer)return;
   m.layer.clearLayers();
-  if(m.url&&m.gcp&&m.gcp.length>=2)m.layer.addLayer(new ChartOverlay(m));
+  if(!(m.url&&m.gcp&&m.gcp.length>=2))return;
+  m.overlayUrl=null;
+  if(!umapBgOn(m)){m.layer.addLayer(new ChartOverlay(m));return;}
+  var lyr=m.layer;
+  umapClearUrl(m).then(function(u){if(m.layer!==lyr)return;lyr.clearLayers();m.overlayUrl=u;lyr.addLayer(new ChartOverlay(m));})
+    .catch(function(){if(m.layer===lyr){lyr.clearLayers();lyr.addLayer(new ChartOverlay(m));}});
 }
 function umapImgGeo(m,geo){
   if(!m||!m.url)return;
@@ -9481,7 +9578,7 @@ function umapPickFile(){
     inp.click();
   });
 }
-function umapPending(m){return !m.layer;}
+function umapPending(m){return !m.layer&&!m.builtin;}
 /* a remembered map whose file is not open yet: ask permission (handle) or re-pick the file */
 function umapReopen(m){
   var p;
@@ -9545,6 +9642,12 @@ function umapZoom(m){
   if(m.bounds)map.fitBounds([[m.bounds[1],m.bounds[0]],[m.bounds[3],m.bounds[2]]],{maxZoom:Math.max(8,m.maxZ||8)});
 }
 function umapDelete(m){
+  if(m.builtin){ /* built-in: can't be removed, only its offline copy */
+    if(!confirm(m.name+' เป็นแผนที่ในแอพ ลบไม่ได้\nซ่อน + ลบไฟล์ที่ก็อปไว้ในเครื่อง (ถ้ามี)?'))return;
+    if(m.layer)umapGroup.removeLayer(m.layer);m.layer=null;m.on=false;m.stored=false;
+    if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return c.delete(umapKey(m.id));}).catch(function(){});
+    umapSave();umapRender();return;
+  }
   if(!confirm('ลบแผนที่ "'+m.name+'" ออกจากเครื่อง?'))return;
   if(m.layer)umapGroup.removeLayer(m.layer);
   userMaps=userMaps.filter(function(x){return x!==m;});
@@ -9587,7 +9690,10 @@ function umapRender(status){
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
-  document.getElementById('umapDelBtn').disabled=document.getElementById('umapDelAllBtn').disabled=!userMaps.length;
+  document.getElementById('umapBgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
+  document.getElementById('umapDelBtn').disabled=!userMaps.length;
+  document.getElementById('umapDelAllBtn').disabled=!userMaps.some(function(m){return !m.builtin;});
   var cb=0,cn=0;userMaps.forEach(function(m){if(m.stored){cn++;cb+=m.bytes||0;}});
   var clr=document.getElementById('umapClearBtn');
   clr.disabled=!cn;clr.textContent='🧹 ล้าง cache แผนที่'+(cn?' ('+cn+' ไฟล์, '+mb(cb)+')':'');
@@ -9595,7 +9701,8 @@ function umapRender(status){
   document.getElementById('umapKeep').checked=umapKeepOn();
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
-  else st.textContent=cur?(umapIsImg(cur)?'PDF/ภาพ'+(cur.page?' หน้า '+cur.page:'')+(cur.gcp&&cur.gcp.length>=2?' · ตั้งพิกัดแล้ว ('+cur.gcp.length+' จุด)':' · ยังไม่ตั้งพิกัด → กด 📍'):UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ)+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
+  else st.textContent=cur&&cur.builtin?'แผนที่ในแอพ (AIP) · z'+cur.minZ+'-'+cur.maxZ+(cur.stored?' · ก็อปไว้ในเครื่อง ใช้ออฟไลน์ได้ '+mb(cur.bytes):' · โหลดจากเน็ต (ติ๊กก็อปไฟล์ = ใช้ออฟไลน์ได้)')
+    :cur?(umapIsImg(cur)?'PDF/ภาพ'+(cur.page?' หน้า '+cur.page:'')+(cur.gcp&&cur.gcp.length>=2?' · ตั้งพิกัดแล้ว ('+cur.gcp.length+' จุด)':' · ยังไม่ตั้งพิกัด → กด 📍'):UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ)+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
 }
 function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
 function umapShow(m){
@@ -9605,11 +9712,15 @@ function umapShow(m){
 }
 document.getElementById('umapSel').onchange=function(){
   var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
+  if(m&&m.builtin&&!m.layer){umapRender('กำลังเปิด '+m.name+'…');umapBuiltinOpen(m).then(function(){umapShow(m);umapZoom(m);}).catch(function(e){umapRender('เปิด '+m.name+' ไม่ได้ (ต้องต่อเน็ตครั้งแรก)');});return;}
   if(m&&umapPending(m)){umapRender();umapReopen(m);return;}
   umapShow(m);if(m)umapZoom(m);
 };
 document.getElementById('umapOp').oninput=function(){
   var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
+};
+document.getElementById('umapBg').onchange=function(){
+  var m=umapCur();if(!m||!umapIsImg(m))return;m.bgClear=this.checked;umapSave();umapImgRefresh(m);
 };
 document.getElementById('umapViewBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,false);});};
 document.getElementById('umapGeoBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,true);});};
@@ -9625,10 +9736,11 @@ document.getElementById('umapDelBtn').onclick=function(){
 };
 /* CLEAR MAPs: delete every imported map (list, copies in the app, saved file links) */
 document.getElementById('umapDelAllBtn').onclick=function(){
-  if(!userMaps.length||!confirm('ลบ MAP ทั้งหมด '+userMaps.length+' แผนที่ ออกจากเครื่อง?\n(ไฟล์ต้นฉบับในเครื่องไม่ถูกลบ)'))return;
-  userMaps.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
-  var ids=userMaps.map(function(m){return m.id;});
-  userMaps=[];umapSave();umapRender('✓ ลบ MAP ทั้งหมดแล้ว');
+  var mine=userMaps.filter(function(m){return !m.builtin;});
+  if(!mine.length||!confirm('ลบ MAP ที่ import ทั้งหมด '+mine.length+' แผนที่ ออกจากเครื่อง?\n(ไฟล์ต้นฉบับในเครื่องไม่ถูกลบ, แผนที่ในแอพยังอยู่)'))return;
+  mine.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
+  var ids=mine.map(function(m){return m.id;});
+  userMaps=userMaps.filter(function(m){return m.builtin;});umapSave();umapRender('✓ ลบ MAP ที่ import ทั้งหมดแล้ว');
   if('caches' in window)caches.delete(UMAP_CACHE).catch(function(){});
   ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
@@ -9649,12 +9761,12 @@ document.getElementById('umapClearBtn').onclick=function(){
 };
 document.getElementById('umapKeep').onchange=function(){
   var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
-  if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
+  if(on){var m=umapCur();if(m&&m.builtin)umapBuiltinCopy(m);else if(m&&!m.stored&&m.file)umapStore(m);}
 };
 document.getElementById('importMapBtn').onclick=function(){
   umapPickFile().then(importUserMap).catch(function(e){if(e&&e.name!=='AbortError')alert('เปิดไฟล์ไม่ได้: '+(e.message||e));});
 };
-loadUserMaps();umapRender();
+umapBuiltinInit();loadUserMaps();umapRender();
 
 /* ---- CHART: chart images (PNG/JPG/WEBP, or one page of a PDF) read straight from a folder on the device.
    Nothing of the chart file is copied into the app; only the folder link (Chrome/Edge: File System Access
@@ -9812,7 +9924,7 @@ var ChartOverlay=L.Layer.extend({
   initialize:function(c){this._c=c;this._t=null;this._job=0;},
   onAdd:function(m){
     var img=this._img=L.DomUtil.create('img','leaflet-image-layer leaflet-zoom-animated');
-    img.alt='';img.src=chartUrl(this._c);
+    img.alt='';img.src=this._c.overlayUrl||chartUrl(this._c);
     img.style.cssText='position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;width:'+this._c.w+'px;height:'+this._c.h+'px';
     img.style.opacity=this._c.opacity;
     m.getPane(this._c.pane||'charts').appendChild(img);
@@ -9867,6 +9979,7 @@ var ChartOverlay=L.Layer.extend({
     this._task=c._pg.render({canvasContext:ctx,viewport:vp});
     this._task.promise.then(function(){
       if(job!==me._job||!me._cv)return;
+      if(c.overlayUrl){var f=c.frame;whiteToAlpha(ctx,W,H,f?[(f[0]-x0)*r,(f[1]-y0)*r,(f[2]-x0)*r,(f[3]-y0)*r]:null);}
       cv.width=W;cv.height=H;cv.getContext('2d').drawImage(off,0,0);
       me._cb=[x0,y0,W,H,1/r];cv.style.display='block';me._reset();
     }).catch(function(){});
