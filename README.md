@@ -81,7 +81,7 @@
 | Workflow | ทำอะไร | ทำงานเมื่อ |
 |---|---|---|
 | `build-map-and-deploy.yml` | เผยแพร่เว็บแอป (~2 MB) | push เข้า `main` หรือกด Run workflow |
-| repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
+| repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/AirNavFlow/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
 | `aip-watch.yml` | ตรวจ eAIP (aip.caat.or.th) หา AIRAC ใหม่ เทียบ ENR 3/4/5.1, AD 2, AMDT, SUP, AIC แล้วเปิด Issue "AIP AIRAC ..." | Claude routine ทุกวันจันทร์ 18:00 |
 
 - ตั้งค่า Pages: **Settings → Pages → Source: `GitHub Actions`**
