@@ -1177,7 +1177,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-clear{width:100%;margin-top:8px;padding:7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mute);font:600 12px system-ui,sans-serif;cursor:pointer}
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
-/* IMPORT CHART: chart images (PNG/JPG/PDF page) - viewer + georeferenced overlay */
+/* CHART: chart images (PNG/JPG/PDF page) read from a folder - viewer + georeferenced overlay */
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--cyan);background:transparent;color:var(--cyan);font:600 13px system-ui,sans-serif;cursor:pointer}
 .chart-btn:disabled{opacity:.35;cursor:default}
 .chart-import{border-color:var(--cyan);background:var(--cyan);color:#06222a}
@@ -1841,10 +1841,10 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="chartZoomBtn">Zoom</button>
   </div>
   <div class="umap-btns" style="margin-top:6px">
-    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Import a chart image (PNG/JPG) or a PDF page, kept offline in the app">📄 IMPORT CHART</button>
-    <button type="button" id="chartDelBtn" class="umap-del" title="Delete the selected chart from this device">🗑 ลบ</button>
+    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose the folder that holds your charts (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📁 เลือกโฟลเดอร์ CHART</button>
+    <button type="button" id="chartReloadBtn" class="chart-btn" style="flex:1" title="Read the folder again (new or renamed chart files)">🔄 รีเฟรช</button>
   </div>
-  <input id="importChartFile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
+  <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
 </section>
 
@@ -9372,33 +9372,117 @@ document.getElementById('importMapBtn').onclick=function(){
 };
 loadUserMaps();umapRender();
 
-/* ---- IMPORT CHART: chart images (PNG/JPG/WEBP, or one page of a PDF) kept offline in IndexedDB 'fp-charts'
+/* ---- CHART: chart images (PNG/JPG/WEBP, or one page of a PDF) read straight from a folder on the device.
+   Nothing of the chart file is copied into the app; only the folder link (Chrome/Edge: File System Access
+   handle in IndexedDB 'fp-charts') and each chart's georeference / opacity (localStorage 'fp-charts-v1').
+   Safari/iPad has no folder handles: pick the folder (or files) again after the app is reopened.
    - 👁 viewer: full screen, pinch / wheel zoom, drag to pan
    - 📍 georeference: tap 2-3 grid crossings and type their Lat/Long; 2 points = move/rotate/scale, 3+ = affine
    - overlay: image drawn on the map (pane above IMPORT MAP, below airspace/route) with a CSS matrix */
-var CHART_DB='fp-charts', CHART_SEL='fp-chart-sel', charts=[], chartLayer=null;
+var CHART_META='fp-charts-v1', CHART_RE=/\.(png|jpe?g|webp|pdf)$/i, CHART_FSA=typeof window.showDirectoryPicker==='function';
+var charts=[], chartLayer=null, chartDir=null, chartDirOk=false, chartMeta={sel:'',items:{}};
+try{var cm=JSON.parse(localStorage.getItem(CHART_META)||'null');if(cm&&cm.items)chartMeta=cm;}catch(e){}
 var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.style.pointerEvents='none';
-function chartDb(){
-  if(!chartDb.p)chartDb.p=new Promise(function(res,rej){
-    var q=indexedDB.open(CHART_DB,1);
-    q.onupgradeneeded=function(){q.result.createObjectStore('charts',{keyPath:'id'});};
-    q.onsuccess=function(){res(q.result);};q.onerror=function(){rej(q.error);};
-  });
-  return chartDb.p;
-}
-function chartTx(mode,fn){
-  return chartDb().then(function(db){return new Promise(function(res,rej){
-    var t=db.transaction('charts',mode),r=fn(t.objectStore('charts'));
-    t.oncomplete=function(){res(r&&r.result);};t.onerror=t.onabort=function(){rej(t.error);};
-  });});
-}
+function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
 function chartPut(c){
-  return chartTx('readwrite',function(st){return st.put({id:c.id,name:c.name,blob:c.blob,w:c.w,h:c.h,gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,added:c.added});});
+  chartMeta.items[c.key]={gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,w:c.w||0,h:c.h||0};
+  chartMetaSave();return Promise.resolve();
 }
-function chartUrl(c){if(!c.url)c.url=URL.createObjectURL(c.blob);return c.url;}
-function chartCur(){var id='';try{id=localStorage.getItem(CHART_SEL)||'';}catch(e){}return charts.filter(function(c){return c.id===id;})[0]||null;}
-function chartSetCur(c){try{localStorage.setItem(CHART_SEL,c?c.id:'');}catch(e){}}
-
+function chartCur(){return charts.filter(function(c){return c.key===chartMeta.sel;})[0]||null;}
+function chartSetCur(c){chartMeta.sel=c?c.key:'';chartMetaSave();}
+function chartUrl(c){return c.url;}
+function chartIdb(mode,fn){
+  return new Promise(function(res,rej){
+    if(!window.indexedDB){rej(new Error('idb'));return;}
+    var q=indexedDB.open('fp-charts',1);
+    q.onupgradeneeded=function(){q.result.createObjectStore('handles');};
+    q.onerror=function(){rej(q.error);};
+    q.onsuccess=function(){
+      var db=q.result,tx,r;
+      try{tx=db.transaction('handles',mode);r=fn(tx.objectStore('handles'));}catch(e){db.close();rej(e);return;}
+      tx.oncomplete=function(){db.close();res(r&&r.result);};
+      tx.onerror=function(){db.close();rej(tx.error);};
+    };
+  });
+}
+/* build the chart list from files: [{key:'sub/name.png', name, file?|fh?}] keeping saved georeference */
+function chartSetList(list){
+  if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
+  charts.forEach(function(c){if(c.url)URL.revokeObjectURL(c.url);});
+  charts=list.sort(function(a,b){return a.key.localeCompare(b.key,'th');}).map(function(f){
+    var m=chartMeta.items[f.key]||{};
+    return {key:f.key,name:f.key.replace(CHART_RE,''),file:f.file||null,fh:f.fh||null,
+      gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,w:m.w||0,h:m.h||0,url:null};
+  });
+  if(!chartCur())chartSetCur(charts[0]||null);
+  chartRender();chartSelect(chartCur(),false);
+}
+function chartScanDir(dir){
+  var out=[];
+  function walk(d,pre,depth){
+    var it=d.values(),p=Promise.resolve();
+    function next(){
+      return it.next().then(function(r){
+        if(r.done)return;
+        var h=r.value;
+        if(h.kind==='file'&&CHART_RE.test(h.name))out.push({key:pre+h.name,fh:h});
+        else if(h.kind==='directory'&&depth<3&&h.name.charAt(0)!=='.')return walk(h,pre+h.name+'/',depth+1).then(next);
+        return next();
+      });
+    }
+    return p.then(next);
+  }
+  chartRender('กำลังอ่านโฟลเดอร์…');
+  return walk(dir,'',0).then(function(){chartSetList(out);});
+}
+function chartOpenDir(dir){
+  chartDir=dir;chartDirOk=true;
+  return chartScanDir(dir).catch(function(e){chartRender('อ่านโฟลเดอร์ไม่ได้: '+((e&&e.message)||e));});
+}
+/* pick a folder: Chrome/Edge -> directory handle (remembered); others -> <input webkitdirectory> / multiple files */
+function chartPickFolder(){
+  if(CHART_FSA){
+    window.showDirectoryPicker({id:'fp-charts',mode:'read'}).then(function(d){
+      chartIdb('readwrite',function(st){return st.put(d,'dir');}).catch(function(){});
+      return chartOpenDir(d);
+    }).catch(function(e){if(e&&e.name!=='AbortError')alert('เปิดโฟลเดอร์ไม่ได้: '+(e.message||e));});
+    return;
+  }
+  document.getElementById('importChartFile').click();
+}
+function chartLoadSaved(){
+  if(!CHART_FSA){chartRender();return;}
+  chartIdb('readonly',function(st){return st.get('dir');}).then(function(d){
+    if(!d){chartRender();return;}
+    chartDir=d;
+    return d.queryPermission({mode:'read'}).then(function(s){
+      if(s==='granted')return chartOpenDir(d);
+      chartRender();
+    });
+  }).catch(function(){chartRender();});
+}
+/* read the chart from its file (PDF page rendered in memory); only the selected chart is held in memory */
+function chartLoad(c){
+  if(c.url)return Promise.resolve(c);
+  var fp=c.file?Promise.resolve(c.file):c.fh?c.fh.getFile():Promise.reject(new Error('ไม่มีไฟล์'));
+  chartRender('กำลังเปิดชาร์ต…');
+  return fp.then(function(file){
+    if(!/\.pdf$/i.test(c.key))return file;
+    return chartPdfToPng(file,c).then(function(r){c.page=r.page;return r.blob;});
+  }).then(function(blob){
+    return chartImgSize(blob).then(function(sz){
+      charts.forEach(function(x){if(x!==c&&x.url){URL.revokeObjectURL(x.url);x.url=null;}});
+      c.url=URL.createObjectURL(blob);c.w=sz[0];c.h=sz[1];c.bytes=blob.size;chartPut(c);return c;
+    });
+  });
+}
+function chartSelect(c,zoom){
+  if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
+  chartSetCur(c);chartRender();
+  if(!c||!(c.onMap&&c.gcp.length>=2))return Promise.resolve(c);
+  return chartLoad(c).then(function(){chartShowOverlay();chartRender();if(zoom)chartZoom(c);return c;})
+    .catch(function(e){chartRender('เปิดชาร์ตไม่ได้: '+((e&&e.message)||e));});
+}
 /* fit image px (x,y) -> target pts (X,Y). 2 points: similarity (complex a*w+b); 3+: least-squares affine.
    returns [a,b,c,d,e,f] for X=a*x+c*y+e, Y=b*x+d*y+f (CSS matrix order) */
 function chartFit(src,dst){
@@ -9455,33 +9539,27 @@ function chartBounds(c){
 function chartShowOverlay(){
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
   var c=chartCur();
-  if(c&&c.onMap&&c.gcp&&c.gcp.length>=2){chartLayer=new ChartOverlay(c);chartLayer.addTo(map);}
+  if(c&&c.url&&c.onMap&&c.gcp&&c.gcp.length>=2){chartLayer=new ChartOverlay(c);chartLayer.addTo(map);}
 }
 function chartZoom(c){var b=c&&c.gcp&&c.gcp.length>=2&&chartBounds(c);if(b&&b.isValid())map.fitBounds(b,{padding:[20,20]});}
 function chartRender(status){
   var sel=document.getElementById('chartSel');if(!sel)return;
-  var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2);
-  sel.innerHTML=(charts.length?'':'<option value="">— ไม่มีชาร์ต —</option>')+charts.map(function(x){
-    return '<option value="'+esc(x.id)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
+  var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2),pend=chartDir&&!chartDirOk;
+  sel.innerHTML=(charts.length?'':'<option value="">'+(pend?'— แตะ 📁 เพื่อเปิดโฟลเดอร์อีกครั้ง —':'— เลือกโฟลเดอร์ชาร์ตก่อน —')+'</option>')+charts.map(function(x){
+    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
   }).join('');
   document.getElementById('chartViewBtn').disabled=!c;
   document.getElementById('chartGeoBtn').disabled=!c;
-  document.getElementById('chartDelBtn').disabled=!c;
+  document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
+  document.getElementById('importChartBtn').textContent=pend?'🔓 เปิดโฟลเดอร์ "'+chartDir.name+'"':charts.length?'📁 เปลี่ยนโฟลเดอร์ CHART':'📁 เลือกโฟลเดอร์ CHART';
   var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!!c.onMap;
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
   var st=document.getElementById('chartStatus');
-  if(status!==undefined)st.textContent=status||'';
-  else st.textContent=!c?'ไฟล์ PNG / JPG หรือ PDF (เลือกหน้า) · เก็บออฟไลน์ในแอพ'
-    :c.w+'×'+c.h+' px · '+(c.blob.size/1048576).toFixed(1)+' MB · '+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด: กด 📍 ตั้งพิกัด เพื่อซ้อนบนแผนที่');
-}
-function loadCharts(){
-  if(!('indexedDB' in window))return;
-  chartTx('readonly',function(st){return st.getAll();}).then(function(list){
-    charts=(list||[]).sort(function(a,b){return (a.added||0)-(b.added||0);});
-    if(!chartCur()&&charts.length)chartSetCur(charts[charts.length-1]);
-    chartRender();chartShowOverlay();
-  }).catch(function(){chartRender('เปิดคลังชาร์ตไม่ได้ (เบราว์เซอร์ไม่รองรับ IndexedDB)');});
+  if(status!==undefined){st.textContent=status||'';return;}
+  var src=chartDir&&chartDirOk?'โฟลเดอร์ "'+chartDir.name+'" · '+charts.length+' ไฟล์':charts.length?charts.length+' ไฟล์ (เปิดแอพใหม่ต้องเลือกโฟลเดอร์อีกครั้ง)':'';
+  st.textContent=!c?(src||(Object.keys(chartMeta.items).length?'เลือกโฟลเดอร์ชาร์ตอีกครั้ง (พิกัดที่ตั้งไว้ยังอยู่)':'อ่าน PNG / JPG / PDF จากโฟลเดอร์โดยตรง ไม่ก็อปเข้าแอพ'))
+    :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด');
 }
 function chartImgSize(blob){
   return new Promise(function(res,rej){
@@ -9508,41 +9586,25 @@ function chartLoadPdfJs(){
   });
   return chartLoadPdfJs.p;
 }
-function chartPdfToPng(file){
+function chartPdfToPng(file,c){
   chartRender('กำลังเปิด PDF…');
   return chartLoadPdfJs().then(function(lib){return file.arrayBuffer().then(function(ab){return lib.getDocument({data:ab}).promise;});})
   .then(function(pdf){
-    var pg=1;
-    if(pdf.numPages>1){
-      var a=prompt('PDF มี '+pdf.numPages+' หน้า เลือกหน้าที่จะ import (1-'+pdf.numPages+')','1');
-      if(a===null)throw {name:'AbortError'};
-      pg=Math.min(pdf.numPages,Math.max(1,parseInt(a,10)||1));
+    var pg=c.page||1;
+    if(pdf.numPages>1&&!c.page){
+      var a=prompt(c.name+'\nPDF มี '+pdf.numPages+' หน้า เลือกหน้าที่จะใช้ (1-'+pdf.numPages+')','1');
+      if(a===null)throw new Error('ยกเลิก');
+      pg=parseInt(a,10)||1;
     }
+    pg=Math.min(pdf.numPages,Math.max(1,pg));
     return pdf.getPage(pg).then(function(page){
       var v1=page.getViewport({scale:1}),sc=Math.min(6,2600/Math.max(v1.width,v1.height)),v=page.getViewport({scale:sc});
       var cv=document.createElement('canvas');cv.width=Math.round(v.width);cv.height=Math.round(v.height);
       var ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
       return page.render({canvasContext:ctx,viewport:v}).promise.then(function(){
-        return new Promise(function(res){cv.toBlob(function(b){res({blob:b,page:pdf.numPages>1?pg:0});},'image/png');});
+        return new Promise(function(res){cv.toBlob(function(b){res({blob:b,page:pg});},'image/png');});
       });
     });
-  });
-}
-function importChart(file){
-  if(!file)return;
-  var isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
-  var base=file.name.replace(/\.[^.]+$/,'');
-  (isPdf?chartPdfToPng(file):Promise.resolve({blob:file,page:0})).then(function(r){
-    return chartImgSize(r.blob).then(function(sz){
-      var c={id:'c'+Date.now().toString(36),name:base+(r.page?' p.'+r.page:''),blob:r.blob,w:sz[0],h:sz[1],gcp:[],opacity:0.8,onMap:false,added:Date.now()};
-      return chartPut(c).then(function(){
-        charts.push(c);chartSetCur(c);chartShowOverlay();chartRender();
-        if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
-      });
-    });
-  }).catch(function(e){
-    if(e&&e.name==='AbortError'){chartRender();return;}
-    chartRender('');alert('Import chart ไม่ได้: '+((e&&e.message)||e));
   });
 }
 /* "15-00 100-00", "1500 10000", "150000 1000000", "N15 00.00 E100 00.00", "15.5 100.25" */
@@ -9680,30 +9742,40 @@ function openChartViewer(c,geo){
   fit();setGeo(!!geo);
 }
 document.getElementById('chartSel').onchange=function(){
-  var id=this.value,c=charts.filter(function(x){return x.id===id;})[0]||null;
-  chartSetCur(c);chartShowOverlay();chartRender();if(c&&c.onMap)chartZoom(c);
+  var k=this.value,c=charts.filter(function(x){return x.key===k;})[0]||null;
+  chartSelect(c,true);
 };
-document.getElementById('chartViewBtn').onclick=function(){openChartViewer(chartCur(),false);};
-document.getElementById('chartGeoBtn').onclick=function(){openChartViewer(chartCur(),true);};
+function chartWithFile(fn){return function(){var c=chartCur();if(!c)return;chartLoad(c).then(function(){chartRender();fn(c);}).catch(function(e){chartRender('เปิดชาร์ตไม่ได้: '+((e&&e.message)||e));});};}
+document.getElementById('chartViewBtn').onclick=chartWithFile(function(c){openChartViewer(c,false);});
+document.getElementById('chartGeoBtn').onclick=chartWithFile(function(c){openChartViewer(c,true);});
 document.getElementById('chartOnMap').onchange=function(){
-  var c=chartCur();if(!c)return;c.onMap=this.checked;chartPut(c).catch(function(){});chartShowOverlay();chartRender();if(c.onMap)chartZoom(c);
+  var c=chartCur();if(!c)return;c.onMap=this.checked;chartPut(c);
+  if(c.onMap)chartSelect(c,true);else{chartShowOverlay();chartRender();}
 };
 document.getElementById('chartOp').oninput=function(){
-  var c=chartCur();if(!c)return;c.opacity=+this.value;if(chartLayer)chartLayer.setOpacity(c.opacity);
-  clearTimeout(chartPut.t);chartPut.t=setTimeout(function(){chartPut(c).catch(function(){});},400);
+  var c=chartCur();if(!c)return;c.opacity=+this.value;if(chartLayer)chartLayer.setOpacity(c.opacity);chartPut(c);
 };
 document.getElementById('chartZoomBtn').onclick=function(){chartZoom(chartCur());};
-document.getElementById('chartDelBtn').onclick=function(){
-  var c=chartCur();if(!c||!confirm('ลบชาร์ต "'+c.name+'" ออกจากเครื่องนี้?'))return;
-  chartTx('readwrite',function(st){return st.delete(c.id);}).catch(function(){}).then(function(){
-    if(c.url)URL.revokeObjectURL(c.url);
-    charts=charts.filter(function(x){return x!==c;});
-    chartSetCur(charts[charts.length-1]||null);chartShowOverlay();chartRender('✓ ลบชาร์ตแล้ว');
-  });
+document.getElementById('chartReloadBtn').onclick=function(){if(chartDir&&chartDirOk)chartScanDir(chartDir);};
+document.getElementById('importChartBtn').onclick=function(){
+  if(chartDir&&!chartDirOk){ /* remembered folder: one tap to grant read access again */
+    chartDir.requestPermission({mode:'read'}).then(function(s){if(s==='granted')chartOpenDir(chartDir);else chartPickFolder();})
+      .catch(function(){chartPickFolder();});
+    return;
+  }
+  chartPickFolder();
 };
-document.getElementById('importChartBtn').onclick=function(){document.getElementById('importChartFile').click();};
-document.getElementById('importChartFile').onchange=function(){var f=this.files&&this.files[0];this.value='';importChart(f);};
-chartRender();loadCharts();
+(function(){ /* fallback picker (Safari/iPad/Firefox): folder where supported, else several files */
+  var inp=document.getElementById('importChartFile'),ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(!ios&&'webkitdirectory' in inp)inp.webkitdirectory=true;
+  inp.onchange=function(){
+    var fs=Array.prototype.slice.call(inp.files||[]).filter(function(f){return CHART_RE.test(f.name);});
+    inp.value='';if(!fs.length)return;
+    chartDir=null;chartDirOk=false;
+    chartSetList(fs.map(function(f){return {key:(f.webkitRelativePath||f.name).replace(/^[^\/]+\//,''),file:f};}));
+  };
+})();
+chartRender();chartLoadSaved();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
