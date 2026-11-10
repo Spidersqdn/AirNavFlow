@@ -1193,6 +1193,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #chartViewer .cv-bar button,#chartViewer .cv-geo button{margin:0;padding:6px 10px;color:var(--text);font:600 13px system-ui,sans-serif}
 #chartViewer .cv-geo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:#3d3418;color:#ffe08a;font-size:13px}
 #chartViewer .cv-geo[hidden]{display:none}
+#chartViewer .cv-pg{font:600 13px system-ui,sans-serif;white-space:nowrap;color:var(--orange,#ff8a2a)}
+#chartViewer .cv-bar button:disabled{opacity:.35}
 #chartViewer .cv-geo span{flex:1;min-width:180px}
 #chartViewer .cv-geo .cv-save{background:var(--amber);border-color:var(--amber);color:#1a1200}
 #chartViewer .cv-geo .cv-save:disabled{opacity:.4}
@@ -9631,9 +9633,25 @@ var charts=[], chartLayer=null, chartDir=null, chartDirOk=false, chartMeta={sel:
 try{var cm=JSON.parse(localStorage.getItem(CHART_META)||'null');if(cm&&cm.items)chartMeta=cm;}catch(e){}
 var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.style.pointerEvents='none';
 function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
+/* PDF with several pages: each page has its own georeference, saved under 'path#pN'; 'path' keeps the page shown */
 function chartPut(c){
-  chartMeta.items[c.key]={gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,w:c.w||0,h:c.h||0};
+  var v={gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,pages:c.pages||0,w:c.w||0,h:c.h||0};
+  chartMeta.items[c.key]=v;
+  if(c.pages>1&&c.page)chartMeta.items[c.key+'#p'+c.page]=v;
   chartMetaSave();return Promise.resolve();
+}
+function chartPageMeta(c,n){
+  var m=chartMeta.items[c.key+'#p'+n]||{};
+  c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;
+}
+/* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
+function chartGoPage(c,n,geo){
+  if(!c.pages||n<1||n>c.pages||n===c.page)return;
+  chartPut(c);chartPageMeta(c,n);
+  if(c.url){URL.revokeObjectURL(c.url);c.url=null;}
+  if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
+  chartLoad(c).then(function(){chartShowOverlay();chartRender();openChartViewer(c,geo);})
+    .catch(function(e){chartRender('เปิดหน้า PDF ไม่ได้: '+((e&&e.message)||e));});
 }
 function chartCur(){return charts.filter(function(c){return c.key===chartMeta.sel;})[0]||null;}
 function chartSetCur(c){chartMeta.sel=c?c.key:'';chartMetaSave();}
@@ -9658,8 +9676,8 @@ function chartSetList(list){
   charts.forEach(function(c){if(c.url)URL.revokeObjectURL(c.url);});
   charts=list.sort(function(a,b){return a.key.localeCompare(b.key,'th');}).map(function(f){
     var m=chartMeta.items[f.key]||{};
-    return {key:f.key,name:f.key.replace(CHART_RE,''),file:f.file||null,fh:f.fh||null,
-      gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,w:m.w||0,h:m.h||0,url:null};
+    return {key:f.key,name:f.key.replace(CHART_RE,''),isPdf:/\.pdf$/i.test(f.key),file:f.file||null,fh:f.fh||null,
+      gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,pages:m.pages||0,w:m.w||0,h:m.h||0,url:null,onPage:chartGoPage};
   });
   if(!chartCur())chartSetCur(charts[0]||null);
   chartRender();chartSelect(chartCur(),false);
@@ -9793,7 +9811,7 @@ function chartRender(status){
   var sel=document.getElementById('chartSel');if(!sel)return;
   var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2),pend=chartDir&&!chartDirOk;
   sel.innerHTML=(charts.length?'':'<option value="">'+(pend?'— แตะ 📁 เพื่อเปิดโฟลเดอร์อีกครั้ง —':'— เลือกโฟลเดอร์ชาร์ตก่อน —')+'</option>')+charts.map(function(x){
-    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
+    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' (หน้า '+x.page+'/'+x.pages+')':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
   }).join('');
   document.getElementById('chartViewBtn').disabled=!c;
   document.getElementById('chartGeoBtn').disabled=!c;
@@ -9835,10 +9853,12 @@ function chartLoadPdfJs(){
 }
 function chartPdfToPng(file,c){
   chartRender('กำลังเปิด PDF…');
-  return chartLoadPdfJs().then(function(lib){return file.arrayBuffer().then(function(ab){return lib.getDocument({data:ab}).promise;});})
-  .then(function(pdf){
-    var pg=c.page||1;
-    if(pdf.numPages>1&&!c.page){
+  var fid=file.name+'|'+file.size+'|'+file.lastModified,doc=(c._pdf&&c._pdfFile===fid)?Promise.resolve(c._pdf)
+    :chartLoadPdfJs().then(function(lib){return file.arrayBuffer().then(function(ab){return lib.getDocument({data:ab}).promise;});})
+      .then(function(pdf){c._pdf=pdf;c._pdfFile=fid;return pdf;});
+  return doc.then(function(pdf){
+    var pg=c.page||1;c.pages=pdf.numPages;
+    if(pdf.numPages>1&&!c.page&&!c.onPage){
       var a=prompt(c.name+'\nPDF มี '+pdf.numPages+' หน้า เลือกหน้าที่จะใช้ (1-'+pdf.numPages+')','1');
       if(a===null)throw new Error('ยกเลิก');
       pg=parseInt(a,10)||1;
@@ -9887,6 +9907,7 @@ function openChartViewer(c,geo){
   var bg=document.createElement('div');bg.id='chartViewer';
   bg.innerHTML='<div class="cv-bar"><b></b>'+
     '<button type="button" data-a="out" title="Zoom out">−</button><button type="button" data-a="in" title="Zoom in">+</button>'+
+    (c.pages>1&&c.onPage?'<button type="button" data-a="pp" title="Previous page"'+(c.page<=1?' disabled':'')+'>◀</button><span class="cv-pg">หน้า '+c.page+'/'+c.pages+'</span><button type="button" data-a="pn" title="Next page"'+(c.page>=c.pages?' disabled':'')+'>▶</button>':'')+
     '<button type="button" data-a="fit">Fit</button><button type="button" data-a="geo">📍</button><button type="button" data-a="x">✕</button></div>'+
     '<div class="cv-geo" hidden><span></span><button type="button" data-a="undo">↶ ลบจุดล่าสุด</button><button type="button" data-a="gx">ยกเลิก</button><button type="button" class="cv-save" data-a="save">บันทึก</button></div>'+
     '<div class="cv-stage"><div class="cv-wrap"><img alt=""></div></div>';
@@ -9934,6 +9955,7 @@ function openChartViewer(c,geo){
   bg.addEventListener('click',function(e){
     var b=e.target.closest('[data-a]');if(!b)return;
     var a=b.getAttribute('data-a'),W=stage.clientWidth/2,H=stage.clientHeight/2;
+    if(a==='pp'||a==='pn'){var g=geoOn;close();c.onPage(c,c.page+(a==='pn'?1:-1),g);return;}
     if(a==='x')close();
     else if(a==='in')zoomAt(1.4,W,H);
     else if(a==='out')zoomAt(1/1.4,W,H);
