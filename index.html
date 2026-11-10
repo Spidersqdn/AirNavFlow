@@ -8057,12 +8057,14 @@ function showMiniMap(cv){
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
   };
-  /* PowerPoint: one A5 portrait slide; background map and route/symbols as 2 pictures, waypoint circles, leader lines (glued), info boxes / tags / HDG bars / title as movable, editable shapes */
+  /* PowerPoint: one A4 landscape slide, waypoint table on the right; background map and route/symbols as 2 pictures, waypoint circles, leader lines (glued), info boxes / tags / HDG bars / title as movable, editable shapes */
   var pb=document.getElementById('mmPpt');
   pb.onclick=function(){
     var pn=fname.replace(/\.png$/,'.pptx');pb.disabled=true;
     buildMiniMap({skip:mmOffSkip(),layers:true}).then(function(c2){   /* same sheet, boxes as separate editable shapes */
-      return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),c2.mmShapes,c2.mmW,c2.mmBase);
+      var sk={};mmOffSkip().forEach(function(k){sk[k]=1;});
+      var offs=(c2.mmOffs||[]).filter(function(p){return !sk[mmOffKey(p)];});
+      return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),c2.mmShapes,c2.mmW,c2.mmBase,c2.mmH,mmTableRows(offs));
     }).then(function(blob){
       var a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=pn;document.body.appendChild(a);a.click();a.remove();
       setTimeout(function(){URL.revokeObjectURL(u);},30000);
@@ -8085,11 +8087,13 @@ function mmRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat
 function mmTitle(){try{var o=JSON.parse(localStorage.getItem('fp-mm-title')||'null');if(o&&o.k===mmRouteKey()&&o.t)return o.t;}catch(e){}return mmTitleDef();}
 function mmTitleSave(t){try{t=(t||'').trim();if(t&&t!==mmTitleDef())localStorage.setItem('fp-mm-title',JSON.stringify({k:mmRouteKey(),t:t}));else localStorage.removeItem('fp-mm-title');}catch(e){}}
 /* PowerPoint (.pptx) with one A5 portrait slide holding a PNG full-page (built with the bundled JSZip, works offline) */
-function mmPptxBlob(pngDataUrl,title,shapes,SW,base){
+function mmPptxBlob(pngDataUrl,title,shapes,SW,base,SH,rows){
   var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
   var R='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
-  var CX=5328000,CY=7560000;   /* A5 portrait: 148 x 210 mm (SPD); same 1:1.414 shape as the A4 sheet */
+  var CX=10692000,CY=7560000;   /* A4 landscape (SPD): MINI MAP on the left, waypoint table on the right */
+  SW=SW||1800;SH=SH||2546;
+  var K=CY/SH,MW=Math.round(SW*K);   /* EMU per sheet px; the portrait sheet fills the slide height */
   function xe(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function rels(list){return X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+list.map(function(r,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+(r[0].indexOf('http')===0?r[0]:R+r[0])+'" Target="'+r[1]+'"/>';}).join('')+'</Relationships>';}
   var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
@@ -8118,11 +8122,11 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base){
   z.file('ppt/slides/slide1.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+
     (base?'<p:pic><p:nvPicPr><p:cNvPr id="3" name="Background map"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
       '<p:blipFill><a:blip r:embed="rId3"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
-      '<p:spPr><a:xfrm><a:off x="0" y="'+Math.round(base.y*CX/(SW||1800))+'"/><a:ext cx="'+CX+'" cy="'+Math.round(base.h*CX/(SW||1800))+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':'')+
+      '<p:spPr><a:xfrm><a:off x="0" y="'+Math.round(base.y*K)+'"/><a:ext cx="'+MW+'" cy="'+Math.round(base.h*K)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':'')+
     '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+(base?'Route and symbols':xe(title||'MINI MAP'))+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
     '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
-    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+CX+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'+
-    mmPptxShapes(shapes||[],CX/(SW||1800))+
+    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+MW+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'+
+    mmPptxShapes(shapes||[],K)+mmPptxTable(MW+90000,CX-90000,CY,title,rows||[],X)+
     '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
   z.file('ppt/slides/_rels/slide1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image1.png']].concat(base?[['image','../media/image2.jpeg']]:[])));
   var C=function(n,v){return '<a:'+n+'><a:srgbClr val="'+v+'"/></a:'+n+'>';};
@@ -8141,6 +8145,42 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base){
 }
 /* recorded MINI MAP boxes -> PowerPoint text boxes (movable, editable). k = EMU per canvas px.
    Font: TH SarabunPSK (SPD); sizes follow the sheet */
+/* right half of the landscape slide: purple title bar + editable PowerPoint table (Waypoint | Coordinate | Radial / DME | Landmark) */
+function mmPptxTable(x0,x1,CY,title,rows){
+  var FN='TH SarabunPSK',W=x1-x0,top=60000,hh=560000,ty=top+hh+60000,avail=CY-ty-60000;
+  function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  var n=rows.length+1,rh=Math.max(180000,Math.min(420000,Math.floor(avail/n))),fs=Math.round(Math.min(14,rh/12700*0.55)*100);   /* TH SarabunPSK 14 pt keeps a coordinate on one line */
+  function run(t,sz,b,c,u){return '<a:r><a:rPr lang="th-TH" sz="'+sz+'" b="'+(b?1:0)+'"'+(u?' u="sng"':'')+' dirty="0"><a:solidFill><a:srgbClr val="'+c+'"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(t)+'</a:t></a:r>';}
+  var ln=function(t){return '<a:'+t+' w="9525"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:'+t+'>';};
+  function cell(t,fill,c,b,u){return '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/>'+(t?run(t,fs,b,c,u):'')+'<a:endParaRPr lang="th-TH" sz="'+fs+'"/></a:p></a:txBody>'+
+    '<a:tcPr marL="45720" marR="45720" marT="0" marB="0" anchor="ctr">'+ln('lnL')+ln('lnR')+ln('lnT')+ln('lnB')+'<a:solidFill><a:srgbClr val="'+fill+'"/></a:solidFill></a:tcPr></a:tc>';}
+  var cw=[0.20,0.38,0.20,0.22].map(function(f){return Math.round(W*f);});
+  var tr='<a:tr h="'+rh+'">'+['Waypoint','Coordinate','Radial / DME','Landmark'].map(function(h){return cell(h,'4472C4','FFFFFF',true);}).join('')+'</a:tr>';
+  rows.forEach(function(r,i){
+    var f=i%2?'E9EDF6':'D0D8EE';
+    tr+='<a:tr h="'+rh+'">'+cell(r.n,f,r.c,false,true)+cell(r.coord,f,'111111')+cell(r.rad,f,'111111')+cell(r.lm,f,r.c,false,!!r.lm)+'</a:tr>';
+  });
+  var hdr='<p:sp><p:nvSpPr><p:cNvPr id="4" name="Table title"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+x0+'" y="'+top+'"/><a:ext cx="'+W+'" cy="'+hh+'"/></a:xfrm>'+
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="6F2A93"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr>'+
+    '<p:txBody><a:bodyPr wrap="square" anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/>'+run(title||'MINI MAP',2800,true,'FFFFFF')+'</a:p></p:txBody></p:sp>';
+  return hdr+'<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Waypoint table"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>'+
+    '<p:xfrm><a:off x="'+x0+'" y="'+ty+'"/><a:ext cx="'+W+'" cy="'+rh*n+'"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1" bandRow="1"/>'+
+    '<a:tblGrid>'+cw.map(function(w){return '<a:gridCol w="'+w+'"/>';}).join('')+'</a:tblGrid>'+tr+'</a:tbl></a:graphicData></a:graphic></p:graphicFrame>';
+}
+/* table rows: route waypoints (green, airports and repeats left out), then the off-route points on the sheet (blue) */
+function mmTableRows(offs){
+  function dm(v,lat){var a=Math.abs(v),d=Math.floor(a),m=(a-d)*60;if(m>=59.995){d++;m=0;}return d+'° '+m.toFixed(2).padStart(5,'0')+"'"+(lat?(v<0?'S':'N'):(v<0?'W':'E'));}
+  function rad(p){var r=mmRadial(p);return r.replace(/^(R-\d+)\//,'$1 / ');}
+  var out=[],seen={};
+  function add(p,c){
+    var key=(p.name||'').toUpperCase().trim()+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);
+    if(seen[key])return;seen[key]=1;
+    out.push({n:p.name||'',coord:dm(p.lat,true)+' '+dm(p.lng,false),rad:rad(p),lm:p.remark||'',c:c});
+  }
+  pts.forEach(function(p){if(!APX[(p.name||'').toUpperCase()])add(p,'1E8C3A');});
+  (offs||[]).forEach(function(p){add(p,'1F2FD6');});
+  return out;
+}
 function mmPptxShapes(list,k){
   var id=10,FN='TH SarabunPSK',FK=1.25;   /* SPD: TH SarabunPSK; its glyphs are small for their point size, so sizes are scaled up to fill the boxes like the sheet */
   function E(v){return Math.round(v*k);}
