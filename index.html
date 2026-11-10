@@ -8140,9 +8140,9 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base){
   return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});
 }
 /* recorded MINI MAP boxes -> PowerPoint text boxes (movable, editable). k = EMU per canvas px.
-   Font: Tahoma (on every Windows / Mac); sizes follow the sheet, a little smaller so text stays in its box */
+   Font: TH SarabunPSK (SPD); sizes follow the sheet */
 function mmPptxShapes(list,k){
-  var id=10,FN='Tahoma',FK=0.92;
+  var id=10,FN='TH SarabunPSK',FK=1.25;   /* SPD: TH SarabunPSK; its glyphs are small for their point size, so sizes are scaled up to fill the boxes like the sheet */
   function E(v){return Math.round(v*k);}
   function P(px){return Math.max(100,Math.round(px*k/12700*FK*100));}   /* hundredths of a point */
   function hex(c){c=String(c||'#111').replace('#','');if(c.length===3)c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];return c.toUpperCase();}
