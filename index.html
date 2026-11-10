@@ -1179,6 +1179,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
 /* CHART: chart images (PNG/JPG/PDF page) read from a folder - viewer + georeferenced overlay */
 .map-panel .umap-head{color:var(--amber)}
+.map-3btn{gap:4px}.map-3btn button,.map-3btn .umap-import{flex:1;min-width:0;padding:9px 2px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .map-panel #umapSel{border-color:var(--amber)}
 .map-panel input[type=checkbox],.map-panel input[type=range]{accent-color:var(--amber)}
 .map-panel .chart-btn,.map-panel #umapZoomBtn,.map-panel .umap-del,.map-panel .umap-clear{border-color:var(--amber);color:var(--amber);background:transparent}
@@ -1867,8 +1868,8 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
   </div>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
-  <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
-  <div class="umap-btns" style="margin-top:8px">
+  <div class="umap-btns map-3btn">
+    <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
     <button type="button" id="umapDelBtn" class="umap-del" title="Delete one imported map from this device">🗑 DELETE MAP</button>
     <button type="button" id="umapDelAllBtn" class="umap-del" title="Delete every imported map from this device">🗑 CLEAR MAPs</button>
   </div>
