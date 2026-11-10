@@ -1129,7 +1129,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 /* Scale ruler */
 .leaflet-control-scale{
   margin-left:12px!important;
-  margin-bottom:12px!important;
+  margin-bottom:calc(var(--status-h,26px) + 16px)!important; /* sit above #status coordinate readout */
 }
 .leaflet-control-scale-line{
   background:rgba(245,245,245,.9)!important;
@@ -1504,6 +1504,11 @@ td .wp-delete{
 #onMapBtn{border-color:var(--amber);color:var(--amber);background:transparent}
 #onMapBtn[aria-pressed="true"]{background:var(--amber);color:#04202a;font-weight:600}
 #map{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+/* Popup / info-box text is selectable + copyable (incl. iPad long-press) */
+#map .leaflet-popup-content,#map .leaflet-popup-content *{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;cursor:text}
+#map .leaflet-popup-content button,#map .leaflet-popup-content button *{-webkit-user-select:none;user-select:none;cursor:pointer}
+.mapinfo-popup h4{display:flex;align-items:center;gap:8px}
+.mapinfo-popup .mi-copy{margin-left:auto;margin-right:14px;padding:2px 8px;font-size:11px;background:transparent;border:1px solid #747b84;border-radius:4px;color:inherit}
 .mapinfo-popup{font-size:12px;line-height:1.5;min-width:190px}
 .mapinfo-popup h4{margin:0 0 4px;font-size:13px}
 .mapinfo-popup .mi-btns{display:flex;gap:6px;margin-top:8px}
@@ -5406,6 +5411,12 @@ fitLayerCtl();
 function enrGate(){map.getContainer().classList.toggle('enr-zlow',map.getZoom()<8);}
 map.on('zoomend',enrGate);enrGate();
 L.control.scale({position:'bottomleft',imperial:false,metric:true,maxWidth:180}).addTo(map);
+(function(){ /* keep scale bar above the #status coordinate box */
+  var stEl=document.getElementById('status'),mw=document.getElementById('mapwrap');
+  function upd(){if(stEl&&mw)mw.style.setProperty('--status-h',(stEl.offsetParent?stEl.offsetHeight:0)+'px');}
+  upd();
+  if(window.ResizeObserver&&stEl)new ResizeObserver(upd).observe(stEl);
+})();
 
 var elevCache={};
 function legKey(a,b){
@@ -8852,6 +8863,16 @@ function elevFt(lat,lng){
       });
   });
 }
+function copyText(t){
+  if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t);
+  return new Promise(function(ok,no){
+    var ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);
+    ta.select();ta.setSelectionRange(0,t.length);
+    var r=false;try{r=document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);r?ok():no();
+  });
+}
 function showMapPointInfo(ll,opt){
   opt=opt||{};
   var now=Date.now();
@@ -8869,7 +8890,7 @@ function showMapPointInfo(ll,opt){
   }
   if(mapInfoMarker)map.removeLayer(mapInfoMarker);
   mapInfoMarker=L.circleMarker([p.lat,p.lng],{radius:6,color:'#ffb000',weight:2,fillColor:'#ffb000',fillOpacity:.5}).addTo(map);
-  var html='<div class="mapinfo-popup'+(opt.onMap?' mi-onmap':'')+'"><h4>'+esc(opt.title||'MAP POINT')+'</h4>'+
+  var html='<div class="mapinfo-popup'+(opt.onMap?' mi-onmap':'')+'"><h4><span>'+esc(opt.title||'MAP POINT')+'</span><button type="button" class="mi-copy" title="Copy">📋 COPY</button></h4>'+
     (opt.sub?'<div>'+esc(opt.sub)+'</div>':'')+
     '<div><b>Lat/Long:</b> '+esc(wpCoordText(p))+'</div>'+
     '<div><b>MGRS:</b> '+esc(latLngToMgrs(p.lat,p.lng))+'</div>'+
@@ -8884,6 +8905,11 @@ function showMapPointInfo(ll,opt){
   var nm=opt.name||'';
   el.querySelector('.mi-route').onclick=function(){addPt(p.lat,p.lng,nm,icao);map.closePopup(pop);};
   el.querySelector('.mi-off').onclick=function(){addOffRoutePt(p.lat,p.lng,nm,icao);map.closePopup(pop);};
+  el.querySelector('.mi-copy').onclick=function(){
+    var b=this,lines=[].slice.call(el.querySelectorAll('.mapinfo-popup > div:not(.mi-btns)')).map(function(d){return d.textContent.trim();});
+    copyText(lines.join('\n')).then(function(){b.textContent='✓ COPIED';},function(){b.textContent='✗';});
+    setTimeout(function(){b.textContent='📋 COPY';},1500);
+  };
   var cx=el.querySelector('.mi-cancel');
   if(cx)cx.onclick=function(){map.closePopup(pop);};
   pop.on('remove',function(){if(mapInfoMarker){map.removeLayer(mapInfoMarker);mapInfoMarker=null;}});
