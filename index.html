@@ -1183,6 +1183,11 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .map-panel input[type=checkbox],.map-panel input[type=range]{accent-color:var(--amber)}
 .map-panel .chart-btn,.map-panel #umapZoomBtn,.map-panel .umap-del,.map-panel .umap-clear{border-color:var(--amber);color:var(--amber);background:transparent}
 .chart-panel{--orange:#ff8a2a}
+.chart-selrow{display:flex;gap:4px;align-items:center}.chart-selrow #chartSel{flex:1;min-width:0}
+#chartPgBox{display:flex;align-items:center;gap:2px;white-space:nowrap}#chartPgBox[hidden]{display:none}
+#chartPgBox button{width:auto;margin:0;padding:6px 7px;border:1px solid var(--orange);border-radius:6px;background:transparent;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer}
+#chartPgBox button:disabled{opacity:.35;cursor:default}
+#chartPgTxt{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
 .chart-panel .umap-head{color:var(--orange)}
 #chartSel{border-color:var(--orange)!important}
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
@@ -1832,7 +1837,7 @@ body.panel-hidden #panel{display:none}
 
 <section class="umap-panel chart-panel">
   <div class="umap-head">CHART</div>
-  <select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select>
+  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 ดูชาร์ต</button>
     <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 ตั้งพิกัด</button>
@@ -9674,12 +9679,12 @@ function chartPageMeta(c,n){
   c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;
 }
 /* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
-function chartGoPage(c,n,geo){
+function chartGoPage(c,n,geo,noView){
   if(!c.pages||n<1||n>c.pages||n===c.page)return;
   chartPut(c);chartPageMeta(c,n);
   if(c.url){URL.revokeObjectURL(c.url);c.url=null;}
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
-  chartLoad(c).then(function(){chartShowOverlay();chartRender();openChartViewer(c,geo);})
+  chartLoad(c).then(function(){chartShowOverlay();chartRender();if(!noView)openChartViewer(c,geo);})
     .catch(function(e){chartRender('เปิดหน้า PDF ไม่ได้: '+((e&&e.message)||e));});
 }
 function chartCur(){return charts.filter(function(c){return c.key===chartMeta.sel;})[0]||null;}
@@ -9884,9 +9889,12 @@ function chartRender(status){
   var sel=document.getElementById('chartSel');if(!sel)return;
   var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2),pend=chartDir&&!chartDirOk;
   sel.innerHTML=(charts.length?'':'<option value="">'+(pend?'— แตะ 📁 เพื่อเปิดโฟลเดอร์อีกครั้ง —':'— เลือกโฟลเดอร์ชาร์ตก่อน —')+'</option>')+charts.map(function(x){
-    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' (หน้า '+x.page+'/'+x.pages+')':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
+    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' ('+x.pages+' หน้า)':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
   }).join('');
   document.getElementById('chartViewBtn').disabled=!c;
+  var pg=!!(c&&c.pages>1);document.getElementById('chartPgBox').hidden=!pg;
+  if(pg){document.getElementById('chartPgTxt').textContent='หน้า '+c.page+'/'+c.pages;
+    document.getElementById('chartPgPrev').disabled=c.page<=1;document.getElementById('chartPgNext').disabled=c.page>=c.pages;}
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
   document.getElementById('importChartBtn').textContent=pend?'🔓 เปิดโฟลเดอร์ "'+chartDir.name+'"':charts.length?'📁 เปลี่ยนโฟลเดอร์ CHART':'📁 เลือกโฟลเดอร์ CHART';
@@ -10107,6 +10115,9 @@ function openChartViewer(c,geo){
   window.addEventListener('resize',fit);document.addEventListener('keydown',onKey);
   fit();setGeo(!!geo);
 }
+['chartPgPrev','chartPgNext'].forEach(function(id,i){
+  document.getElementById(id).onclick=function(){var c=chartCur();if(c&&c.pages>1)chartGoPage(c,c.page+(i?1:-1),false,true);};
+});
 document.getElementById('chartSel').onchange=function(){
   var k=this.value,c=charts.filter(function(x){return x.key===k;})[0]||null;
   chartSelect(c,true);
