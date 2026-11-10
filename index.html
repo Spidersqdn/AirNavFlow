@@ -8046,10 +8046,45 @@ function buildMiniMap(opt){
   });
 }
 
+/* SPD: waypoint table as its own A4 portrait sheet (same size and title bar as the MINI MAP); the MINI MAP window switches between the two */
+function mmTableSheet(sheet){
+  var SH=sheet.height,SW=sheet.width,W=SW,cv=document.createElement('canvas');cv.width=W;cv.height=SH;cv.mmOffs=sheet.mmOffs;
+  var c=cv.getContext('2d'),HEAD=236,S=2,FN='"TH SarabunPSK","TH Sarabun New",Sarabun,sans-serif';
+  c.fillStyle='#fff';c.fillRect(0,0,W,SH);
+  c.drawImage(sheet,0,0,SW,HEAD,0,0,SW,HEAD);   /* same title bar: title, UPDATE, badge */
+  var x0=14*S,x1=W-14*S,TW=x1-x0;
+  var rows=mmTableRows(offRoutePts||[]),hd=['Waypoint','Coordinate','Radial / DME','Landmark'],keys=['n','coord','rad','lm'];
+  var top=HEAD+14*S,avail=SH-top-14*S,n=rows.length+1,rh=Math.max(24*S,Math.min(56*S,Math.floor(avail/n))),fs0=Math.min(28*S,rh*0.62);
+  function tw(t,b){c.font=(b?'700 ':'400 ')+'100px '+FN;return c.measureText(String(t||'')).width/100;}
+  var need=keys.map(function(k,j){var m=tw(hd[j],true);rows.forEach(function(r){m=Math.max(m,tw(r[k]));});return Math.max(m,0.01);});
+  var tot=need.reduce(function(a,b){return a+b;},0),cw=need.map(function(v){return Math.max(0.12,v/tot);}),ct=cw.reduce(function(a,b){return a+b;},0);
+  cw=cw.map(function(v){return TW*v/ct;});
+  var pad=8*S,colFs=keys.map(function(k,j){var m=fs0;rows.forEach(function(r){if(r[k])m=Math.min(m,(cw[j]-2*pad)/tw(r[k]));});return Math.max(9*S,m);});
+  var hFs=Math.min(fs0,Math.max.apply(null,colFs)*1.15);
+  function cellTx(t,x,y,w,fs,b,col,u){
+    if(!t)return;fs=Math.min(fs,(w-2*pad)/tw(t,b));c.font=(b?'700 ':'400 ')+fs+'px '+FN;c.fillStyle=col;c.textAlign='left';c.textBaseline='middle';
+    var ww=c.measureText(t).width,tx=x+(w-ww)/2,ty=y+rh/2;c.fillText(t,tx,ty);
+    if(u)c.fillRect(tx,ty+fs*0.42,ww,Math.max(1,fs*0.05));
+  }
+  function row(y,fill,cells){
+    var x=x0;cells.forEach(function(cl,j){c.fillStyle=fill;c.fillRect(x,y,cw[j],rh);c.strokeStyle='#fff';c.lineWidth=1.5*S;c.strokeRect(x,y,cw[j],rh);
+      cellTx(cl[0],x,y,cw[j],cl[1],cl[2],cl[3],cl[4]);x+=cw[j];});
+  }
+  row(top,'#4472c4',hd.map(function(h){return [h,hFs,true,'#fff',false];}));
+  rows.forEach(function(r,i){
+    var col='#'+r.c;
+    row(top+rh*(i+1),i%2?'#e9edf6':'#d0d8ee',[[r.n,colFs[0],false,col,true],[r.coord,colFs[1],false,'#111',false],[r.rad,colFs[2],false,'#111',false],[r.lm,colFs[3],false,col,!!r.lm]]);
+  });
+  c.strokeStyle='#111';c.lineWidth=3*S;c.strokeRect(0,0,W,SH);
+  return cv;
+}
 function showMiniMap(cv){
   var old=document.getElementById('miniMapModal');if(old)old.remove();
+  var sheet=cv,view=(function(){try{return localStorage.getItem('fp-mm-view')==='table'?'table':'map';}catch(e){return 'map';}})();
+  function pick(){return view==='table'?mmTableSheet(sheet):sheet;}
+  cv=pick();
   var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
-  var fname='MiniMap_'+dep+'_'+arr+'.png';
+  var fbase='MiniMap_'+dep+'_'+arr,fname=fbase+(view==='table'?'_Table':'')+'.png';
   var url=cv.toDataURL('image/png');
   var d=document.createElement('div');d.id='miniMapModal';
   var offList=(cv.mmOffs||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}),skip=mmOffSkip(),skipSet={};   /* only points inside this sheet */
@@ -8060,6 +8095,7 @@ function showMiniMap(cv){
     offList.map(function(p,i){return '<label><input type="checkbox" data-i="'+i+'"'+(skipSet[mmOffKey(p)]?'':' checked')+'> '+esc(p.name||('WPt '+(i+1)))+'</label>';}).join('')+
     '</div></details> ':'';
   d.innerHTML='<div class="mm-card"><div class="mm-bar"><input id="mmTitleIn" type="text" maxlength="60" placeholder="'+esc(mmTitleDef())+'" style="flex:1;min-width:0;padding:5px 8px;font:600 14px system-ui,sans-serif;border-radius:6px;border:1px solid #666d76;background:#15181c;color:#fff"><span style="white-space:nowrap">'+wpt+
+    '<span class="mm-view" style="display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #666d76"><button type="button" data-v="map" style="border:0;border-radius:0">MINI MAP</button><button type="button" data-v="table" style="border:0;border-radius:0">ตาราง</button></span> '+
     '<button type="button" id="mmSave">บันทึก PNG</button> <button type="button" id="mmPpt">PPT</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
@@ -8068,6 +8104,14 @@ function showMiniMap(cv){
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
   document.body.appendChild(d);
   document.getElementById('mmClose').onclick=function(){d.remove();};
+  /* MINI MAP | ตาราง: choose which sheet is shown / saved / shared (remembered on this device) */
+  var vbs=[].slice.call(d.querySelectorAll('.mm-view button'));
+  function vbStyle(){vbs.forEach(function(b){var on=b.getAttribute('data-v')===view;b.style.background=on?'#6f2a93':'';b.style.color=on?'#fff':'';});}
+  vbs.forEach(function(b){b.onclick=function(){
+    view=b.getAttribute('data-v');try{localStorage.setItem('fp-mm-view',view);}catch(e){}
+    cv=pick();url=cv.toDataURL('image/png');fname=fbase+(view==='table'?'_Table':'')+'.png';d.querySelector('.mm-img img').src=url;vbStyle();
+  };});
+  vbStyle();
   /* title: typed text replaces "DEP - ARR" on the sheet; kept for this route on this device, sheet redrawn after a short pause */
   var ti=document.getElementById('mmTitleIn'),tt=null;
   ti.value=mmTitle();
@@ -8075,7 +8119,7 @@ function showMiniMap(cv){
     clearTimeout(tt);tt=setTimeout(function(){
       mmTitleSave(ti.value);
       buildMiniMap({skip:mmOffSkip()}).then(function(c2){
-        cv=c2;url=c2.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
+        sheet=c2;cv=pick();url=cv.toDataURL('image/png');d.querySelector('.mm-img img').src=url;
       }).catch(function(){});
     },700);
   };
@@ -8103,7 +8147,7 @@ function showMiniMap(cv){
   /* PowerPoint: one A4 landscape slide, waypoint table on the right; background map and route/symbols as 2 pictures, waypoint circles, leader lines (glued), info boxes / tags / HDG bars / title as movable, editable shapes */
   var pb=document.getElementById('mmPpt');
   pb.onclick=function(){
-    var pn=fname.replace(/\.png$/,'.pptx');pb.disabled=true;
+    var pn=fbase+'.pptx';pb.disabled=true;
     buildMiniMap({skip:mmOffSkip(),layers:true}).then(function(c2){   /* same sheet, boxes as separate editable shapes */
       return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),c2.mmShapes,c2.mmW,c2.mmBase,c2.mmH,mmTableRows(offRoutePts||[]));   /* SPD: table lists every route and off-route waypoint */
     }).then(function(blob){
