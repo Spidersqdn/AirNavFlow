@@ -1165,7 +1165,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .actions{flex-wrap:wrap}
 .umap-panel{padding:14px 18px;border-bottom:1px solid var(--line)}
 .umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
-#umapSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
+#umapSel,#chartSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
 .umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
 .umap-row[hidden]{display:none}
 .umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
@@ -1177,6 +1177,26 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-clear{width:100%;margin-top:8px;padding:7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mute);font:600 12px system-ui,sans-serif;cursor:pointer}
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
+/* IMPORT CHART: chart images (PNG/JPG/PDF page) - viewer + georeferenced overlay */
+.chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--cyan);background:transparent;color:var(--cyan);font:600 13px system-ui,sans-serif;cursor:pointer}
+.chart-btn:disabled{opacity:.35;cursor:default}
+.chart-import{border-color:var(--cyan);background:var(--cyan);color:#06222a}
+.chart-onmap:has(input:disabled){opacity:.45}
+#chartViewer{position:fixed;inset:0;z-index:6000;background:#1d2024;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+#chartViewer .cv-bar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);color:var(--text)}
+#chartViewer .cv-bar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 14px system-ui,sans-serif}
+#chartViewer .cv-bar button,#chartViewer .cv-geo button{margin:0;padding:6px 10px;color:var(--text);font:600 13px system-ui,sans-serif}
+#chartViewer .cv-geo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:#3d3418;color:#ffe08a;font-size:13px}
+#chartViewer .cv-geo[hidden]{display:none}
+#chartViewer .cv-geo span{flex:1;min-width:180px}
+#chartViewer .cv-geo .cv-save{background:var(--amber);border-color:var(--amber);color:#1a1200}
+#chartViewer .cv-geo .cv-save:disabled{opacity:.4}
+#chartViewer .cv-stage{position:relative;flex:1;overflow:hidden;touch-action:none;cursor:grab;background:#e9e9e9}
+#chartViewer .cv-stage.geo{cursor:crosshair}
+#chartViewer .cv-wrap{position:absolute;left:0;top:0;transform-origin:0 0}
+#chartViewer .cv-wrap img{display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+#chartViewer .cv-pt{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid #e0007a;background:rgba(224,0,122,.25);color:#e0007a;font:700 11px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#chartViewer .cv-pt i{position:absolute;left:24px;top:-2px;white-space:nowrap;font-style:normal;background:#fff;color:#e0007a;padding:1px 4px;border-radius:3px}
 #miniMapModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px}
 #miniMapModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 #miniMapModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
@@ -1806,6 +1826,26 @@ body.panel-hidden #panel{display:none}
   <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
   <input id="importMapFile" type="file" hidden>
   <div class="umap-status" id="umapStatus"></div>
+</section>
+
+<section class="umap-panel chart-panel">
+  <div class="umap-head">CHART</div>
+  <select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select>
+  <div class="umap-btns" style="margin-top:6px">
+    <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 ดูชาร์ต</button>
+    <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 ตั้งพิกัด</button>
+  </div>
+  <label class="umap-keep chart-onmap"><input type="checkbox" id="chartOnMap"> ซ้อนบนแผนที่</label>
+  <div class="umap-row" id="chartRow" hidden>
+    <span>โปร่งใส</span><input type="range" id="chartOp" min="0.1" max="1" step="0.05" value="0.8">
+    <button type="button" id="chartZoomBtn">Zoom</button>
+  </div>
+  <div class="umap-btns" style="margin-top:6px">
+    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Import a chart image (PNG/JPG) or a PDF page, kept offline in the app">📄 IMPORT CHART</button>
+    <button type="button" id="chartDelBtn" class="umap-del" title="Delete the selected chart from this device">🗑 ลบ</button>
+  </div>
+  <input id="importChartFile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
+  <div class="umap-status" id="chartStatus"></div>
 </section>
 
 <section class="offline-panel">
@@ -9331,6 +9371,339 @@ document.getElementById('importMapBtn').onclick=function(){
   umapPickFile().then(importUserMap).catch(function(e){if(e&&e.name!=='AbortError')alert('เปิดไฟล์ไม่ได้: '+(e.message||e));});
 };
 loadUserMaps();umapRender();
+
+/* ---- IMPORT CHART: chart images (PNG/JPG/WEBP, or one page of a PDF) kept offline in IndexedDB 'fp-charts'
+   - 👁 viewer: full screen, pinch / wheel zoom, drag to pan
+   - 📍 georeference: tap 2-3 grid crossings and type their Lat/Long; 2 points = move/rotate/scale, 3+ = affine
+   - overlay: image drawn on the map (pane above IMPORT MAP, below airspace/route) with a CSS matrix */
+var CHART_DB='fp-charts', CHART_SEL='fp-chart-sel', charts=[], chartLayer=null;
+var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.style.pointerEvents='none';
+function chartDb(){
+  if(!chartDb.p)chartDb.p=new Promise(function(res,rej){
+    var q=indexedDB.open(CHART_DB,1);
+    q.onupgradeneeded=function(){q.result.createObjectStore('charts',{keyPath:'id'});};
+    q.onsuccess=function(){res(q.result);};q.onerror=function(){rej(q.error);};
+  });
+  return chartDb.p;
+}
+function chartTx(mode,fn){
+  return chartDb().then(function(db){return new Promise(function(res,rej){
+    var t=db.transaction('charts',mode),r=fn(t.objectStore('charts'));
+    t.oncomplete=function(){res(r&&r.result);};t.onerror=t.onabort=function(){rej(t.error);};
+  });});
+}
+function chartPut(c){
+  return chartTx('readwrite',function(st){return st.put({id:c.id,name:c.name,blob:c.blob,w:c.w,h:c.h,gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,added:c.added});});
+}
+function chartUrl(c){if(!c.url)c.url=URL.createObjectURL(c.blob);return c.url;}
+function chartCur(){var id='';try{id=localStorage.getItem(CHART_SEL)||'';}catch(e){}return charts.filter(function(c){return c.id===id;})[0]||null;}
+function chartSetCur(c){try{localStorage.setItem(CHART_SEL,c?c.id:'');}catch(e){}}
+
+/* fit image px (x,y) -> target pts (X,Y). 2 points: similarity (complex a*w+b); 3+: least-squares affine.
+   returns [a,b,c,d,e,f] for X=a*x+c*y+e, Y=b*x+d*y+f (CSS matrix order) */
+function chartFit(src,dst){
+  var n=Math.min(src.length,dst.length);
+  if(n<2)return null;
+  if(n===2){
+    var wx=src[1][0]-src[0][0],wy=src[1][1]-src[0][1],zx=dst[1][0]-dst[0][0],zy=dst[1][1]-dst[0][1],dd=wx*wx+wy*wy;
+    if(!dd)return null;
+    var p=(zx*wx+zy*wy)/dd,q=(zy*wx-zx*wy)/dd;
+    return [p,q,-q,p,dst[0][0]-(p*src[0][0]-q*src[0][1]),dst[0][1]-(q*src[0][0]+p*src[0][1])];
+  }
+  var M=[[0,0,0],[0,0,0],[0,0,0]],bx=[0,0,0],by=[0,0,0];
+  for(var i=0;i<n;i++){
+    var v=[src[i][0],src[i][1],1];
+    for(var r=0;r<3;r++){for(var k=0;k<3;k++)M[r][k]+=v[r]*v[k];bx[r]+=v[r]*dst[i][0];by[r]+=v[r]*dst[i][1];}
+  }
+  function solve(A,b){ /* 3x3 Cramer */
+    function det(m){return m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);}
+    var D=det(A);if(Math.abs(D)<1e-9)return null;
+    return [0,1,2].map(function(c){var m=A.map(function(row,ri){return row.map(function(x,ci){return ci===c?b[ri]:x;});});return det(m)/D;});
+  }
+  var sx=solve(M,bx),sy=solve(M,by);
+  if(!sx||!sy)return null;
+  return [sx[0],sy[0],sx[1],sy[1],sx[2],sy[2]];
+}
+var ChartOverlay=L.Layer.extend({
+  initialize:function(c){this._c=c;},
+  onAdd:function(m){
+    var img=this._img=L.DomUtil.create('img','leaflet-image-layer leaflet-zoom-animated');
+    img.alt='';img.src=chartUrl(this._c);
+    img.style.cssText='position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;width:'+this._c.w+'px;height:'+this._c.h+'px';
+    img.style.opacity=this._c.opacity;
+    m.getPane('charts').appendChild(img);
+    this._reset();
+  },
+  onRemove:function(){if(this._img)L.DomUtil.remove(this._img);this._img=null;},
+  getEvents:function(){return {zoom:this._reset,viewreset:this._reset,zoomanim:this._anim};},
+  setOpacity:function(o){if(this._img)this._img.style.opacity=o;},
+  _set:function(toPt){
+    var g=this._c.gcp,t=chartFit(g.map(function(p){return [p.x,p.y];}),g.map(function(p){var q=toPt(L.latLng(p.lat,p.lng));return [q.x,q.y];}));
+    if(t&&this._img)this._img.style.transform='matrix('+t.join(',')+')';
+  },
+  _reset:function(){var m=this._map;this._set(function(ll){return m.latLngToLayerPoint(ll);});},
+  _anim:function(e){var m=this._map;this._set(function(ll){return m._latLngToNewLayerPoint(ll,e.zoom,e.center);});}
+});
+/* corners of the chart image on the map (for Zoom) */
+function chartBounds(c){
+  var g=c.gcp,t=chartFit(g.map(function(p){return [p.x,p.y];}),g.map(function(p){var q=map.project(L.latLng(p.lat,p.lng),10);return [q.x,q.y];}));
+  if(!t)return null;
+  return L.latLngBounds([[0,0],[c.w,0],[0,c.h],[c.w,c.h]].map(function(p){
+    return map.unproject(L.point(t[0]*p[0]+t[2]*p[1]+t[4],t[1]*p[0]+t[3]*p[1]+t[5]),10);
+  }));
+}
+function chartShowOverlay(){
+  if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
+  var c=chartCur();
+  if(c&&c.onMap&&c.gcp&&c.gcp.length>=2){chartLayer=new ChartOverlay(c);chartLayer.addTo(map);}
+}
+function chartZoom(c){var b=c&&c.gcp&&c.gcp.length>=2&&chartBounds(c);if(b&&b.isValid())map.fitBounds(b,{padding:[20,20]});}
+function chartRender(status){
+  var sel=document.getElementById('chartSel');if(!sel)return;
+  var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2);
+  sel.innerHTML=(charts.length?'':'<option value="">— ไม่มีชาร์ต —</option>')+charts.map(function(x){
+    return '<option value="'+esc(x.id)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
+  }).join('');
+  document.getElementById('chartViewBtn').disabled=!c;
+  document.getElementById('chartGeoBtn').disabled=!c;
+  document.getElementById('chartDelBtn').disabled=!c;
+  var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!!c.onMap;
+  document.getElementById('chartRow').hidden=!(geo&&c.onMap);
+  if(c)document.getElementById('chartOp').value=c.opacity;
+  var st=document.getElementById('chartStatus');
+  if(status!==undefined)st.textContent=status||'';
+  else st.textContent=!c?'ไฟล์ PNG / JPG หรือ PDF (เลือกหน้า) · เก็บออฟไลน์ในแอพ'
+    :c.w+'×'+c.h+' px · '+(c.blob.size/1048576).toFixed(1)+' MB · '+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด: กด 📍 ตั้งพิกัด เพื่อซ้อนบนแผนที่');
+}
+function loadCharts(){
+  if(!('indexedDB' in window))return;
+  chartTx('readonly',function(st){return st.getAll();}).then(function(list){
+    charts=(list||[]).sort(function(a,b){return (a.added||0)-(b.added||0);});
+    if(!chartCur()&&charts.length)chartSetCur(charts[charts.length-1]);
+    chartRender();chartShowOverlay();
+  }).catch(function(){chartRender('เปิดคลังชาร์ตไม่ได้ (เบราว์เซอร์ไม่รองรับ IndexedDB)');});
+}
+function chartImgSize(blob){
+  return new Promise(function(res,rej){
+    var u=URL.createObjectURL(blob),im=new Image();
+    im.onload=function(){URL.revokeObjectURL(u);res([im.naturalWidth,im.naturalHeight]);};
+    im.onerror=function(){URL.revokeObjectURL(u);rej(new Error('อ่านรูปไม่ได้'));};
+    im.src=u;
+  });
+}
+/* PDF: pdf.js loaded on demand (needs internet once), chosen page rendered to PNG (long side ~2600 px) */
+var PDFJS_V='3.11.174';
+function chartLoadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(!chartLoadPdfJs.p)chartLoadPdfJs.p=new Promise(function(res,rej){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.min.js';
+    s.onload=function(){
+      if(!window.pdfjsLib){rej(new Error('pdf.js'));return;}
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.worker.min.js';
+      res(pdfjsLib);
+    };
+    s.onerror=function(){chartLoadPdfJs.p=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ตตอน import PDF ครั้งแรก)'));};
+    document.head.appendChild(s);
+  });
+  return chartLoadPdfJs.p;
+}
+function chartPdfToPng(file){
+  chartRender('กำลังเปิด PDF…');
+  return chartLoadPdfJs().then(function(lib){return file.arrayBuffer().then(function(ab){return lib.getDocument({data:ab}).promise;});})
+  .then(function(pdf){
+    var pg=1;
+    if(pdf.numPages>1){
+      var a=prompt('PDF มี '+pdf.numPages+' หน้า เลือกหน้าที่จะ import (1-'+pdf.numPages+')','1');
+      if(a===null)throw {name:'AbortError'};
+      pg=Math.min(pdf.numPages,Math.max(1,parseInt(a,10)||1));
+    }
+    return pdf.getPage(pg).then(function(page){
+      var v1=page.getViewport({scale:1}),sc=Math.min(6,2600/Math.max(v1.width,v1.height)),v=page.getViewport({scale:sc});
+      var cv=document.createElement('canvas');cv.width=Math.round(v.width);cv.height=Math.round(v.height);
+      var ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+      return page.render({canvasContext:ctx,viewport:v}).promise.then(function(){
+        return new Promise(function(res){cv.toBlob(function(b){res({blob:b,page:pdf.numPages>1?pg:0});},'image/png');});
+      });
+    });
+  });
+}
+function importChart(file){
+  if(!file)return;
+  var isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
+  var base=file.name.replace(/\.[^.]+$/,'');
+  (isPdf?chartPdfToPng(file):Promise.resolve({blob:file,page:0})).then(function(r){
+    return chartImgSize(r.blob).then(function(sz){
+      var c={id:'c'+Date.now().toString(36),name:base+(r.page?' p.'+r.page:''),blob:r.blob,w:sz[0],h:sz[1],gcp:[],opacity:0.8,onMap:false,added:Date.now()};
+      return chartPut(c).then(function(){
+        charts.push(c);chartSetCur(c);chartShowOverlay();chartRender();
+        if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+      });
+    });
+  }).catch(function(e){
+    if(e&&e.name==='AbortError'){chartRender();return;}
+    chartRender('');alert('Import chart ไม่ได้: '+((e&&e.message)||e));
+  });
+}
+/* "15-00 100-00", "1500 10000", "150000 1000000", "N15 00.00 E100 00.00", "15.5 100.25" */
+function chartParseOne(s,isLat){
+  s=String(s||'').trim().toUpperCase().replace(/^([NE])\s*/,'').replace(/\s*([NE])$/,'');
+  var m=s.match(/^(\d{1,3})[-:°\s](\d{1,2}(?:\.\d+)?)'?$/);
+  var v=NaN;
+  if(m&&+m[2]<60)v=+m[1]+m[2]/60;
+  else if(isLat&&/^\d{4}$/.test(s))v=+s.slice(0,2)+s.slice(2)/60;
+  else if(!isLat&&/^\d{5}$/.test(s))v=+s.slice(0,3)+s.slice(3)/60;
+  else if(/^\d{1,3}(\.\d+)?$/.test(s))v=+s;
+  else v=parseCoordInput(s,isLat);
+  return (isFinite(v)&&Math.abs(v)<=(isLat?90:180))?v:NaN;
+}
+function chartParseLL(txt){
+  var t=String(txt||'').trim().toUpperCase().replace(/[,\/;]+/g,' ').replace(/\s+/g,' ');
+  var m=t.match(/^N?\s*(.+?)\s+E\s*(.+)$/)||null;
+  var a,b,parts=t.split(' ');
+  if(m&&/^N/.test(t)){a=m[1];b=m[2];}
+  else if(parts.length===2){a=parts[0];b=parts[1];}
+  else if(parts.length===4){a=parts[0]+'-'+parts[1];b=parts[2]+'-'+parts[3];}
+  else return null;
+  var lat=chartParseOne(a,true),lng=chartParseOne(b,false);
+  return (isFinite(lat)&&isFinite(lng))?{lat:lat,lng:lng}:null;
+}
+function chartFmtLL(p){
+  function f(v,dw){var d=Math.floor(Math.abs(v)+1e-9),mi=(Math.abs(v)-d)*60;return String(d).padStart(dw,'0')+'-'+(mi<9.995?'0':'')+mi.toFixed(2).replace(/\.00$/,'');}
+  return 'N'+f(p.lat,2)+' E'+f(p.lng,3);
+}
+function openChartViewer(c,geo){
+  if(!c)return;
+  var old=document.getElementById('chartViewer');if(old)old.remove();
+  var bg=document.createElement('div');bg.id='chartViewer';
+  bg.innerHTML='<div class="cv-bar"><b></b>'+
+    '<button type="button" data-a="out" title="Zoom out">−</button><button type="button" data-a="in" title="Zoom in">+</button>'+
+    '<button type="button" data-a="fit">Fit</button><button type="button" data-a="geo">📍</button><button type="button" data-a="x">✕</button></div>'+
+    '<div class="cv-geo" hidden><span></span><button type="button" data-a="undo">↶ ลบจุดล่าสุด</button><button type="button" data-a="gx">ยกเลิก</button><button type="button" class="cv-save" data-a="save">บันทึก</button></div>'+
+    '<div class="cv-stage"><div class="cv-wrap"><img alt=""></div></div>';
+  document.body.appendChild(bg);
+  bg.querySelector('b').textContent=c.name;
+  var stage=bg.querySelector('.cv-stage'),wrap=bg.querySelector('.cv-wrap'),img=wrap.querySelector('img'),gbar=bg.querySelector('.cv-geo');
+  img.src=chartUrl(c);img.style.width=c.w+'px';img.style.height=c.h+'px';
+  var s=1,tx=0,ty=0,minS=0.05,pts=[],geoOn=false;
+  function apply(){
+    wrap.style.transform='translate('+tx+'px,'+ty+'px) scale('+s+')';
+    stage.querySelectorAll('.cv-pt').forEach(function(el){el.remove();});
+    if(!geoOn)return;
+    pts.forEach(function(p,i){
+      var d=document.createElement('div');d.className='cv-pt';d.style.left=(tx+p.x*s)+'px';d.style.top=(ty+p.y*s)+'px';
+      d.innerHTML=(i+1)+'<i>'+esc(chartFmtLL(p))+'</i>';stage.appendChild(d);
+    });
+  }
+  function fit(){
+    var W=stage.clientWidth,H=stage.clientHeight;s=Math.min(W/c.w,H/c.h);minS=s/2;
+    tx=(W-c.w*s)/2;ty=(H-c.h*s)/2;apply();
+  }
+  function zoomAt(f,cx,cy){var ns=Math.max(minS,Math.min(8,s*f));tx=cx-(cx-tx)*ns/s;ty=cy-(cy-ty)*ns/s;s=ns;apply();}
+  function geoMsg(){
+    gbar.querySelector('span').textContent=pts.length<2
+      ?'แตะจุดตัดเส้นกริด Lat/Long จุดที่ '+(pts.length+1)+' แล้วใส่พิกัด (ใช้ 2 จุดทแยงกัน ไกลกันที่สุด; จุดที่ 3 ช่วยให้แม่นขึ้น)'
+      :pts.length+' จุดแล้ว · แตะเพิ่มได้ หรือกด บันทึก';
+    gbar.querySelector('[data-a=save]').disabled=pts.length<2;
+    gbar.querySelector('[data-a=undo]').disabled=!pts.length;
+  }
+  function setGeo(on){
+    geoOn=on;gbar.hidden=!on;stage.classList.toggle('geo',on);
+    pts=on?(c.gcp||[]).map(function(p){return {x:p.x,y:p.y,lat:p.lat,lng:p.lng};}):[];
+    if(on)geoMsg();apply();
+  }
+  function addPoint(x,y){
+    if(x<0||y<0||x>c.w||y>c.h)return;
+    var a=prompt('พิกัดจุดที่ '+(pts.length+1)+' (LAT LONG)\nเช่น 15-00 100-00 · 1500 10000 · 150000 1000000','');
+    if(a===null)return;
+    var ll=chartParseLL(a);
+    if(!ll){alert('อ่านพิกัดไม่ได้: '+a+'\nตัวอย่าง 15-00 100-00');return;}
+    pts.push({x:Math.round(x*10)/10,y:Math.round(y*10)/10,lat:ll.lat,lng:ll.lng});geoMsg();apply();
+  }
+  function close(){bg.remove();window.removeEventListener('resize',fit);document.removeEventListener('keydown',onKey);}
+  function onKey(e){if(e.key==='Escape')close();}
+  bg.addEventListener('click',function(e){
+    var b=e.target.closest('[data-a]');if(!b)return;
+    var a=b.getAttribute('data-a'),W=stage.clientWidth/2,H=stage.clientHeight/2;
+    if(a==='x')close();
+    else if(a==='in')zoomAt(1.4,W,H);
+    else if(a==='out')zoomAt(1/1.4,W,H);
+    else if(a==='fit')fit();
+    else if(a==='geo')setGeo(!geoOn);
+    else if(a==='gx')setGeo(false);
+    else if(a==='undo'){pts.pop();geoMsg();apply();}
+    else if(a==='save'&&pts.length>=2){
+      c.gcp=pts.slice();c.onMap=true;chartSetCur(c);
+      chartPut(c).catch(function(){});
+      chartShowOverlay();chartRender();close();chartZoom(c);
+    }
+  });
+  /* pan / pinch / tap */
+  var ptrs={},start=null,pinch=null;
+  function rel(e){var r=stage.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];}
+  stage.addEventListener('pointerdown',function(e){
+    stage.setPointerCapture(e.pointerId);ptrs[e.pointerId]=rel(e);
+    var ids=Object.keys(ptrs);
+    if(ids.length===1)start={p:ptrs[e.pointerId],t:Date.now(),tx:tx,ty:ty,moved:false};
+    else if(ids.length===2){
+      var a=ptrs[ids[0]],b=ptrs[ids[1]];
+      pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,s:s,mx:(a[0]+b[0])/2,my:(a[1]+b[1])/2,tx:tx,ty:ty};
+      if(start)start.moved=true;
+    }
+  });
+  stage.addEventListener('pointermove',function(e){
+    if(!ptrs[e.pointerId])return;
+    ptrs[e.pointerId]=rel(e);var ids=Object.keys(ptrs);
+    if(ids.length>=2&&pinch){
+      var a=ptrs[ids[0]],b=ptrs[ids[1]],d=Math.hypot(a[0]-b[0],a[1]-b[1]),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+      var ns=Math.max(minS,Math.min(8,pinch.s*d/pinch.d));
+      tx=mx-(pinch.mx-pinch.tx)*ns/pinch.s;ty=my-(pinch.my-pinch.ty)*ns/pinch.s;s=ns;apply();
+    }else if(start){
+      var p=ptrs[e.pointerId],dx=p[0]-start.p[0],dy=p[1]-start.p[1];
+      if(Math.abs(dx)+Math.abs(dy)>6)start.moved=true;
+      if(start.moved){tx=start.tx+dx;ty=start.ty+dy;apply();}
+    }
+  });
+  function up(e){
+    if(!ptrs[e.pointerId])return;
+    var p=ptrs[e.pointerId];delete ptrs[e.pointerId];
+    var left=Object.keys(ptrs).length;
+    if(!left){
+      if(start&&!start.moved&&Date.now()-start.t<600&&e.type==='pointerup'&&geoOn)addPoint((p[0]-tx)/s,(p[1]-ty)/s);
+      start=null;pinch=null;
+    }else if(left===1){pinch=null;var k=Object.keys(ptrs)[0];start={p:ptrs[k],t:0,tx:tx,ty:ty,moved:true};}
+  }
+  stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);
+  stage.addEventListener('wheel',function(e){e.preventDefault();var p=rel(e);zoomAt(e.deltaY<0?1.2:1/1.2,p[0],p[1]);},{passive:false});
+  stage.addEventListener('dblclick',function(e){if(geoOn)return;var p=rel(e);zoomAt(2,p[0],p[1]);});
+  window.addEventListener('resize',fit);document.addEventListener('keydown',onKey);
+  fit();setGeo(!!geo);
+}
+document.getElementById('chartSel').onchange=function(){
+  var id=this.value,c=charts.filter(function(x){return x.id===id;})[0]||null;
+  chartSetCur(c);chartShowOverlay();chartRender();if(c&&c.onMap)chartZoom(c);
+};
+document.getElementById('chartViewBtn').onclick=function(){openChartViewer(chartCur(),false);};
+document.getElementById('chartGeoBtn').onclick=function(){openChartViewer(chartCur(),true);};
+document.getElementById('chartOnMap').onchange=function(){
+  var c=chartCur();if(!c)return;c.onMap=this.checked;chartPut(c).catch(function(){});chartShowOverlay();chartRender();if(c.onMap)chartZoom(c);
+};
+document.getElementById('chartOp').oninput=function(){
+  var c=chartCur();if(!c)return;c.opacity=+this.value;if(chartLayer)chartLayer.setOpacity(c.opacity);
+  clearTimeout(chartPut.t);chartPut.t=setTimeout(function(){chartPut(c).catch(function(){});},400);
+};
+document.getElementById('chartZoomBtn').onclick=function(){chartZoom(chartCur());};
+document.getElementById('chartDelBtn').onclick=function(){
+  var c=chartCur();if(!c||!confirm('ลบชาร์ต "'+c.name+'" ออกจากเครื่องนี้?'))return;
+  chartTx('readwrite',function(st){return st.delete(c.id);}).catch(function(){}).then(function(){
+    if(c.url)URL.revokeObjectURL(c.url);
+    charts=charts.filter(function(x){return x!==c;});
+    chartSetCur(charts[charts.length-1]||null);chartShowOverlay();chartRender('✓ ลบชาร์ตแล้ว');
+  });
+};
+document.getElementById('importChartBtn').onclick=function(){document.getElementById('importChartFile').click();};
+document.getElementById('importChartFile').onchange=function(){var f=this.files&&this.files[0];this.value='';importChart(f);};
+chartRender();loadCharts();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
