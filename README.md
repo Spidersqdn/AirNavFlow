@@ -80,14 +80,15 @@
 ## ระบบอัตโนมัติ (GitHub Actions)
 | Workflow | ทำอะไร | ทำงานเมื่อ |
 |---|---|---|
-| `build-map-and-deploy.yml` | สร้าง `map/thailand.pmtiles` + `map/elevation.pmtiles` แล้วเผยแพร่เว็บ | push เข้า `main` หรือกด Run workflow |
+| `build-map-and-deploy.yml` | เผยแพร่เว็บแอป (~2 MB) | push เข้า `main` หรือกด Run workflow |
+| repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
 | `aip-watch.yml` | ตรวจ eAIP (aip.caat.or.th) หา AIRAC ใหม่ เทียบ ENR 3/4/5.1, AD 2, AMDT, SUP, AIC แล้วเปิด Issue "AIP AIRAC ..." | Claude routine ทุกวันจันทร์ 18:00 |
 
 - ตั้งค่า Pages: **Settings → Pages → Source: `GitHub Actions`**
 - ปุ่มดาวน์โหลดแผนที่ในแอปจะกดได้หลังจาก workflow สร้างแผนที่เสร็จแล้ว
 
 ### ปรับขนาด/ความละเอียดแผนที่
-แก้ใน `.github/workflows/build-map-and-deploy.yml`
+แก้ใน `.github/workflows/build-map-and-deploy.yml` ของ repo `DataBase`
 - `MAP_MAXZOOM: "13"` ซูมสูงสุดที่เก็บ (12 = ไฟล์เล็กลงราวครึ่ง, 14 = ละเอียดขึ้นแต่ไฟล์ใหญ่ขึ้นมาก)
 - `ELEV_MAXZOOM: "10"` ความละเอียดความสูง (10 ≈ 150 ม., 11 ≈ 75 ม. ไฟล์ใหญ่ขึ้น ~4 เท่า)
 - `MAP_BBOX` กรอบพื้นที่ (ลองจิจูดต่ำสุด, ละติจูดต่ำสุด, ลองจิจูดสูงสุด, ละติจูดสูงสุด)
