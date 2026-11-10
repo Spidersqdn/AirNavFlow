@@ -1167,7 +1167,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-head{font:600 13px var(--mono);color:var(--text);margin-bottom:8px}
 #umapSel,#chartSel{width:100%;box-sizing:border-box;padding:8px 10px;border:2px solid var(--cyan);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
 .umap-row{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--mute)}
-.umap-row[hidden],.umap-btns[hidden]{display:none}
+.umap-row[hidden],.umap-btns[hidden],.umap-keep[hidden]{display:none}
 .umap-row input{flex:1}.umap-row button{width:auto;margin:0;padding:3px 8px}
 .umap-keep{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;color:var(--mute)}
 .umap-import{width:100%;padding:10px;border-radius:6px;border:1px solid var(--amber);background:var(--amber);color:#1a1200;font:600 14px system-ui,sans-serif;cursor:pointer}
@@ -1867,6 +1867,7 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen">👁 VIEW</button>
     <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
   </div>
+  <label class="umap-keep" id="umapBgRow" hidden><input type="checkbox" id="umapBg"> พื้นหลังโปร่งใส (ตัดสีขาวของ PDF/รูป)</label>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
   <div class="umap-btns map-3btn">
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
@@ -9383,7 +9384,7 @@ var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
 function umapSave(){
   try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.map(function(m){
-    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
+    return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,bgClear:m.bgClear,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
   })));}catch(e){}
 }
 var UMapRaster=L.GridLayer.extend({
@@ -9420,10 +9421,43 @@ function umapImgBounds(m){
   var b=m.gcp&&m.gcp.length>=2&&m.w&&chartBounds(m);
   m.bounds=b&&b.isValid()?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;
 }
+/* white -> transparent ("colour to alpha"): white paper disappears, lines and colours keep their look on top of the map */
+function whiteToAlpha(ctx,W,H){
+  var d=ctx.getImageData(0,0,W,H),a=d.data;
+  for(var i=0;i<a.length;i+=4){
+    var r=a[i],g=a[i+1],b=a[i+2],al=Math.max(255-r,255-g,255-b);
+    if(al<=6){a[i+3]=0;continue;}
+    var f=255/al;
+    a[i]=255-(255-r)*f;a[i+1]=255-(255-g)*f;a[i+2]=255-(255-b)*f;a[i+3]=al*a[i+3]/255;
+  }
+  ctx.putImageData(d,0,0);
+}
+function umapBgOn(m){return umapIsImg(m)&&m.bgClear!==false;}
+function umapClearUrl(m){
+  if(m._clearFor===m.url&&m.urlClear)return Promise.resolve(m.urlClear);
+  var src=m.url;
+  return new Promise(function(res,rej){
+    var im=new Image();
+    im.onload=function(){
+      var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;
+      var ctx=cv.getContext('2d');ctx.drawImage(im,0,0);whiteToAlpha(ctx,cv.width,cv.height);
+      cv.toBlob(function(b){
+        if(m.urlClear)URL.revokeObjectURL(m.urlClear);
+        m.urlClear=URL.createObjectURL(b);m._clearFor=src;res(m.urlClear);
+      },'image/png');
+    };
+    im.onerror=rej;im.src=src;
+  });
+}
 function umapImgRefresh(m){
   if(!m.layer)return;
   m.layer.clearLayers();
-  if(m.url&&m.gcp&&m.gcp.length>=2)m.layer.addLayer(new ChartOverlay(m));
+  if(!(m.url&&m.gcp&&m.gcp.length>=2))return;
+  m.overlayUrl=null;
+  if(!umapBgOn(m)){m.layer.addLayer(new ChartOverlay(m));return;}
+  var lyr=m.layer;
+  umapClearUrl(m).then(function(u){if(m.layer!==lyr)return;lyr.clearLayers();m.overlayUrl=u;lyr.addLayer(new ChartOverlay(m));})
+    .catch(function(){if(m.layer===lyr){lyr.clearLayers();lyr.addLayer(new ChartOverlay(m));}});
 }
 function umapImgGeo(m,geo){
   if(!m||!m.url)return;
@@ -9587,6 +9621,8 @@ function umapRender(status){
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
   document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapBgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
   document.getElementById('umapDelBtn').disabled=document.getElementById('umapDelAllBtn').disabled=!userMaps.length;
   var cb=0,cn=0;userMaps.forEach(function(m){if(m.stored){cn++;cb+=m.bytes||0;}});
   var clr=document.getElementById('umapClearBtn');
@@ -9610,6 +9646,9 @@ document.getElementById('umapSel').onchange=function(){
 };
 document.getElementById('umapOp').oninput=function(){
   var m=umapCur();if(!m)return;m.opacity=+this.value;if(m.layer)m.layer.setOpacity(m.opacity);umapSave();
+};
+document.getElementById('umapBg').onchange=function(){
+  var m=umapCur();if(!m||!umapIsImg(m))return;m.bgClear=this.checked;umapSave();umapImgRefresh(m);
 };
 document.getElementById('umapViewBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,false);});};
 document.getElementById('umapGeoBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,true);});};
@@ -9812,7 +9851,7 @@ var ChartOverlay=L.Layer.extend({
   initialize:function(c){this._c=c;this._t=null;this._job=0;},
   onAdd:function(m){
     var img=this._img=L.DomUtil.create('img','leaflet-image-layer leaflet-zoom-animated');
-    img.alt='';img.src=chartUrl(this._c);
+    img.alt='';img.src=this._c.overlayUrl||chartUrl(this._c);
     img.style.cssText='position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;width:'+this._c.w+'px;height:'+this._c.h+'px';
     img.style.opacity=this._c.opacity;
     m.getPane(this._c.pane||'charts').appendChild(img);
@@ -9867,6 +9906,7 @@ var ChartOverlay=L.Layer.extend({
     this._task=c._pg.render({canvasContext:ctx,viewport:vp});
     this._task.promise.then(function(){
       if(job!==me._job||!me._cv)return;
+      if(c.overlayUrl)whiteToAlpha(ctx,W,H);
       cv.width=W;cv.height=H;cv.getContext('2d').drawImage(off,0,0);
       me._cb=[x0,y0,W,H,1/r];cv.style.display='block';me._reset();
     }).catch(function(){});
