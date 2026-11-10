@@ -8035,7 +8035,7 @@ function showMiniMap(cv){
   document.getElementById('mmSave').onclick=function(){
     var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
   };
-  /* PowerPoint: one A4 portrait slide with the sheet (current title included) */
+  /* PowerPoint: one A5 portrait slide with the sheet (current title included) */
   var pb=document.getElementById('mmPpt');
   pb.onclick=function(){
     var pn=fname.replace(/\.png$/,'.pptx');pb.disabled=true;
@@ -8060,12 +8060,12 @@ function mmTitleDef(){return (pts[0]&&pts[0].name||'START')+' - '+(pts.length&&p
 function mmRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join(';');}
 function mmTitle(){try{var o=JSON.parse(localStorage.getItem('fp-mm-title')||'null');if(o&&o.k===mmRouteKey()&&o.t)return o.t;}catch(e){}return mmTitleDef();}
 function mmTitleSave(t){try{t=(t||'').trim();if(t&&t!==mmTitleDef())localStorage.setItem('fp-mm-title',JSON.stringify({k:mmRouteKey(),t:t}));else localStorage.removeItem('fp-mm-title');}catch(e){}}
-/* PowerPoint (.pptx) with one A4 portrait slide holding a PNG full-page (built with the bundled JSZip, works offline) */
+/* PowerPoint (.pptx) with one A5 portrait slide holding a PNG full-page (built with the bundled JSZip, works offline) */
 function mmPptxBlob(pngDataUrl,title){
   var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
   var R='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
-  var CX=7560000,CY=10692000;   /* A4 portrait: 210 x 297 mm */
+  var CX=5328000,CY=7560000;   /* A5 portrait: 148 x 210 mm (SPD); same 1:1.414 shape as the A4 sheet */
   function xe(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function rels(list){return X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+list.map(function(r,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+(r[0].indexOf('http')===0?r[0]:R+r[0])+'" Target="'+r[1]+'"/>';}).join('')+'</Relationships>';}
   var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
