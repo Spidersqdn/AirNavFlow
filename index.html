@@ -9382,8 +9382,46 @@ umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}});
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
+/* maps built into the app: served from the DataBase site (spidersqdn.github.io/DataBase/AirNavFlow/).
+   ENROUTE (AIP): the AIP Thailand enroute chart, georeferenced + transparent, as WEBP tiles (built by DataBase's workflow) */
+var UMAP_BUILTIN=[{id:'aip-enroute',name:'ENROUTE (AIP)',file:'enroute.pmtiles',type:4,minZ:5,maxZ:10,opacity:0.85}];
+function umapBuiltinInit(){
+  var st;try{st=JSON.parse(localStorage.getItem('fp-user-maps-bi')||'{}')||{};}catch(e){st={};}
+  UMAP_BUILTIN.slice().reverse().forEach(function(d){
+    var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
+    userMaps.unshift(m);
+    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m);}).catch(function(){});
+  });
+}
+function umapBuiltinOpen(m){
+  if(m.layer)return Promise.resolve(m);
+  if(typeof pmtiles==='undefined')return Promise.reject(new Error('lib'));
+  var url=MAP_SITE+m.file;
+  var cp=('caches' in window)?caches.open(UMAP_CACHE).then(function(c){return c.match(umapKey(m.id));}).then(function(r){return r?r.blob():null;}).catch(function(){return null;}):Promise.resolve(null);
+  return cp.then(function(blob){
+    m.stored=!!blob;
+    var pm=new pmtiles.PMTiles(blob?new pmtiles.FileSource(new File([blob],m.file)):url);
+    return pm.getHeader().then(function(h){
+      m.minZ=h.minZoom;m.maxZ=h.maxZoom;m.bytes=blob?blob.size:0;
+      m.bounds=[h.minLon,h.minLat,h.maxLon,h.maxLat];
+      m.layer=umapLayer(m,pm);
+      if(!blob&&umapKeepOn())umapBuiltinCopy(m);
+      return m;
+    });
+  });
+}
+/* copy the built-in map into the app (offline): whole file into Cache Storage */
+function umapBuiltinCopy(m){
+  if(m.stored||m._copying||!('caches' in window))return;
+  m._copying=true;umapRender('กำลังก็อป '+m.name+' ลงเครื่อง…');
+  fetch(MAP_SITE+m.file,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();})
+    .then(function(b){m.file0=m.file;m.file=new File([b],m.file0);m.bytes=b.size;return umapStore(m).then(function(){m.file=m.file0;});})
+    .catch(function(e){umapRender('ก็อปไม่สำเร็จ: '+((e&&e.message)||e));})
+    .then(function(){m._copying=false;});
+}
 function umapSave(){
-  try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.map(function(m){
+  try{var bi={};userMaps.forEach(function(m){if(m.builtin)bi[m.id]={on:m.on,opacity:m.opacity,stored:m.stored};});localStorage.setItem('fp-user-maps-bi',JSON.stringify(bi));}catch(e){}
+  try{localStorage.setItem(UMAP_META,JSON.stringify(userMaps.filter(function(m){return !m.builtin;}).map(function(m){
     return {id:m.id,name:m.name,bytes:m.bytes,type:m.type,minZ:m.minZ,maxZ:m.maxZ,bounds:m.bounds,opacity:m.opacity,bgClear:m.bgClear,on:m.on,stored:m.stored,linked:m.linked,gcp:m.gcp,page:m.page,w:m.w,h:m.h,fname:m.fname};
   })));}catch(e){}
 }
@@ -9540,7 +9578,7 @@ function umapPickFile(){
     inp.click();
   });
 }
-function umapPending(m){return !m.layer;}
+function umapPending(m){return !m.layer&&!m.builtin;}
 /* a remembered map whose file is not open yet: ask permission (handle) or re-pick the file */
 function umapReopen(m){
   var p;
@@ -9604,6 +9642,12 @@ function umapZoom(m){
   if(m.bounds)map.fitBounds([[m.bounds[1],m.bounds[0]],[m.bounds[3],m.bounds[2]]],{maxZoom:Math.max(8,m.maxZ||8)});
 }
 function umapDelete(m){
+  if(m.builtin){ /* built-in: can't be removed, only its offline copy */
+    if(!confirm(m.name+' เป็นแผนที่ในแอพ ลบไม่ได้\nซ่อน + ลบไฟล์ที่ก็อปไว้ในเครื่อง (ถ้ามี)?'))return;
+    if(m.layer)umapGroup.removeLayer(m.layer);m.layer=null;m.on=false;m.stored=false;
+    if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return c.delete(umapKey(m.id));}).catch(function(){});
+    umapSave();umapRender();return;
+  }
   if(!confirm('ลบแผนที่ "'+m.name+'" ออกจากเครื่อง?'))return;
   if(m.layer)umapGroup.removeLayer(m.layer);
   userMaps=userMaps.filter(function(x){return x!==m;});
@@ -9648,7 +9692,8 @@ function umapRender(status){
   document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
   document.getElementById('umapBgRow').hidden=!(cur&&umapIsImg(cur));
   document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
-  document.getElementById('umapDelBtn').disabled=document.getElementById('umapDelAllBtn').disabled=!userMaps.length;
+  document.getElementById('umapDelBtn').disabled=!userMaps.length;
+  document.getElementById('umapDelAllBtn').disabled=!userMaps.some(function(m){return !m.builtin;});
   var cb=0,cn=0;userMaps.forEach(function(m){if(m.stored){cn++;cb+=m.bytes||0;}});
   var clr=document.getElementById('umapClearBtn');
   clr.disabled=!cn;clr.textContent='🧹 ล้าง cache แผนที่'+(cn?' ('+cn+' ไฟล์, '+mb(cb)+')':'');
@@ -9656,7 +9701,8 @@ function umapRender(status){
   document.getElementById('umapKeep').checked=umapKeepOn();
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
-  else st.textContent=cur?(umapIsImg(cur)?'PDF/ภาพ'+(cur.page?' หน้า '+cur.page:'')+(cur.gcp&&cur.gcp.length>=2?' · ตั้งพิกัดแล้ว ('+cur.gcp.length+' จุด)':' · ยังไม่ตั้งพิกัด → กด 📍'):UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ)+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
+  else st.textContent=cur&&cur.builtin?'แผนที่ในแอพ (AIP) · z'+cur.minZ+'-'+cur.maxZ+(cur.stored?' · ก็อปไว้ในเครื่อง ใช้ออฟไลน์ได้ '+mb(cur.bytes):' · โหลดจากเน็ต (ติ๊กก็อปไฟล์ = ใช้ออฟไลน์ได้)')
+    :cur?(umapIsImg(cur)?'PDF/ภาพ'+(cur.page?' หน้า '+cur.page:'')+(cur.gcp&&cur.gcp.length>=2?' · ตั้งพิกัดแล้ว ('+cur.gcp.length+' จุด)':' · ยังไม่ตั้งพิกัด → กด 📍'):UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ)+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
 }
 function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
 function umapShow(m){
@@ -9666,6 +9712,7 @@ function umapShow(m){
 }
 document.getElementById('umapSel').onchange=function(){
   var id=this.value,m=userMaps.filter(function(x){return x.id===id;})[0]||null;
+  if(m&&m.builtin&&!m.layer){umapRender('กำลังเปิด '+m.name+'…');umapBuiltinOpen(m).then(function(){umapShow(m);umapZoom(m);}).catch(function(e){umapRender('เปิด '+m.name+' ไม่ได้ (ต้องต่อเน็ตครั้งแรก)');});return;}
   if(m&&umapPending(m)){umapRender();umapReopen(m);return;}
   umapShow(m);if(m)umapZoom(m);
 };
@@ -9689,10 +9736,11 @@ document.getElementById('umapDelBtn').onclick=function(){
 };
 /* CLEAR MAPs: delete every imported map (list, copies in the app, saved file links) */
 document.getElementById('umapDelAllBtn').onclick=function(){
-  if(!userMaps.length||!confirm('ลบ MAP ทั้งหมด '+userMaps.length+' แผนที่ ออกจากเครื่อง?\n(ไฟล์ต้นฉบับในเครื่องไม่ถูกลบ)'))return;
-  userMaps.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
-  var ids=userMaps.map(function(m){return m.id;});
-  userMaps=[];umapSave();umapRender('✓ ลบ MAP ทั้งหมดแล้ว');
+  var mine=userMaps.filter(function(m){return !m.builtin;});
+  if(!mine.length||!confirm('ลบ MAP ที่ import ทั้งหมด '+mine.length+' แผนที่ ออกจากเครื่อง?\n(ไฟล์ต้นฉบับในเครื่องไม่ถูกลบ, แผนที่ในแอพยังอยู่)'))return;
+  mine.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
+  var ids=mine.map(function(m){return m.id;});
+  userMaps=userMaps.filter(function(m){return m.builtin;});umapSave();umapRender('✓ ลบ MAP ที่ import ทั้งหมดแล้ว');
   if('caches' in window)caches.delete(UMAP_CACHE).catch(function(){});
   ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
@@ -9713,12 +9761,12 @@ document.getElementById('umapClearBtn').onclick=function(){
 };
 document.getElementById('umapKeep').onchange=function(){
   var on=this.checked;try{localStorage.setItem('fp-user-maps-keep',on?'1':'0');}catch(e){}
-  if(on){var m=umapCur();if(m&&!m.stored&&m.file)umapStore(m);}
+  if(on){var m=umapCur();if(m&&m.builtin)umapBuiltinCopy(m);else if(m&&!m.stored&&m.file)umapStore(m);}
 };
 document.getElementById('importMapBtn').onclick=function(){
   umapPickFile().then(importUserMap).catch(function(e){if(e&&e.name!=='AbortError')alert('เปิดไฟล์ไม่ได้: '+(e.message||e));});
 };
-loadUserMaps();umapRender();
+umapBuiltinInit();loadUserMaps();umapRender();
 
 /* ---- CHART: chart images (PNG/JPG/WEBP, or one page of a PDF) read straight from a folder on the device.
    Nothing of the chart file is copied into the app; only the folder link (Chrome/Edge: File System Access
