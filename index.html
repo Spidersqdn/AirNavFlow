@@ -1248,6 +1248,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   #miniMapModal .mm-thead{font-size:18px}
   #miniMapModal .mm-tbl{font-size:14px}
 }
+#miniMapModal .mm-rwy{white-space:nowrap;font-size:13px}
+#miniMapModal .mm-rwy input{width:3.2em;padding:4px;font:600 14px system-ui,sans-serif;text-align:center;border-radius:5px;border:1px solid #666d76;background:#15181c;color:#fff}
 #miniMapModal .mm-sharebox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 10px 8px;color:var(--text,#fff);font-size:13px}
 #miniMapModal .mm-sharebox button{min-height:36px;padding:5px 12px}
 #miniMapModal .mm-sharego{background:#2e86de;color:#fff;font-weight:700}
@@ -8015,6 +8017,12 @@ function buildMiniMap(opt){
         lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
         if(end||!many)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
+        if(i===pts.length-1&&i>0){   /* SPD: destination that is not an airport -> take-off / landing headings (typed in the MINI MAP window) + radial / DME */
+          var rw=mmRwyGet(),ap=(p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p);
+          lines.push({t:'วิ่งขึ้น '+(rw.to?mmPad3(+rw.to):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
+          lines.push({t:'ร่อนลง '+(rw.ld?mmPad3(+rw.ld):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
+          if(ap){var rd=dist({lat:ap[4],lng:ap[5]},p);lines.push({t:'R-'+mmPad3(course({lat:ap[4],lng:ap[5]},p))+' / '+rd.toFixed(1)+' '+ap[0],f:sz+'px '+WFONT,lh:lh,sz:sz});}
+        }
         var m=mmMeasure(ctx,lines,pad);   /* SPD 11 NOV: box fits its text (no blank rows / minimum width) */
         items.push({p:p,q:P[i],lines:lines,m:m,pad:pad});
       });
@@ -8226,6 +8234,10 @@ function mmRenderLayers(c2){
     mmDrawLayers(cv,c2,mmPosGet());return cv;
   });
 }
+/* destination (not an airport) take-off / landing headings, kept per route on this device */
+function mmRwyGet(){try{var o=JSON.parse(localStorage.getItem('fp-mm-rwy')||'null');if(o&&o.k===mmRouteKey())return o;}catch(e){}return {};}
+function mmRwySet(to,ld){try{if(to||ld)localStorage.setItem('fp-mm-rwy',JSON.stringify({k:mmRouteKey(),to:to,ld:ld}));else localStorage.removeItem('fp-mm-rwy');}catch(e){}}
+function mmDestNotAD(){var p=pts[pts.length-1];return !!p&&!APX[(p.name||'').toUpperCase()];}
 function mmBuildSheet(skip){return buildMiniMap({skip:skip,layers:true}).then(mmRenderLayers);}
 
 /* ---- editable waypoint table (rows / columns / merged cells / text), kept per route + off-route set ---- */
@@ -8413,7 +8425,7 @@ function showMiniMap(cv){
     '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     '<button type="button" id="mmShare">แชร์</button></span></div>'+
     '<div class="mm-sharebox" id="mmShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="png">PNG</button> <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="mmShareSt"></span></div>'+
-    '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+    '<div class="mm-bar2" id="mmMapBar">'+(mmDestNotAD()?'<span class="mm-rwy">ปลายทาง วิ่งขึ้น <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° ร่อนลง <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">°</span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblView" style="display:none"><div class="mm-bar2" style="background:var(--panel,#1b1f24);padding-top:8px;position:sticky;top:0;z-index:3"><button type="button" id="mmTblEdit">✏️ แก้ไขตาราง</button> <span id="mmTblInfo"></span></div><div id="mmTblPrev"></div><div id="mmTblEd" style="display:none"></div></div></div>'+
     '<p class="mm-note">ขนาด A5 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
@@ -8510,6 +8522,20 @@ function showMiniMap(cv){
       }).catch(function(){});
     },700);
   };
+  /* destination take-off / landing headings (SPD): typed here, shown in the destination box */
+  var toI=document.getElementById('mmTo'),ldI=document.getElementById('mmLd'),rt=null;
+  if(toI){
+    var rw0=mmRwyGet();toI.value=rw0.to||'';ldI.value=rw0.ld||'';
+    toI.oninput=ldI.oninput=function(){
+      [toI,ldI].forEach(function(x){x.value=x.value.replace(/\D/g,'').slice(0,3);});
+      clearTimeout(rt);rt=setTimeout(function(){
+        mmRwySet(toI.value,ldI.value);
+        mmBuildSheet(mmOffSkip()).then(function(c2){
+          sheet=c2;refreshImg();if(moving){live.width=sheet.width;live.height=sheet.height;redraw();}
+        }).catch(function(){});
+      },700);
+    };
+  }
   /* WPt list: tick / untick each off-route waypoint; remembered on this device, sheet redrawn after a short pause */
   var wd=document.getElementById('mmWpt'),wt=null;
   if(wd){
