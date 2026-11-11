@@ -1924,6 +1924,7 @@ body.panel-hidden #panel{display:none}
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose the folder that holds your charts (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📁 SELECT CHART FOLDER</button>
     <button type="button" id="chartReloadBtn" class="chart-btn" style="flex:1" title="Read the folder again (new or renamed chart files)">🔄 Refresh</button>
+    <button type="button" id="chartResetBtn" class="chart-btn" style="flex:0 0 auto" title="Remove the imported chart folder and its georeference from the app (files on your device are not touched)">🗑 RESET</button>
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
@@ -10451,7 +10452,8 @@ function chartRender(status){
     document.getElementById('chartPgPrev').disabled=c.page<=1;document.getElementById('chartPgNext').disabled=c.page>=c.pages;}
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
-  document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN FOLDER "'+chartDir.name+'"':charts.length?'📁 CHANGE CHART FOLDER':'📁 SELECT CHART FOLDER';
+  document.getElementById('chartResetBtn').disabled=!(chartDir||charts.some(function(x){return !x.db;}));
+  document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN FOLDER "'+chartDir.name+'"':fol.length?'📁 CHANGE CHART FOLDER':'📁 SELECT CHART FOLDER';
   var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!c.onMap; /* HIDE CHARTs: ticked = not on the map */
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
@@ -10689,6 +10691,15 @@ document.getElementById('chartOp').oninput=function(){
   var c=chartCur();if(!c)return;c.opacity=+this.value;if(chartLayer)chartLayer.setOpacity(c.opacity);chartPut(c);
 };
 document.getElementById('chartZoomBtn').onclick=function(){chartZoom(chartCur());};
+document.getElementById('chartResetBtn').onclick=function(){
+  if(!confirm('RESET: ลบชาร์ตที่ import (โฟลเดอร์ + พิกัดที่ตั้งไว้) ออกจากแอพ?\nไฟล์ในเครื่องไม่ถูกลบ · ชาร์ตในแอพยังอยู่'))return;
+  chartIdb('readwrite',function(st){return st.delete('dir');}).catch(function(){});
+  chartDir=null;chartDirOk=false;
+  Object.keys(chartMeta.items).forEach(function(k){if(k.indexOf('db:')!==0)delete chartMeta.items[k];});
+  if(chartMeta.sel.indexOf('db:')!==0)chartMeta.sel='';
+  chartMetaSave();document.getElementById('importChartFile').value='';
+  chartSetList([]);chartRender('ลบชาร์ตที่ import แล้ว');
+};
 document.getElementById('chartReloadBtn').onclick=function(){if(chartDir&&chartDirOk)chartScanDir(chartDir);};
 document.getElementById('importChartBtn').onclick=function(){
   if(chartDir&&!chartDirOk){ /* remembered folder: one tap to grant read access again */
