@@ -1270,6 +1270,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #flightLogModal .fl-grid,#slideModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
 #flightLogModal .fl-grid label,#slideModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
 #flightLogModal .fl-grid input,#slideModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
+#flightLogModal .fl-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+#flightLogModal .fl-grid label{font-size:10px;white-space:nowrap;overflow:hidden}
+#flightLogModal .fl-grid input{padding:3px 4px;font-size:12px}
 #flightLogModal .fl-ads{margin-top:8px;font-size:11px;color:var(--mute,#aaa)}
 #flightLogModal #flAdList{display:flex;flex-wrap:wrap;gap:4px 10px;margin:4px 0}
 #flightLogModal .fl-ad{display:flex;align-items:center;gap:3px;font-size:13px;color:var(--text,#fff)}
@@ -9240,9 +9243,10 @@ function openFlightLog(){
     (navigator.canShare?'<button type="button" id="flShare">แชร์</button> ':'')+
     '<button type="button" id="flClose">✕</button></span></div>'+
     '<details class="fl-form" open><summary>ข้อมูลที่กรอกเอง (จำไว้ในเครื่องนี้)</summary><div class="fl-grid">'+
-    FL_FIELDS.map(function(x){return '<label>'+x[1]+'<input data-fl="'+x[0]+'" type="text" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
-    '<label>IAS (kt)<input data-fl="ias" type="text" inputmode="decimal" value="'+esc(f.ias)+'"></label>'+
-    '<label>FUEL<input data-fl="fuel" type="text" inputmode="decimal" value="'+esc(f.fuel)+'"></label>'+
+    /* 2 rows in MSN CARD order: DATE, CALL SIGN, TYPE, FLIGHT RULE, STEP, START, T/O, L/D / MISSION, IFF, ALTITUDE, IAS, FUEL, BINGO */
+    [['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],['step','STEP'],['start','START'],['to','T/O'],['ld','L/D'],
+     ['mission','MISSION'],['iff','IFF'],['alt','ALTITUDE'],['ias','IAS',1],['fuel','FUEL',1],['bingo','BINGO']].map(function(x){
+      return '<label>'+x[1]+'<input data-fl="'+x[0]+'" type="text"'+(x[2]?' inputmode="decimal"':'')+' value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
     '</div><div class="fl-ads"><div>AIRPORT INFORMATION (ติ๊กออก = ไม่แสดง)</div><div id="flAdList"></div>'+
     '<div class="fl-adadd"><input id="flAdNew" type="text" placeholder="ICAO เช่น VTBD" maxlength="4" autocapitalize="characters">'+
     '<button type="button" id="flAdBtn">+ เพิ่มสนามบิน</button></div></div></details>'+
