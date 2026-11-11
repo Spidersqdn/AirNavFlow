@@ -1290,7 +1290,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   #miniMapModal .mm-btns,#flightLogModal .mm-bar>span,#slideModal .mm-bar>span,#miniMapModal .mm-bar>span,#windy header>span{
     display:flex;flex-wrap:nowrap;align-items:center;gap:4px;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   #miniMapModal .mm-btns::-webkit-scrollbar,#flightLogModal .mm-bar>span::-webkit-scrollbar,#slideModal .mm-bar>span::-webkit-scrollbar,#windy header>span::-webkit-scrollbar{display:none}
-  #miniMapModal .mm-btns{overflow:visible}  /* WPt list drops down below; buttons are sized to fit */
+  #miniMapModal .mm-bar>span.mm-btns{overflow:visible}  /* WPt list drops down below; buttons are sized to fit */
   /* MINI MAP button row fills the width, same height as the ✋ row below (SPD) */
   #miniMapModal .mm-bar .mm-btns{width:100%;flex:1 1 100%}
   #miniMapModal .mm-bar .mm-btns>*,#miniMapModal .mm-bar .mm-btns>.mm-view{flex:1 1 auto !important}
