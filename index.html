@@ -8881,9 +8881,10 @@ function slPtName(p){   /* airport ICAO -> Thai airport name; other points keep 
   var nm=String(APX[id][2]||id),wing=/กองบิน\s*(\d+)/.exec(nm);
   return wing?'บน.'+wing[1]:'ท่าอากาศยาน'+nm.split('/')[0].trim();   /* RTAF wing bases: "บน.21" (SPD sample) */
 }
+function slUnit(v,u){v=String(v||'').trim();return v?(/[^\d.,\s]/.test(v)?v:v+' '+u):'-';}   /* append the unit only to a plain number */
 function slOffOn(){try{var a=JSON.parse(localStorage.getItem('fp-sl-offon')||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}   /* off-route WPt ticked for SLIDE (default none) */
 function slRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join('>');}
-function buildSlide(f){
+function buildSlide(f,opt){   /* opt.noTable: leave the table out (PPT draws it as editable shapes) */
   var S=2,W=1600*S,H=900*S,FONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';   /* SPD: TH SarabunPSK */
   var psk=(function(){   /* is TH SarabunPSK installed? (compare glyph widths against a generic font) */
     try{var c=document.createElement('canvas').getContext('2d'),t='กขคงabcWM 123';
@@ -8968,8 +8969,9 @@ function buildSlide(f){
     });
     ctx.restore();
     ctx.strokeStyle='#9aa0a8';ctx.lineWidth=1*S;ctx.strokeRect(MX,MY,MWd,MHt);
+    if(opt&&opt.noTable)return cv;
     /* table */
-    function unit(v,u){v=String(v||'').trim();return v?(/[^\d.,\s]/.test(v)?v:v+' '+u):'-';}
+    var unit=slUnit;
     var routeTh=f.route||'';
     function TC(t,x,yc,mw,mid){   /* text centred up/down on yc (letter body measured on "Hก", so Thai text doesn't sit high);
       mid = centre left/right on x. Position is worked out here, not left to textAlign (iPad Safari drew centred lines left-aligned). */
@@ -9020,6 +9022,7 @@ function openSlide(){
   d.innerHTML='<div class="mm-card"><div class="mm-bar" style="justify-content:flex-start"><span style="flex:1;min-width:0">'+
     '<button type="button" id="slMake">อัปเดต</button> '+
     '<button type="button" id="slSave">บันทึก PNG</button> '+
+    '<button type="button" id="slPpt" title="PowerPoint 16:9: ตารางแก้ไขได้">PPT</button> '+
     (navigator.canShare?'<button type="button" id="slShare">แชร์</button> ':'')+
     '<button type="button" id="slReset">ค่าเริ่มต้น</button> '+
     '<button type="button" id="slClose">✕</button></span></div>'+
@@ -9068,6 +9071,14 @@ function openSlide(){
   document.getElementById('slSave').onclick=function(){
     if(!cv)return;var a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download=fname;document.body.appendChild(a);a.click();a.remove();
   };
+  var pb=document.getElementById('slPpt');
+  pb.onclick=function(){
+    read();pb.disabled=true;
+    slPptxBlob(f).then(function(bl){
+      var a=document.createElement('a'),u=URL.createObjectURL(bl);a.href=u;a.download=fname.replace(/\.png$/,'.pptx');
+      document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},30000);
+    }).catch(function(err){alert('สร้างไฟล์ PPT ไม่สำเร็จ ('+(err&&err.message||err)+')');}).then(function(){pb.disabled=false;});
+  };
   var sh=document.getElementById('slShare');
   if(sh)sh.onclick=function(){
     if(!cv)return;
@@ -9079,6 +9090,70 @@ function openSlide(){
   };
   make();
   if(needMsa||!f.msa)fillMsa();
+}
+
+/* SLIDE -> PowerPoint 16:9 (bundled JSZip, works offline): slide picture without the table (background, map, WPt)
+   + the ENROUTE table as editable shapes in TH SarabunPSK, same layout as the PNG (design units 1600 x 900) */
+function slPptxBlob(f){
+  if(typeof JSZip==='undefined')return Promise.reject(new Error('JSZip unavailable'));
+  return buildSlide(f,{noTable:true}).then(function(c){
+    var CX=12192000,CY=6858000,K=CX/1600,FN='TH SarabunPSK';
+    var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    var NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+    var RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+    function xe(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function rels(list){return X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+list.map(function(r,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RL+r[0]+'" Target="'+r[1]+'"/>';}).join('')+'</Relationships>';}
+    function E(v){return Math.round(v*K);}
+    var id=10;
+    function run(t,sz){return '<a:r><a:rPr lang="th-TH" sz="'+sz+'" dirty="0"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(t)+'</a:t></a:r>';}
+    function para(runs,algn,tab,spc){return '<a:p><a:pPr algn="'+algn+'">'+(spc?'<a:lnSpc><a:spcPts val="'+spc+'"/></a:lnSpc>':'')+(tab?'<a:tabLst><a:tab pos="'+tab+'" algn="l"/></a:tabLst>':'')+'</a:pPr>'+runs+'</a:p>';}
+    function sp(name,x,y,w,h,fill,line,paras,lw){   /* rectangle with text (editable) */
+      return '<p:sp><p:nvSpPr><p:cNvPr id="'+(id++)+'" name="'+name+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(x)+'" y="'+E(y)+'"/><a:ext cx="'+E(w)+'" cy="'+E(h)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'+
+        (fill?'<a:solidFill><a:srgbClr val="'+fill+'"/></a:solidFill>':'<a:noFill/>')+(line?'<a:ln w="'+(lw||E(2))+'"><a:solidFill><a:srgbClr val="'+line+'"/></a:solidFill></a:ln>':'<a:ln><a:noFill/></a:ln>')+'</p:spPr>'+
+        '<p:txBody><a:bodyPr wrap="square" lIns="'+E(16)+'" rIns="'+E(12)+'" tIns="0" bIns="0" anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/>'+(paras||'<a:p><a:endParaRPr lang="th-TH"/></a:p>')+'</p:txBody></p:sp>';
+    }
+    var TX=822,TW=708,y=198,NAVY='1F3461',DK='0D1A33',body='';
+    body+=sp('ENROUTE',TX,y,TW,64,NAVY,DK,null)+sp('ENROUTE text',TX+1,y+1,TW-2,62,null,'FFFFFF',para(run('ENROUTE / DIST / ALT / SPEED / ETE',2100),'ctr'));
+    y+=70;body+=sp('Route',TX,y,TW,116,NAVY,DK,para(run(f.title||'เส้นทางบิน',2000),'ctr',0,3000)+para(run(f.route||'',2000),'ctr',0,3000));
+    y+=116;
+    var rows=[['ระยะทาง',slUnit(f.dist,'ไมล์ทะเล')],['ความสูงบิน',slUnit(f.alt,'ฟุต')],['MSA',slUnit(f.msa,'ฟุต')],['ความเร็ว',slUnit(f.speed,'นอต')],['ใช้เวลา',slUnit(f.ete,'นาที')]];
+    var tab=E(TW*0.44-16);
+    body+=sp('Data',TX,y,TW,rows.length*46+16,NAVY,DK,rows.map(function(r){return para(run(r[0],2000)+run('\t'+r[1],2000),'l',tab,2760);}).join(''));
+    body+=sp('Divider',TX,y-1,TW,2,'FFFFFF',null,null);
+    y+=rows.length*46+16+6;body+=sp('Route ICAO',TX,y,TW,62,NAVY,DK,para(run('เส้นทางบิน : '+(f.code||'-'),2000),'l'));
+    var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
+    var pic='<p:pic><p:nvPicPr><p:cNvPr id="2" name="Mission overview"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
+      '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+CX+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+    var z=new JSZip();
+    z.file('[Content_Types].xml',X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'+
+      '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'+
+      '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>'+
+      '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>'+
+      '<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>'+
+      '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/></Types>');
+    z.file('_rels/.rels',rels([['officeDocument','ppt/presentation.xml']]));
+    z.file('ppt/presentation.xml',X+'<p:presentation '+NS+'><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst><p:sldId id="256" r:id="rId3"/></p:sldIdLst><p:sldSz cx="'+CX+'" cy="'+CY+'"/><p:notesSz cx="'+CY+'" cy="'+CX+'"/><p:defaultTextStyle/></p:presentation>');
+    z.file('ppt/_rels/presentation.xml.rels',rels([['slideMaster','slideMasters/slideMaster1.xml'],['theme','theme/theme1.xml'],['slide','slides/slide1.xml']]));
+    z.file('ppt/slideMasters/slideMaster1.xml',X+'<p:sldMaster '+NS+'><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>'+tree+'</p:spTree></p:cSld>'+
+      '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>'+
+      '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>');
+    z.file('ppt/slideMasters/_rels/slideMaster1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['theme','../theme/theme1.xml']]));
+    z.file('ppt/slideLayouts/slideLayout1.xml',X+'<p:sldLayout '+NS+' type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>'+tree+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>');
+    z.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels',rels([['slideMaster','../slideMasters/slideMaster1.xml']]));
+    z.file('ppt/slides/slide1.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+pic+body+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
+    z.file('ppt/slides/_rels/slide1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image1.png']]));
+    var C=function(n,v){return '<a:'+n+'><a:srgbClr val="'+v+'"/></a:'+n+'>';},FT='<a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/>';
+    var fill='<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',ln='<a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>';
+    z.file('ppt/theme/theme1.xml',X+'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="AirNavFlow"><a:themeElements>'+
+      '<a:clrScheme name="AirNavFlow"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>'+
+      C('dk2','44546A')+C('lt2','E7E6E6')+C('accent1','1F3461')+C('accent2','B88A1C')+C('accent3','A5A5A5')+C('accent4','FFC000')+C('accent5','5B9BD5')+C('accent6','70AD47')+C('hlink','0563C1')+C('folHlink','954F72')+'</a:clrScheme>'+
+      '<a:fontScheme name="AirNavFlow"><a:majorFont>'+FT+'</a:majorFont><a:minorFont>'+FT+'</a:minorFont></a:fontScheme>'+
+      '<a:fmtScheme name="AirNavFlow"><a:fillStyleLst>'+fill+fill+fill+'</a:fillStyleLst><a:lnStyleLst>'+ln+ln+ln+'</a:lnStyleLst>'+
+      '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>'+
+      '<a:bgFillStyleLst>'+fill+fill+fill+'</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>');
+    z.file('ppt/media/image1.png',c.toDataURL('image/png').split(',')[1],{base64:true});
+    return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});
+  });
 }
 
 /* ---- FLIGHT LOG: Pilot Mission Data Card (PNG), layout after the squadron's paper card.
