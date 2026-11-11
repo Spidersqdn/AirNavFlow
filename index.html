@@ -1270,6 +1270,11 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #flightLogModal .fl-grid,#slideModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
 #flightLogModal .fl-grid label,#slideModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
 #flightLogModal .fl-grid input,#slideModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
+#flightLogModal .fl-ads{margin-top:8px;font-size:11px;color:var(--mute,#aaa)}
+#flightLogModal #flAdList{display:flex;flex-wrap:wrap;gap:4px 10px;margin:4px 0}
+#flightLogModal .fl-ad{display:flex;align-items:center;gap:3px;font-size:13px;color:var(--text,#fff)}
+#flightLogModal .fl-adadd{display:flex;gap:6px}
+#flightLogModal .fl-adadd input{width:110px;padding:4px 6px;font-size:13px;text-transform:uppercase}
 .actions button{
   flex:1 1 calc(33.333% - 8px);
   min-width:92px;
@@ -8958,11 +8963,32 @@ function flRouteNotamIds(){
   }).map(function(n){return n.id;});
 }
 
+/* default AIRPORT INFORMATION rows: route airports (dep, dest first) + 3 nearest off-route airports */
+function flAdDefaults(){
+  var dep=pts[0],arr=pts[pts.length-1],ads=[];
+  pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
+  var onR=[];
+  [(dep.name||'').toUpperCase(),(arr.name||'').toUpperCase()].concat(ads).forEach(function(id){if(APX[id]&&onR.indexOf(id)<0)onR.push(id);});
+  var near=AP.filter(function(a){return ads.indexOf(a[0])<0;}).map(function(a){
+    var q={lat:a[4],lng:a[5]},m=Infinity;
+    for(var i=1;i<pts.length;i++)m=Math.min(m,pDistToSegment(q,pts[i-1],pts[i]));
+    return [a[0],m];
+  }).sort(function(x,y){return x[1]-y[1];}).slice(0,3).map(function(x){return x[0];});
+  return {onR:onR,near:near};
+}
+/* airport add/remove choices belong to one route: reset when the route changes */
+function flRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+p.lat.toFixed(3)+','+p.lng.toFixed(3);}).join(';');}
+function flAdSel(f){
+  if(f.adKey!==flRouteKey()){f.adKey=flRouteKey();f.adOff=[];f.adAdd=[];}
+  return {off:f.adOff||[],add:f.adAdd||[]};
+}
 function buildFlightLog(f){
   var BW=1015,K=2,FONT='Arial,"Helvetica Neue","Sarabun",Tahoma,sans-serif';
   var PUR='#7f62a8',GRY='#e4e2ec',YEL='#eef2d9',INK='#1a2a9c';
   var X=[8,87,180,265,345,425,505,585,684,764,846,928,1007];
-  var spd=num('speed'),burn=num('burn'),fuel0=parseFloat(document.getElementById('fuel').value),taxi=0;
+  var spd=parseFloat(f.ias),burn=num('burn'),fuel0=parseFloat(f.fuel),taxi=0;
+  if(!(spd>0))spd=num('speed');
+  if(!isFinite(fuel0))fuel0=parseFloat(document.getElementById('fuel').value);
   var dep=pts[0],arr=pts[pts.length-1];
   var ads=[];pts.forEach(function(p){var id=(p.name||'').toUpperCase();if(APX[id]&&ads.indexOf(id)<0)ads.push(id);});
   function vhf(t){   /* keep VHF COM freqs only (118-137 MHz), drop UHF */
@@ -8972,14 +8998,11 @@ function buildFlightLog(f){
     var r=(AD_INFO[id]||[]).filter(function(x){return x[0]===k;})[0];
     return r?r[1].replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').trim():'';
   }
-  /* white rows = every airport on the route (departure, destination first); green rows = 3 nearest airports off the route */
-  var onR=[],dI=(dep.name||'').toUpperCase(),aI=(arr.name||'').toUpperCase();
-  [dI,aI].concat(ads).forEach(function(id){if(APX[id]&&onR.indexOf(id)<0)onR.push(id);});
-  var near=AP.filter(function(a){return ads.indexOf(a[0])<0;}).map(function(a){
-    var q={lat:a[4],lng:a[5]},m=Infinity;
-    for(var i=1;i<pts.length;i++)m=Math.min(m,pDistToSegment(q,pts[i-1],pts[i]));
-    return [a[0],m];
-  }).sort(function(x,y){return x[1]-y[1];}).slice(0,3).map(function(x){return x[0];});
+  /* white rows = every airport on the route (departure, destination first); green rows = 3 nearest airports off the route.
+     The MSN CARD form can untick any of them (f.adOff) and add more by ICAO (f.adAdd, green rows) */
+  var dfl=flAdDefaults(),off=flAdSel(f).off,onR=dfl.onR.filter(function(id){return off.indexOf(id)<0;});
+  var near=dfl.near.concat(flAdSel(f).add).filter(function(id,i,a){return APX[id]&&off.indexOf(id)<0&&onR.indexOf(id)<0&&a.indexOf(id)===i;});
+  ads=ads.filter(function(id){return off.indexOf(id)<0;});
   var adRows=onR.concat(near);
   var ref=APX[(dep.name||'').toUpperCase()]||nearestAirportForPoint(dep);
   var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
@@ -9206,6 +9229,8 @@ function openFlightLog(){
   if(pts.length<2){alert('ต้องมี waypoint อย่างน้อย 2 จุดก่อนทำ MSN CARD');return;}
   var old=document.getElementById('flightLogModal');if(old)old.remove();
   var f=flLoad(),cv=null;
+  f.ias=String(num('speed')||'');f.fuel=document.getElementById('fuel').value;   /* start from the app values; edits here are for this card only */
+  flAdSel(f);
   var dep=(pts[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_'),arr=(pts[pts.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
   var fname='MsnCard_'+dep+'_'+arr+'.png';
   var d=document.createElement('div');d.id='flightLogModal';
@@ -9216,18 +9241,41 @@ function openFlightLog(){
     '<button type="button" id="flClose">✕</button></span></div>'+
     '<details class="fl-form" open><summary>ข้อมูลที่กรอกเอง (จำไว้ในเครื่องนี้)</summary><div class="fl-grid">'+
     FL_FIELDS.map(function(x){return '<label>'+x[1]+'<input data-fl="'+x[0]+'" type="text" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
-    '</div></details>'+
+    '<label>IAS (kt)<input data-fl="ias" type="text" inputmode="decimal" value="'+esc(f.ias)+'"></label>'+
+    '<label>FUEL<input data-fl="fuel" type="text" inputmode="decimal" value="'+esc(f.fuel)+'"></label>'+
+    '</div><div class="fl-ads"><div>AIRPORT INFORMATION (ติ๊กออก = ไม่แสดง)</div><div id="flAdList"></div>'+
+    '<div class="fl-adadd"><input id="flAdNew" type="text" placeholder="ICAO เช่น VTBD" maxlength="4" autocapitalize="characters">'+
+    '<button type="button" id="flAdBtn">+ เพิ่มสนามบิน</button></div></div></details>'+
     '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
     '<p class="mm-note">ข้อมูลเส้นทาง/สนามบิน/ความถี่ เติมให้อัตโนมัติ · HDG = CRS(T) · ETE ใช้ Airspeed, EFR ใช้ Fuel Consumption ในแอป · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos</p></div>';
   document.body.appendChild(d);
   var imgBox=d.querySelector('.mm-img');
-  function read(){d.querySelectorAll('[data-fl]').forEach(function(i){f[i.getAttribute('data-fl')]=i.value.trim();});var s=Object.assign({},f);delete s.date;flSave(s);}
+  function read(){d.querySelectorAll('[data-fl]').forEach(function(i){f[i.getAttribute('data-fl')]=i.value.trim();});var s=Object.assign({},f);delete s.date;delete s.ias;delete s.fuel;flSave(s);}
+  function adList(){
+    var dfl=flAdDefaults(),sel=flAdSel(f),all=dfl.onR.concat(dfl.near,sel.add).filter(function(id,i,a){return a.indexOf(id)===i;});
+    document.getElementById('flAdList').innerHTML=all.map(function(id){
+      var tag=dfl.onR.indexOf(id)>=0?'':' *';
+      return '<label class="fl-ad"><input type="checkbox" data-ad="'+id+'"'+(sel.off.indexOf(id)<0?' checked':'')+'>'+id+tag+'</label>';
+    }).join('')+'<small> * = นอกเส้นทาง (แถวสีเขียว)</small>';
+    d.querySelectorAll('[data-ad]').forEach(function(c){c.onchange=function(){
+      var id=c.getAttribute('data-ad');f.adOff=(f.adOff||[]).filter(function(x){return x!==id;});
+      if(!c.checked)f.adOff.push(id);make();
+    };});
+  }
   function make(){
     read();imgBox.innerHTML='<p class="mm-note">กำลังสร้าง…</p>';
     buildFlightLog(f).then(function(c){cv=c;imgBox.innerHTML='<img alt="Flight log" src="'+c.toDataURL('image/png')+'">';})
       .catch(function(err){imgBox.innerHTML='<p class="mm-note">สร้างไม่สำเร็จ ('+esc(err&&err.message||err)+')</p>';});
   }
   document.getElementById('flMake').onclick=make;
+  document.getElementById('flAdBtn').onclick=function(){
+    var inp=document.getElementById('flAdNew'),id=inp.value.trim().toUpperCase();
+    if(!APX[id]){alert('ไม่พบสนามบิน '+(id||'')+' ในฐานข้อมูล');return;}
+    f.adOff=(f.adOff||[]).filter(function(x){return x!==id;});
+    if(flAdDefaults().onR.concat(flAdDefaults().near).indexOf(id)<0&&(f.adAdd||[]).indexOf(id)<0)f.adAdd=(f.adAdd||[]).concat([id]);
+    inp.value='';adList();make();
+  };
+  adList();
   document.getElementById('flClose').onclick=function(){read();d.remove();};
   d.addEventListener('click',function(e){if(e.target===d){read();d.remove();}});
   document.getElementById('flSave').onclick=function(){
