@@ -1250,6 +1250,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 }
 #miniMapModal .mm-rwy{white-space:nowrap;font-size:13px}
 #miniMapModal .mm-rwy input{width:3.2em;padding:4px;font:600 14px system-ui,sans-serif;text-align:center;border-radius:5px;border:1px solid #666d76;background:#15181c;color:#fff}
+#miniMapModal .mm-rwy input.mm-ref{width:5.5em;font-size:13px}
 #miniMapModal .mm-sharebox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 10px 8px;color:var(--text,#fff);font-size:13px}
 #miniMapModal .mm-sharebox button{min-height:36px;padding:5px 12px}
 #miniMapModal .mm-sharego{background:#2e86de;color:#fff;font-weight:700}
@@ -8018,9 +8019,11 @@ function buildMiniMap(opt){
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
         if(end||!many)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(end){   /* SPD: PZ (start) / LZ (destination) that is not an airport -> take-off / landing headings (typed in the MINI MAP window) + radial / DME */
-          var rw0=mmRwyGet(),rw=i===0?{to:rw0.pto||(mmSameEnds()?rw0.to:''),ld:rw0.pld||(mmSameEnds()?rw0.ld:'')}:rw0,ap=(p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p);
+          var rw0=mmRwyGet(),rw=i===0?{to:rw0.pto||(mmSameEnds()?rw0.to:''),ld:rw0.pld||(mmSameEnds()?rw0.ld:''),ref:rw0.pref||(mmSameEnds()?rw0.ref:'')}:rw0;
+          var ap=rw.ref?mmRefPt(rw.ref):((p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p));
           lines.push({t:'วิ่งขึ้น '+(rw.to?mmPad3(+rw.to):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
           lines.push({t:'ร่อนลง '+(rw.ld?mmPad3(+rw.ld):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
+          if(!ap&&rw.ref)lines.push({t:'R-       /        '+rw.ref,f:sz+'px '+WFONT,lh:lh,sz:sz});   /* unknown REF: blanks to fill in by hand */
           if(ap){var rd=dist({lat:ap[4],lng:ap[5]},p);lines.push({t:'R-'+mmPad3(course({lat:ap[4],lng:ap[5]},p))+' / '+rd.toFixed(1)+' '+ap[0],f:sz+'px '+WFONT,lh:lh,sz:sz});}
         }
         var m=mmMeasure(ctx,lines,pad);   /* SPD 11 NOV: box fits its text (no blank rows / minimum width) */
@@ -8236,7 +8239,13 @@ function mmRenderLayers(c2){
 }
 /* destination (not an airport) take-off / landing headings, kept per route on this device */
 function mmRwyGet(){try{var o=JSON.parse(localStorage.getItem('fp-mm-rwy')||'null');if(o&&o.k===mmRouteKey())return o;}catch(e){}return {};}
-function mmRwySet(to,ld,pto,pld){try{if(to||ld||pto||pld)localStorage.setItem('fp-mm-rwy',JSON.stringify({k:mmRouteKey(),to:to,ld:ld,pto:pto,pld:pld}));else localStorage.removeItem('fp-mm-rwy');}catch(e){}}
+/* REF typed by SPD: airport ICAO, or any route / off-route waypoint name -> [ident,..,..,..,lat,lng] like APX rows */
+function mmRefPt(id){
+  id=(id||'').toUpperCase().trim();if(!id)return null;if(APX[id])return APX[id];
+  var p=pts.concat(offRoutePts||[]).filter(function(q){return (q.name||'').toUpperCase().trim()===id;})[0];
+  return p?[id,'','','',+p.lat,+p.lng]:null;
+}
+function mmRwySet(o){try{o.k=mmRouteKey();if(o.to||o.ld||o.pto||o.pld||o.ref||o.pref)localStorage.setItem('fp-mm-rwy',JSON.stringify(o));else localStorage.removeItem('fp-mm-rwy');}catch(e){}}
 function mmNotAD(p){return !!p&&!APX[(p.name||'').toUpperCase()];}
 function mmSameEnds(){var a=pts[0],b=pts[pts.length-1];return pts.length>1&&(dist(a,b)<0.1||((a.name||'').toUpperCase().trim()&&(a.name||'').toUpperCase().trim()===(b.name||'').toUpperCase().trim()));}
 function mmBuildSheet(skip){return buildMiniMap({skip:skip,layers:true}).then(mmRenderLayers);}
@@ -8426,8 +8435,8 @@ function showMiniMap(cv){
     '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     '<button type="button" id="mmShare">แชร์</button></span></div>'+
     '<div class="mm-sharebox" id="mmShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="png">PNG</button> <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="mmShareSt"></span></div>'+
-    '<div class="mm-bar2" id="mmMapBar">'+(mmNotAD(pts[0])&&!mmSameEnds()?'<span class="mm-rwy"><b>PZ</b> T/O <input id="mmPTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmPLd" inputmode="numeric" maxlength="3" placeholder="---">°</span> ':'')+
-      (mmNotAD(pts[pts.length-1])?'<span class="mm-rwy"><b>LZ</b> T/O <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">°</span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+    '<div class="mm-bar2" id="mmMapBar">'+(mmNotAD(pts[0])&&!mmSameEnds()?'<span class="mm-rwy"><b>PZ</b> T/O <input id="mmPTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmPLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmPRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+
+      (mmNotAD(pts[pts.length-1])?'<span class="mm-rwy"><b>LZ</b> T/O <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblView" style="display:none"><div class="mm-bar2" style="background:var(--panel,#1b1f24);padding-top:8px;position:sticky;top:0;z-index:3"><button type="button" id="mmTblEdit">✏️ แก้ไขตาราง</button> <span id="mmTblInfo"></span></div><div id="mmTblPrev"></div><div id="mmTblEd" style="display:none"></div></div></div>'+
     '<p class="mm-note">ขนาด A5 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
@@ -8525,14 +8534,13 @@ function showMiniMap(cv){
     },700);
   };
   /* destination take-off / landing headings (SPD): typed here, shown in the destination box */
-  var rwI=['mmTo','mmLd','mmPTo','mmPLd'].map(function(id){return document.getElementById(id);}),rt=null;
-  function rv(k){return rwI[k]?rwI[k].value:'';}
+  var rwK=['to','ld','pto','pld','ref','pref'],rwI=['mmTo','mmLd','mmPTo','mmPLd','mmRef','mmPRef'].map(function(id){return document.getElementById(id);}),rt=null;
   if(rwI.some(function(x){return x;})){
-    var rw0=mmRwyGet();[rw0.to,rw0.ld,rw0.pto,rw0.pld].forEach(function(v,k){if(rwI[k])rwI[k].value=v||'';});
-    rwI.forEach(function(x){if(x)x.oninput=function(){
-      x.value=x.value.replace(/\D/g,'').slice(0,3);
+    var rw0=mmRwyGet();rwK.forEach(function(k,j){if(rwI[j])rwI[j].value=rw0[k]||'';});
+    rwI.forEach(function(x,j){if(x)x.oninput=function(){
+      x.value=j<4?x.value.replace(/\D/g,'').slice(0,3):x.value.toUpperCase().replace(/[^A-Z0-9ก-๙ ._-]/g,'').slice(0,8);
       clearTimeout(rt);rt=setTimeout(function(){
-        var o=mmRwyGet();mmRwySet(rwI[0]?rv(0):o.to||'',rwI[1]?rv(1):o.ld||'',rwI[2]?rv(2):o.pto||'',rwI[3]?rv(3):o.pld||'');
+        var o=mmRwyGet();rwK.forEach(function(k,j2){if(rwI[j2])o[k]=rwI[j2].value.trim();});mmRwySet(o);
         mmBuildSheet(mmOffSkip()).then(function(c2){
           sheet=c2;refreshImg();if(moving){live.width=sheet.width;live.height=sheet.height;redraw();}
         }).catch(function(){});
