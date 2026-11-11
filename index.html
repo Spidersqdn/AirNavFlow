@@ -8008,15 +8008,14 @@ function buildMiniMap(opt){
         if(APX[(p.name||'').toUpperCase()]){adTag(p,P[i],i===0||i===pts.length-1);return;}
         var end=(i===0||i===pts.length-1),lines=[],ef=elevFt[i];
         var nsz=end?PTE:sz,rr0=end?'':(mmRadial(p)||'');ctx.font=sz+'px '+WFONT;
-        var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width*1.05,ctx.measureText(rr0).width*1.05,end?190*S-2*pad:0);   /* wrap only names wider than the other lines */
+        var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width*1.05,ctx.measureText(rr0).width*1.05);   /* wrap only names wider than the other lines */
         lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+nsz+'px '+WFONT,nsz,cw,'#1f2fd6'));
         if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,'#1f2fd6'));
         lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
         lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
         if(end||!many)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
-        if(end)for(var k=0;k<4;k++)lines.push({t:'',f:sz+'px '+WFONT,lh:lh,sz:sz});   /* blank rows to fill in by hand */
-        var m=mmMeasure(ctx,lines,pad);if(end)m.w=Math.max(m.w,190*S);
+        var m=mmMeasure(ctx,lines,pad);   /* SPD 11 NOV: box fits its text (no blank rows / minimum width) */
         items.push({p:p,q:P[i],lines:lines,m:m,pad:pad});
       });
       if(!items.length)return;
@@ -8052,11 +8051,11 @@ function buildMiniMap(opt){
       function place(list,s){   /* column: stack top-to-bottom near each point, then push up from the bottom edge */
         if(!list.length)return [];
         if(s==='T'||s==='B')return placeRow(list,s);
-        var w=list.reduce(function(a,it){return Math.max(a,it.m.w);},0),x=s==='L'?E:W-E-w,cur=HEAD+E,left=[];
+        var cur=HEAD+E,left=[];   /* each box as wide as its own text, kept against the sheet edge */
         var hits=hitsFn(boxes.slice(),false);
         list.sort(function(a,b){return a.q.y-b.q.y;});
         list.forEach(function(it){
-          var b={x:x,y:Math.max(cur,it.q.y-it.m.h/2),w:w,h:it.m.h},o;
+          var b={x:s==='L'?E:W-E-it.m.w,y:Math.max(cur,it.q.y-it.m.h/2),w:it.m.w,h:it.m.h},o;
           while((o=hits(b))&&b.y<H)b.y=o.y+o.h+gap;
           it.b=b;cur=b.y+b.h+gap;
         });
