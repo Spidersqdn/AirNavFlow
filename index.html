@@ -6594,7 +6594,7 @@ function showTrackImage(cv){
   if(sh)sh.onclick=function(){
     cv.toBlob(function(blob){
       var f=new File([blob],fname,{type:'image/png'});
-      if(navigator.canShare({files:[f]}))navigator.share({files:[f],title:fname}).catch(function(){});
+      if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
       else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
     },'image/png');
   };
@@ -6902,7 +6902,7 @@ function askKmzOffRoute(offs){
     });
     function openInFalcon(){
       if(falconFile&&navigator.canShare&&navigator.canShare({files:[falconFile]})){
-        navigator.share({files:[falconFile],title:kmzFileName()}).catch(function(e){
+        navigator.share({files:[falconFile]}).catch(function(e){
           if(!e||e.name!=='AbortError')writeRouteFile([],'kmz'); /* share failed: download instead */
         });
         close(null);
@@ -8631,7 +8631,7 @@ function showMiniMap(cv){
       var can=navigator.canShare&&navigator.canShare({files:files});
       shs.innerHTML='';var go=document.createElement('button');go.type='button';go.className='mm-sharego';
       go.textContent=can?'📤 ส่ง '+t.toUpperCase()+' ('+files.length+' ไฟล์)':'⬇ บันทึก '+t.toUpperCase();
-      go.onclick=function(){if(can)navigator.share({files:files,title:fbase}).catch(function(){});else download(files);};
+      go.onclick=function(){if(can)navigator.share({files:files}).catch(function(){});else download(files);};
       shs.appendChild(go);if(!can)shs.appendChild(document.createTextNode(' อุปกรณ์นี้แชร์ไฟล์ไม่ได้'));
     }).catch(function(err){shs.textContent='สร้างไฟล์ไม่สำเร็จ ('+(err&&err.message||err)+')';});
   };});
@@ -9084,7 +9084,7 @@ function openSlide(){
     if(!cv)return;
     cv.toBlob(function(blob){
       var fl=new File([blob],fname,{type:'image/png'});
-      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl],title:fname}).catch(function(){});
+      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl]}).catch(function(){});
       else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
     },'image/png');
   };
@@ -9514,7 +9514,7 @@ function openFlightLog(){
     if(!cv)return;
     cv.toBlob(function(blob){
       var fl=new File([blob],fname,{type:'image/png'});
-      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl],title:fname}).catch(function(){});
+      if(navigator.canShare({files:[fl]}))navigator.share({files:[fl]}).catch(function(){});
       else alert('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ ใช้ปุ่มบันทึก PNG แทน');
     },'image/png');
   };
