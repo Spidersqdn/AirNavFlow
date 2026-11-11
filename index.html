@@ -10198,14 +10198,15 @@ var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.styl
 function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
 /* PDF with several pages: each page has its own georeference, saved under 'path#pN'; 'path' keeps the page shown */
 function chartPut(c){
-  var v={gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,pages:c.pages||0,w:c.w||0,h:c.h||0};
+  var v={gcp:c.gcpAuto?[]:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,pages:c.pages||0,w:c.w||0,h:c.h||0};
   chartMeta.items[c.key]=v;
   if(c.pages>1&&c.page)chartMeta.items[c.key+'#p'+c.page]=v;
   chartMetaSave();return Promise.resolve();
 }
 function chartPageMeta(c,n){
-  var m=chartMeta.items[c.key+'#p'+n]||{};
-  c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;
+  var m=chartMeta.items[c.key+'#p'+n],on=c.onMap;m=m||{};
+  c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;c.gcpAuto=false;
+  if(c.db)chartDbPreset(c,m.gcp?!!m.onMap:on);
 }
 /* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
 function chartGoPage(c,n,geo,noView){
@@ -10448,7 +10449,7 @@ function chartRender(status){
   var nf=charts.filter(function(x){return !x.db;}).length;
   var src=c&&c.db?'ชาร์ตในแอพ'+(c.labels&&c.labels[(c.page||1)-1]?' · '+c.labels[(c.page||1)-1]:''):nf?'import '+nf+' ไฟล์'+(CHART_FSA?'':' (เปิดแอพใหม่ต้อง import อีกครั้ง)'):'';
   st.textContent=!c?(src||(Object.keys(chartMeta.items).length?'IMPORT CHART อีกครั้ง (พิกัดที่ตั้งไว้ยังอยู่)':'อ่าน PNG / JPG / PDF จากไฟล์โดยตรง ไม่ก็อปเข้าแอพ'))
-    :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด');
+    :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?(c.gcpAuto?'พิกัดอัตโนมัติจากเส้นกริด':'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)'):'ยังไม่ตั้งพิกัด');
 }
 function chartImgSize(blob){
   return new Promise(function(res,rej){
@@ -10613,7 +10614,7 @@ function openChartViewer(c,geo){
     else if(a==='undo'){pts.pop();geoMsg();apply();}
     else if(a==='save'&&pts.length>=2){
       if(c.onGeoSave){c.gcp=pts.slice();close();c.onGeoSave();return;}
-      c.gcp=pts.slice();c.onMap=true;chartSetCur(c);
+      c.gcp=pts.slice();c.gcpAuto=false;c.onMap=true;chartSetCur(c);
       chartPut(c).catch(function(){});
       chartShowOverlay();chartRender();close();chartZoom(c);
     }
@@ -10713,8 +10714,17 @@ function chartDbItems(){
     var c=chartMakeItem({key:'db:'+e.f});
     c.db=e.f;c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
     if(e.pages)c.pages=e.pages;
+    c.geo=e.geo||null;chartDbPreset(c,chartMeta.items[c.key]?c.onMap:true);
     return c;
   });
+}
+/* preset georeference from the chart's grid labels (index.json 'geo': per page [[x,y,lat,lon],...] in px of
+   the standard render, long side 2600 px); a georeference set with SET CHARTs wins */
+function chartDbPreset(c,on){
+  var g=c.geo&&c.geo[(c.page||1)-1];
+  if(c.gcp&&c.gcp.length>=2&&!c.gcpAuto)return;
+  if(!g){c.gcp=[];c.gcpAuto=false;c.onMap=on;return;}
+  c.gcp=g.map(function(p){return {x:p[0],y:p[1],lat:p[2],lng:p[3]};});c.gcpAuto=true;c.onMap=on;
 }
 function chartDbMerge(){
   var cur=chartMeta.sel;
