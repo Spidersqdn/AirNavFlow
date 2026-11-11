@@ -1863,23 +1863,6 @@ body.panel-hidden #panel{display:none}
   <input id="importKmzFile" type="file" hidden>
 </div>
 
-<section class="nav-track">
-  <div class="nav-track-head">NAVIGATION TRACKING</div>
-  <div class="actions">
-    <button id="navTrackBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; screen kept awake)">TRACK</button>
-    <button id="navPrstPosBtn" type="button" title="Center the map on the present position">PPOS</button>
-    <button id="navRouteBtn" type="button" title="Show / hide the track flown so far">ROUTE</button>
-    <button id="navResetBtn" type="button" title="Clear the flown track, distance and flight time">RESET</button>
-    <button id="navExportBtn" type="button" title="Export the flown track as KMZ / KML / GPX / CSV or an image">EXPORT</button>
-  </div>
-  <div class="nav-track-stats">
-    <div><small>DISTANCE</small><b id="navDist">0.0 NM</b></div>
-    <div><small>GROUND SPEED</small><b id="navGs">--- KT</b></div>
-    <div><small>ALTITUDE</small><b id="navAlt">--- FT</b></div>
-    <div><small>FLIGHT TIME</small><b id="navTime">00:00:00</b></div>
-  </div>
-</section>
-
 <section class="elevation-profile">
   <div class="elevation-profile-head">
     <b>Elevation Profile</b>
@@ -1908,6 +1891,23 @@ body.panel-hidden #panel{display:none}
   </div>
   <div id="notamRouteList" class="notam-list">
     <div style="color:var(--mute);font-size:12px">เลือกอย่างน้อย 2 จุดเพื่อคำนวณ NOTAM ใกล้เส้นทาง</div>
+  </div>
+</section>
+
+<section class="nav-track">
+  <div class="nav-track-head">NAVIGATION TRACKING</div>
+  <div class="actions">
+    <button id="navTrackBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; screen kept awake)">TRACK</button>
+    <button id="navPrstPosBtn" type="button" title="Center the map on the present position">PPOS</button>
+    <button id="navRouteBtn" type="button" title="Show / hide the track flown so far">ROUTE</button>
+    <button id="navResetBtn" type="button" title="Clear the flown track, distance and flight time">RESET</button>
+    <button id="navExportBtn" type="button" title="Export the flown track as KMZ / KML / GPX / CSV or an image">EXPORT</button>
+  </div>
+  <div class="nav-track-stats">
+    <div><small>DISTANCE</small><b id="navDist">0.0 NM</b></div>
+    <div><small>GROUND SPEED</small><b id="navGs">--- KT</b></div>
+    <div><small>ALTITUDE</small><b id="navAlt">--- FT</b></div>
+    <div><small>FLIGHT TIME</small><b id="navTime">00:00:00</b></div>
   </div>
 </section>
 
