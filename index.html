@@ -8116,10 +8116,11 @@ function mmApplyPos(L,pos){
   });
   return out;
 }
+function mmBgWhite(){try{return localStorage.getItem('fp-mm-bg')==='white';}catch(e){return false;}}
 function mmDrawLayers(cv,c2,pos){
   var c=cv.getContext('2d'),S=2,W=cv.width,H=cv.height;
   c.setTransform(1,0,0,1,0,0);c.fillStyle='#fff';c.fillRect(0,0,W,H);
-  if(c2.mmBase&&c2.mmBase._im)c.drawImage(c2.mmBase._im,0,c2.mmBase.y,W,c2.mmBase.h);
+  if(c2.mmBase&&c2.mmBase._im&&!mmBgWhite())c.drawImage(c2.mmBase._im,0,c2.mmBase.y,W,c2.mmBase.h);   /* SPD: white background option = no map */
   var L=mmApplyPos(c2.mmShapes||[],pos);
   L.forEach(function(o){
     c.save();
@@ -8310,7 +8311,7 @@ function showMiniMap(cv){
     '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
-    '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+    '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblEd" style="display:none"></div></div>'+
     '<p class="mm-note">ขนาด A4 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
@@ -8339,6 +8340,14 @@ function showMiniMap(cv){
     if(moving){live.width=sheet.width;live.height=sheet.height;redraw();}
     else{mmDrawLayers(sheet,sheet.mmL,pos);refreshImg();}
     show();
+  };
+  /* background: map or plain white (remembered on this device; PDF / PPT / share follow it) */
+  var bgb=document.getElementById('mmBg');
+  function bgLbl(){var w=mmBgWhite();bgb.textContent=w?'🗺 แสดงแผนที่':'⬜ พื้นหลังขาว';}
+  bgLbl();
+  bgb.onclick=function(){
+    try{if(mmBgWhite())localStorage.removeItem('fp-mm-bg');else localStorage.setItem('fp-mm-bg','white');}catch(e){}
+    bgLbl();mmDrawLayers(sheet,sheet.mmL,pos);refreshImg();if(moving)redraw();
   };
   document.getElementById('mmPosReset').onclick=function(){
     if(!Object.keys(pos).length)return;if(!confirm('คืนตำแหน่งกล่องทั้งหมดเป็นค่าเดิม?'))return;
@@ -8404,6 +8413,7 @@ function showMiniMap(cv){
   pb.onclick=function(){
     var pn=fbase+'.pptx';pb.disabled=true;
     buildMiniMap({skip:mmOffSkip(),layers:true}).then(function(c2){
+      if(mmBgWhite()&&c2.mmBase)c2.mmBase.skip=true;   /* white background: no map picture */
       return mmPptxBlob(c2.toDataURL('image/png'),mmTitle(),mmApplyPos(c2.mmShapes,mmPosGet()),c2.mmW,c2.mmBase,c2.mmH,mmTblGet());
     }).then(function(blob){
       var a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=pn;document.body.appendChild(a);a.click();a.remove();
@@ -8468,9 +8478,9 @@ function mmPptxBlob(pngDataUrl,title,shapes,SW,base,SH,rows){
   z.file('ppt/slideLayouts/slideLayout1.xml',X+'<p:sldLayout '+NS+' type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>'+tree+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>');
   z.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels',rels([['slideMaster','../slideMasters/slideMaster1.xml']]));
   z.file('ppt/slides/slide1.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+
-    (base?'<p:pic><p:nvPicPr><p:cNvPr id="3" name="Background map"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
+    (base?(base.skip?'':'<p:pic><p:nvPicPr><p:cNvPr id="3" name="Background map"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
       '<p:blipFill><a:blip r:embed="rId3"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
-      '<p:spPr><a:xfrm><a:off x="0" y="'+HH+'"/><a:ext cx="'+MW+'" cy="'+Math.round(base.h*K)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>':
+      '<p:spPr><a:xfrm><a:off x="0" y="'+HH+'"/><a:ext cx="'+MW+'" cy="'+Math.round(base.h*K)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'):
     '<p:pic><p:nvPicPr><p:cNvPr id="2" name="'+xe(title||'MINI MAP')+'"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'+
     '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
     '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+MW+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>')+
