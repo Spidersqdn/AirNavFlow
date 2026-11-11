@@ -1194,6 +1194,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
 .chart-btn:disabled{opacity:.35;cursor:default}
+.chart-ntsbtn{min-width:34px;font-weight:700;font-size:16px}
+.chart-nts{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;color:#e00;font:800 15px system-ui,sans-serif;background:rgba(255,255,255,.85);padding:2px 6px;border:1.5px solid #e00;border-radius:3px;white-space:nowrap;z-index:1}
 .chart-dbbtn{display:block;width:100%;margin-top:8px;font-size:12px;padding:7px}.chart-dbbtn[hidden]{display:none}
 .chart-import{border-color:var(--orange);background:var(--orange);color:#2a1200}
 .chart-onmap.hide-toggle{color:var(--orange)}
@@ -1920,6 +1922,8 @@ body.panel-hidden #panel{display:none}
   <div class="umap-row" id="chartRow" hidden>
     <span>โปร่งใส</span><input type="range" id="chartOp" min="0.1" max="1" step="0.05" value="0.8">
     <button type="button" id="chartZoomBtn">Zoom</button>
+    <button type="button" id="chartNtsMinus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart smaller on the map">−</button>
+    <button type="button" id="chartNtsPlus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart bigger on the map">+</button>
   </div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT CHART</button>
@@ -10198,14 +10202,15 @@ var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.styl
 function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
 /* PDF with several pages: each page has its own georeference, saved under 'path#pN'; 'path' keeps the page shown */
 function chartPut(c){
-  var v={gcp:c.gcp||[],opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,pages:c.pages||0,w:c.w||0,h:c.h||0};
+  var v={gcp:c.gcpAuto?[]:c.gcp||[],ntsK:c.ntsK||0,opacity:c.opacity,onMap:!!c.onMap,page:c.page||0,pages:c.pages||0,w:c.w||0,h:c.h||0};
   chartMeta.items[c.key]=v;
   if(c.pages>1&&c.page)chartMeta.items[c.key+'#p'+c.page]=v;
   chartMetaSave();return Promise.resolve();
 }
 function chartPageMeta(c,n){
-  var m=chartMeta.items[c.key+'#p'+n]||{};
-  c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;
+  var m=chartMeta.items[c.key+'#p'+n],on=c.onMap;m=m||{};
+  c.page=n;c.gcp=m.gcp||[];c.opacity=m.opacity||c.opacity||0.8;c.onMap=!!m.onMap;c.w=m.w||0;c.h=m.h||0;c.gcpAuto=false;c.nts=false;c.ntsK=m.ntsK||0;
+  if(c.db)chartDbPreset(c,m.gcp?!!m.onMap:on);
 }
 /* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
 function chartGoPage(c,n,geo,noView){
@@ -10236,7 +10241,7 @@ function chartIdb(mode,fn){
 function chartMakeItem(f){
   var m=chartMeta.items[f.key]||{};
   return {key:f.key,name:f.key.replace(CHART_RE,''),isPdf:/\.pdf$/i.test(f.key),file:f.file||null,fh:f.fh||null,
-    gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,pages:m.pages||0,w:m.w||0,h:m.h||0,url:null,onPage:chartGoPage};
+    gcp:m.gcp||[],ntsK:m.ntsK||0,opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,pages:m.pages||0,w:m.w||0,h:m.h||0,url:null,onPage:chartGoPage};
 }
 /* build the chart list from files: [{key:'sub/name.png', name, file?|fh?}] keeping saved georeference */
 function chartSetList(list){
@@ -10289,7 +10294,7 @@ function chartLoad(c){
   }).then(function(blob){
     return chartImgSize(blob).then(function(sz){
       charts.forEach(function(x){if(x!==c&&x.url){URL.revokeObjectURL(x.url);x.url=null;}});
-      c.url=URL.createObjectURL(blob);c.w=sz[0];c.h=sz[1];c.bytes=blob.size;chartPut(c);return c;
+      c.url=URL.createObjectURL(blob);c.w=sz[0];c.h=sz[1];c.bytes=blob.size;if(c.nts)chartNtsSet(c);chartPut(c);return c;
     });
   });
 }
@@ -10348,10 +10353,11 @@ var ChartOverlay=L.Layer.extend({
       this._cv=mkc();this._cv.style.opacity=f?1:c.opacity;
       if(f){this._cv2=mkc();this._cv2.style.opacity=c.opacity;}
     }
+    if(c.nts){this._nts=L.DomUtil.create('div','chart-nts',pane);this._nts.textContent='NOT TO SCALE';}
     this._reset();this._sharp();
   },
   onRemove:function(){
-    var me=this;['_img','_img2','_cv','_cv2'].forEach(function(k){if(me[k])L.DomUtil.remove(me[k]);me[k]=null;});
+    var me=this;['_img','_img2','_cv','_cv2','_nts'].forEach(function(k){if(me[k])L.DomUtil.remove(me[k]);me[k]=null;});
     if(this._task)try{this._task.cancel();}catch(e){}
   },
   getEvents:function(){return {zoom:this._reset,viewreset:this._reset,zoomanim:this._anim,moveend:this._sharpSoon};},
@@ -10366,6 +10372,7 @@ var ChartOverlay=L.Layer.extend({
     if(this._img)this._img.style.transform=mt;if(this._img2)this._img2.style.transform=mt;
     if(this._cv&&this._cb){var b=this._cb,ct=mt+' translate('+b[0]+'px,'+b[1]+'px) scale('+b[4]+')';this._cv.style.transform=ct;if(this._cv2)this._cv2.style.transform=ct;}
     this._t=t;
+    if(this._nts){var c=this._c;this._nts.style.transform='translate('+(t[0]*c.w+t[4])+'px,'+(t[1]*c.w+t[5])+'px) translate(-100%,0)';}
   },
   _reset:function(){var m=this._map;this._set(function(ll){return m.latLngToLayerPoint(ll);});},
   _anim:function(e){var m=this._map;this._set(function(ll){return m._latLngToNewLayerPoint(ll,e.zoom,e.center);});},
@@ -10443,12 +10450,13 @@ function chartRender(status){
   var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!c.onMap; /* HIDE CHARTs: ticked = not on the map */
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
+  document.getElementById('chartNtsMinus').hidden=document.getElementById('chartNtsPlus').hidden=!(c&&c.nts&&geo);
   var st=document.getElementById('chartStatus');
   if(status!==undefined){st.textContent=status||'';return;}
   var nf=charts.filter(function(x){return !x.db;}).length;
   var src=c&&c.db?'ชาร์ตในแอพ'+(c.labels&&c.labels[(c.page||1)-1]?' · '+c.labels[(c.page||1)-1]:''):nf?'import '+nf+' ไฟล์'+(CHART_FSA?'':' (เปิดแอพใหม่ต้อง import อีกครั้ง)'):'';
   st.textContent=!c?(src||(Object.keys(chartMeta.items).length?'IMPORT CHART อีกครั้ง (พิกัดที่ตั้งไว้ยังอยู่)':'อ่าน PNG / JPG / PDF จากไฟล์โดยตรง ไม่ก็อปเข้าแอพ'))
-    :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด');
+    :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?(c.nts?'NOT TO SCALE · ยึด'+(c.ntsAnchor==='grid'?'จุดตัดเส้นกริด':'กึ่งกลางทางวิ่ง')+' · ปรับขนาดด้วย − +':c.gcpAuto?'พิกัดอัตโนมัติจากเส้นกริด':'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)'):'ยังไม่ตั้งพิกัด');
 }
 function chartImgSize(blob){
   return new Promise(function(res,rej){
@@ -10613,7 +10621,7 @@ function openChartViewer(c,geo){
     else if(a==='undo'){pts.pop();geoMsg();apply();}
     else if(a==='save'&&pts.length>=2){
       if(c.onGeoSave){c.gcp=pts.slice();close();c.onGeoSave();return;}
-      c.gcp=pts.slice();c.onMap=true;chartSetCur(c);
+      c.gcp=pts.slice();c.gcpAuto=false;c.onMap=true;chartSetCur(c);
       chartPut(c).catch(function(){});
       chartShowOverlay();chartRender();close();chartZoom(c);
     }
@@ -10677,6 +10685,8 @@ document.getElementById('chartOp').oninput=function(){
   var c=chartCur();if(!c)return;c.opacity=+this.value;if(chartLayer)chartLayer.setOpacity(c.opacity);chartPut(c);
 };
 document.getElementById('chartZoomBtn').onclick=function(){chartZoom(chartCur());};
+document.getElementById('chartNtsMinus').onclick=function(){chartNtsScale(1/1.25);};
+document.getElementById('chartNtsPlus').onclick=function(){chartNtsScale(1.25);};
 document.getElementById('chartResetBtn').onclick=function(){
   if(!confirm('RESET: ลบชาร์ตที่ import (รายการไฟล์ + พิกัดที่ตั้งไว้) ออกจากแอพ?\nไฟล์ในเครื่องไม่ถูกลบ · ชาร์ตในแอพยังอยู่'))return;
   chartIdb('readwrite',function(st){st.delete('dir');return st.delete('files');}).catch(function(){});
@@ -10713,8 +10723,38 @@ function chartDbItems(){
     var c=chartMakeItem({key:'db:'+e.f});
     c.db=e.f;c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
     if(e.pages)c.pages=e.pages;
+    c.geo=e.geo||null;c.ntsIdx=e.nts||null;chartDbPreset(c,chartMeta.items[c.key]?c.onMap:true);
     return c;
   });
+}
+/* preset georeference from the chart's grid labels (index.json 'geo': per page [[x,y,lat,lon],...] in px of
+   the standard render, long side 2600 px); a georeference set with SET CHARTs wins */
+function chartDbPreset(c,on){
+  var g=c.geo&&c.geo[(c.page||1)-1];
+  if(c.gcp&&c.gcp.length>=2&&!c.gcpAuto)return;
+  c.nts=false;c.onMap=on;
+  if(!g){c.nts=true;chartNtsSet(c);return;}
+  c.gcp=g.map(function(p){return {x:p[0],y:p[1],lat:p[2],lng:p[3]};});c.gcpAuto=true;
+}
+/* NOT TO SCALE (no grid fit): north-up, pinned at one known point (crossing of a lat + a long label, from
+   index.json 'nts') or the image centre on the runway midpoint; the user sets the size with − / + (ntsK = m per px) */
+function chartNtsSet(c){
+  var a=c.ntsIdx&&c.ntsIdx[(c.page||1)-1],w=c.w||2600,h=c.h||2600,ll=null,ax,ay;
+  if(a){ax=a[0];ay=a[1];ll=[a[2],a[3]];}
+  else{
+    ax=w/2;ay=h/2;var icao=String(c.db||'').slice(0,4).toUpperCase(),rw=(RWY_INFO[icao]||[]).filter(function(r){return r[0].lat!=null&&r[1].lat!=null;})[0];
+    if(rw)ll=[(rw[0].lat+rw[1].lat)/2,(rw[0].lng+rw[1].lng)/2];
+    else if(typeof APX!=='undefined'&&APX[icao])ll=[APX[icao].lat,APX[icao].lng];
+  }
+  if(!ll||isNaN(ll[0])){c.gcp=[];c.gcpAuto=false;c.nts=false;return;}
+  if(!c.ntsK){var lb=(c.labels&&c.labels[(c.page||1)-1]||'').toUpperCase();
+    c.ntsK=(/SID|STAR/.test(lb)?150000:/RWY/.test(lb)?40000:/AIRPORT|TAXI/.test(lb)?4000:20000)/Math.max(w,h);}
+  var dl=1000*c.ntsK/(111320*Math.cos(ll[0]*Math.PI/180));
+  c.gcp=[{x:ax,y:ay,lat:ll[0],lng:ll[1]},{x:ax+1000,y:ay,lat:ll[0],lng:ll[1]+dl}];c.gcpAuto=true;c.nts=true;c.ntsAnchor=a?'grid':'rwy';
+}
+function chartNtsScale(f){
+  var c=chartCur();if(!c||!c.nts)return;
+  c.ntsK*=f;chartNtsSet(c);chartPut(c);if(chartLayer)chartLayer._reset();
 }
 function chartDbMerge(){
   var cur=chartMeta.sel;
