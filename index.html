@@ -1195,6 +1195,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
 .chart-btn:disabled{opacity:.35;cursor:default}
 .chart-import{border-color:var(--orange);background:var(--orange);color:#2a1200}
+.chart-onmap{font:700 15px system-ui,sans-serif;color:var(--orange);gap:10px;cursor:pointer}
+.chart-onmap input{width:24px;height:24px;margin:0;cursor:pointer}
 .chart-onmap:has(input:disabled){opacity:.45}
 .chart-panel #chartZoomBtn{border-color:var(--orange);color:var(--orange)}
 #chartViewer{position:fixed;inset:0;z-index:6000;background:#1d2024;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
@@ -1843,7 +1845,7 @@ body.panel-hidden #panel{display:none}
     <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW CHARTs</button>
     <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHARTs</button>
   </div>
-  <label class="umap-keep chart-onmap"><input type="checkbox" id="chartOnMap"> ซ้อนบนแผนที่</label>
+  <label class="umap-keep chart-onmap" title="Tick to hide the chart from the map; untick to show it"><input type="checkbox" id="chartOnMap"> HIDE CHARTs</label>
   <div class="umap-row" id="chartRow" hidden>
     <span>โปร่งใส</span><input type="range" id="chartOp" min="0.1" max="1" step="0.05" value="0.8">
     <button type="button" id="chartZoomBtn">Zoom</button>
@@ -10031,7 +10033,7 @@ function chartRender(status){
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
   document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN FOLDER "'+chartDir.name+'"':charts.length?'📁 CHANGE CHART FOLDER':'📁 SELECT CHART FOLDER';
-  var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!!c.onMap;
+  var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!c.onMap; /* HIDE CHARTs: ticked = not on the map */
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
   var st=document.getElementById('chartStatus');
@@ -10259,7 +10261,7 @@ function chartWithFile(fn){return function(){var c=chartCur();if(!c)return;chart
 document.getElementById('chartViewBtn').onclick=chartWithFile(function(c){openChartViewer(c,false);});
 document.getElementById('chartGeoBtn').onclick=chartWithFile(function(c){openChartViewer(c,true);});
 document.getElementById('chartOnMap').onchange=function(){
-  var c=chartCur();if(!c)return;c.onMap=this.checked;chartPut(c);
+  var c=chartCur();if(!c)return;c.onMap=!this.checked;chartPut(c);
   if(c.onMap)chartSelect(c,true);else{chartShowOverlay();chartRender();}
 };
 document.getElementById('chartOp').oninput=function(){
