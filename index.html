@@ -8287,7 +8287,8 @@ function mmTblMerge(m,s){   /* s={r0,c0,r1,c1}; grows to cover any merged cell i
 }
 function mmTblSplit(m,s){mmTblGrid(m).forEach(function(row,y){row.forEach(function(a,x){if(y>=s.r0&&y<=s.r1&&x>=s.c0&&x<=s.c1){a.rs=1;a.cs=1;}});});}
 /* column widths from content, one font size per column, merged cells fitted to their span; em(t,b) = width of t at size 1 */
-function mmTblLayout(m,W,fsMax,em,pad){
+function mmTblLayout(m,W,fsMax,em,pad,hardMax){   /* hardMax: largest font the row height allows (A+ limit) */
+  hardMax=hardMax||fsMax;
   mmTblGrid(m);
   var need=[],c;for(c=0;c<m.C;c++)need.push(0.01);
   m.a.forEach(function(a){if(a.cs===1)need[a.c]=Math.max(need[a.c],em(a.t,a.b));});
@@ -8300,7 +8301,9 @@ function mmTblLayout(m,W,fsMax,em,pad){
   m.a.forEach(function(a){
     var sw=0;for(var x=a.c;x<a.c+a.cs;x++)sw+=cw[x];a._x=0;for(x=0;x<a.c;x++)a._x+=cw[x];a._w=sw;
     var base=m.kinds[a.r]==='h'?hMax:Math.min.apply(null,colFs.slice(a.c,a.c+a.cs));
-    a._fs=a.t?Math.min(base,(sw-pad)/em(a.t,a.b)):base;
+    /* SPD: A+ / A- scale (whole table m.fz, selected cells a.fz); never larger than the row height cap or the cell width */
+    var big=a.t?Math.min(hardMax,(sw-pad)/em(a.t,a.b)):hardMax;
+    a._fs=Math.min(base*(m.fz||1)*(a.fz||1),big);
     a._fill=band[a.r]<0?'4472C4':band[a.r]?'E9EDF6':'D0D8EE';
   });
   return {cw:cw};
@@ -8320,10 +8323,10 @@ function mmTblPages(m){
     if(end<m.R){var e2=end;m.a.forEach(function(a){if(a.r<e2&&a.r+a.rs>e2&&a.r>r)e2=Math.min(e2,a.r);});end=e2;}   /* break above a merged cell */
     var rows=[];for(var i=0;i<nh;i++)rows.push(i);for(i=r;i<end;i++)rows.push(i);
     var map={};rows.forEach(function(o,n){map[o]=n;});
-    var pm={k:m.k,R:rows.length,C:m.C,kinds:rows.map(function(o){return m.kinds[o];}),a:[]};
+    var pm={k:m.k,fz:m.fz,R:rows.length,C:m.C,kinds:rows.map(function(o){return m.kinds[o];}),a:[]};
     m.a.forEach(function(a){
       var top=-1,cnt=0;for(var y=a.r;y<a.r+a.rs;y++)if(y in map){if(top<0)top=map[y];cnt++;}
-      if(top<0)return;pm.a.push({r:top,c:a.c,rs:cnt,cs:a.cs,t:a.t,col:a.col,b:a.b,u:a.u,al:a.al});
+      if(top<0)return;pm.a.push({r:top,c:a.c,rs:cnt,cs:a.cs,t:a.t,col:a.col,b:a.b,u:a.u,al:a.al,fz:a.fz});
     });
     pages.push(pm);r=end;
   }
@@ -8362,6 +8365,7 @@ function mmTblEditor(host,title,onChange){
     '<button type="button" data-a="ic">+ คอลัมน์</button><button type="button" data-a="dc">− คอลัมน์</button>'+
     '<button type="button" data-a="sel">☐ เลือกหลายช่อง</button><button type="button" data-a="mg">รวมช่อง</button><button type="button" data-a="sp">แยกช่อง</button>'+
     '<button type="button" data-a="al" data-v="l" title="ชิดซ้าย">'+mmAlIcon('l')+'</button><button type="button" data-a="al" data-v="c" title="กึ่งกลาง">'+mmAlIcon('c')+'</button><button type="button" data-a="al" data-v="r" title="ชิดขวา">'+mmAlIcon('r')+'</button>'+
+    '<button type="button" data-a="fz" data-v="1" title="ตัวอักษรใหญ่ขึ้น" style="font-weight:700">A<sup>+</sup></button><button type="button" data-a="fz" data-v="-1" title="ตัวอักษรเล็กลง">A<sup>−</sup></button>'+
     '<button type="button" data-a="un">↶ ย้อนกลับ</button><button type="button" data-a="rs">↺ ค่าเดิม</button></div>'+
     '<div class="mm-thead"></div><div class="mm-twrap"><table class="mm-tbl"></table></div>'+
     '<p class="mm-thint">แตะช่องเพื่อแก้ข้อความ · เลือกหลายช่อง: กด ☐ เลือกหลายช่อง แล้วแตะช่องแรกกับช่องสุดท้าย (หรือลาก / Shift+คลิก) แล้วกด รวมช่อง</p>';
@@ -8375,7 +8379,7 @@ function mmTblEditor(host,title,onChange){
       var on=sel&&!(a.r+a.rs-1<sel.r0||a.r>sel.r1||a.c+a.cs-1<sel.c0||a.c>sel.c1);
       var bg=band[y]<0?'#4472c4':band[y]?'#e9edf6':'#d0d8ee';
       h+='<td contenteditable="true" data-r="'+y+'" data-c="'+x+'"'+(a.rs>1?' rowspan="'+a.rs+'"':'')+(a.cs>1?' colspan="'+a.cs+'"':'')+
-        ' style="background:'+bg+';color:#'+a.col+';font-weight:'+(a.b?700:400)+(a.u?';text-decoration:underline':'')+';text-align:'+(a.al==='l'?'left':a.al==='r'?'right':'center')+(on?';outline:3px solid #f39c12;outline-offset:-3px':'')+'">'+esc(a.t||'')+'</td>';}
+        ' style="background:'+bg+';color:#'+a.col+';font-weight:'+(a.b?700:400)+(a.u?';text-decoration:underline':'')+';text-align:'+(a.al==='l'?'left':a.al==='r'?'right':'center')+';font-size:'+Math.round(100*(m.fz||1)*(a.fz||1))+'%'+(on?';outline:3px solid #f39c12;outline-offset:-3px':'')+'">'+esc(a.t||'')+'</td>';}
       h+='</tr>';}
     tb.innerHTML=h;
   }
@@ -8396,6 +8400,12 @@ function mmTblEditor(host,title,onChange){
     if(a==='un'){if(!hist.length)return;m=JSON.parse(hist.pop());sel=null;down=null;draw();save();return;}
     if(a==='al'){var r=sel||(down?{r0:down.r,c0:down.c,r1:down.r,c1:down.c}:null);if(!r)return alert('เลือกช่องที่จะจัดข้อความก่อน');
       snap();var g=mmTblGrid(m),v=b.dataset.v;for(var yy=r.r0;yy<=r.r1;yy++)for(var xx=r.c0;xx<=r.c1;xx++){var an=g[yy][xx];if(an){if(v==='c')delete an.al;else an.al=v;}}
+      draw();save();if(sel)selTo({r:sel.r0,c:sel.c0},{r:sel.r1,c:sel.c1});return;}
+    if(a==='fz'){   /* selected cells (or the tapped cell); nothing chosen = whole table */
+      snap();var up=b.dataset.v==='1',st=function(v){return Math.max(0.4,Math.min(2.5,Math.round((v||1)*(up?1.12:1/1.12)*100)/100));};
+      var r2=sel||(down?{r0:down.r,c0:down.c,r1:down.r,c1:down.c}:null);
+      if(r2){var g2=mmTblGrid(m),seen=[];for(var y2=r2.r0;y2<=r2.r1;y2++)for(var x2=r2.c0;x2<=r2.c1;x2++){var an2=g2[y2][x2];if(an2&&seen.indexOf(an2)<0){seen.push(an2);an2.fz=st(an2.fz);if(an2.fz===1)delete an2.fz;}}}
+      else{m.fz=st(m.fz);if(m.fz===1)delete m.fz;}
       draw();save();if(sel)selTo({r:sel.r0,c:sel.c0},{r:sel.r1,c:sel.c1});return;}
     if(a==='rs'){if(!confirm('คืนตารางเป็นค่าเดิม (ข้อมูลที่แก้จะหาย)?'))return;snap();mmTblSet(null);m=mmTblGet();sel=null;draw();onChange&&onChange();return;}
     snap();
@@ -8739,7 +8749,7 @@ function mmPptxTable(x0,x1,CY,title,rows,HH,upd,badge,media,idb){
   function run(t,sz,b,c,u){return '<a:r><a:rPr lang="th-TH" sz="'+Math.max(600,Math.floor(sz))+'" b="'+(b?1:0)+'"'+(u?' u="sng"':'')+' dirty="0"><a:solidFill><a:srgbClr val="'+c+'"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(t)+'</a:t></a:r>';}
   var ln=function(t){return '<a:'+t+' w="9525"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:'+t+'>';};
   /* SPD: every cell on one line, one size per column, merged cells fitted to their span (measured in TH SarabunPSK when the device has it, else the wider Sarabun) */
-  var em=mmTblEm(),lay=mmTblLayout(m,W,fs,function(t,b){return em(t,b)*127;},131440),cw=lay.cw.map(function(v){return Math.round(v);});
+  var em=mmTblEm(),lay=mmTblLayout(m,W,fs,function(t,b){return em(t,b)*127;},131440,Math.round(rh/12700*0.62*100)),cw=lay.cw.map(function(v){return Math.round(v);});
   var g=mmTblGrid(m),tr='';
   for(var y=0;y<m.R;y++){
     tr+='<a:tr h="'+rh+'">';
