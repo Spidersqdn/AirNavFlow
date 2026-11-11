@@ -1194,6 +1194,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
 .chart-btn:disabled{opacity:.35;cursor:default}
+.chart-dbbtn{display:block;width:100%;margin-top:8px;font-size:12px;padding:7px}.chart-dbbtn[hidden]{display:none}
 .chart-import{border-color:var(--orange);background:var(--orange);color:#2a1200}
 .chart-onmap.hide-toggle{color:var(--orange)}
 .chart-onmap:has(input:disabled){opacity:.45}
@@ -1207,6 +1208,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #chartViewer .cv-bar button,#chartViewer .cv-geo button{margin:0;padding:6px 10px;color:var(--text);font:600 13px system-ui,sans-serif}
 #chartViewer .cv-geo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:#3d3418;color:#ffe08a;font-size:13px}
 #chartViewer .cv-geo[hidden]{display:none}
+#chartViewer .cv-pgsel{max-width:46vw;padding:5px 6px;border:1px solid var(--orange,#ff8a2a);border-radius:6px;background:#15181c;color:var(--orange,#ff8a2a);font:600 13px system-ui,sans-serif}
 #chartViewer .cv-pg{font:600 13px system-ui,sans-serif;white-space:nowrap;color:var(--orange,#ff8a2a)}
 #chartViewer .cv-bar button:disabled{opacity:.35}
 #chartViewer .cv-geo span{flex:1;min-width:180px}
@@ -1925,6 +1927,7 @@ body.panel-hidden #panel{display:none}
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
+  <button type="button" id="chartDbBtn" class="chart-btn chart-dbbtn" hidden title="Copy the charts built into the app (DataBase) onto this device for offline use">⬇ เก็บชาร์ตในแอพไว้ใช้ออฟไลน์</button>
 </section>
 
 <section class="umap-panel map-panel">
@@ -10230,15 +10233,16 @@ function chartIdb(mode,fn){
     };
   });
 }
+function chartMakeItem(f){
+  var m=chartMeta.items[f.key]||{};
+  return {key:f.key,name:f.key.replace(CHART_RE,''),isPdf:/\.pdf$/i.test(f.key),file:f.file||null,fh:f.fh||null,
+    gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,pages:m.pages||0,w:m.w||0,h:m.h||0,url:null,onPage:chartGoPage};
+}
 /* build the chart list from files: [{key:'sub/name.png', name, file?|fh?}] keeping saved georeference */
 function chartSetList(list){
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
   charts.forEach(function(c){if(c.url)URL.revokeObjectURL(c.url);});
-  charts=list.sort(function(a,b){return a.key.localeCompare(b.key,'th');}).map(function(f){
-    var m=chartMeta.items[f.key]||{};
-    return {key:f.key,name:f.key.replace(CHART_RE,''),isPdf:/\.pdf$/i.test(f.key),file:f.file||null,fh:f.fh||null,
-      gcp:m.gcp||[],opacity:m.opacity||0.8,onMap:!!m.onMap,page:m.page||0,pages:m.pages||0,w:m.w||0,h:m.h||0,url:null,onPage:chartGoPage};
-  });
+  charts=list.sort(function(a,b){return a.key.localeCompare(b.key,'th');}).map(chartMakeItem).concat(chartDbItems());
   if(!chartCur())chartSetCur(charts[0]||null);
   chartRender();chartSelect(chartCur(),false);
 }
@@ -10289,7 +10293,7 @@ function chartLoadSaved(){
 /* read the chart from its file (PDF page rendered in memory); only the selected chart is held in memory */
 function chartLoad(c){
   if(c.url)return Promise.resolve(c);
-  var fp=c.file?Promise.resolve(c.file):c.fh?c.fh.getFile():Promise.reject(new Error('ไม่มีไฟล์'));
+  var fp=c.db?chartDbFile(c):c.file?Promise.resolve(c.file):c.fh?c.fh.getFile():Promise.reject(new Error('ไม่มีไฟล์'));
   chartRender('กำลังเปิดชาร์ต…');
   return fp.then(function(file){
     if(!/\.pdf$/i.test(c.key))return file;
@@ -10436,12 +10440,14 @@ function chartZoom(c){var b=c&&c.gcp&&c.gcp.length>=2&&chartBounds(c);if(b&&b.is
 function chartRender(status){
   var sel=document.getElementById('chartSel');if(!sel)return;
   var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2),pend=chartDir&&!chartDirOk;
-  sel.innerHTML=(charts.length?'':'<option value="">'+(pend?'— แตะ 📁 เพื่อเปิดโฟลเดอร์อีกครั้ง —':'— เลือกโฟลเดอร์ชาร์ตก่อน —')+'</option>')+charts.map(function(x){
-    return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' ('+x.pages+' หน้า)':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';
-  }).join('');
+  var opt=function(x){return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' ('+x.pages+' หน้า)':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';};
+  var fol=charts.filter(function(x){return !x.db;}),dbs=charts.filter(function(x){return x.db;});
+  sel.innerHTML=(charts.length?'':'<option value="">'+(pend?'— แตะ 📁 เพื่อเปิดโฟลเดอร์อีกครั้ง —':'— เลือกโฟลเดอร์ชาร์ตก่อน —')+'</option>')+
+    (dbs.length?'<optgroup label="ชาร์ตในแอพ">'+dbs.map(opt).join('')+'</optgroup>':'')+
+    (fol.length?(dbs.length?'<optgroup label="'+esc(chartDir&&chartDirOk?'โฟลเดอร์ '+chartDir.name:'โฟลเดอร์')+'">':'')+fol.map(opt).join('')+(dbs.length?'</optgroup>':''):'');
   document.getElementById('chartViewBtn').disabled=!c;
   var pg=!!(c&&c.pages>1);document.getElementById('chartPgBox').hidden=!pg;
-  if(pg){document.getElementById('chartPgTxt').textContent='หน้า '+c.page+'/'+c.pages;
+  if(pg){document.getElementById('chartPgTxt').textContent='หน้า '+(c.page||1)+'/'+c.pages;
     document.getElementById('chartPgPrev').disabled=c.page<=1;document.getElementById('chartPgNext').disabled=c.page>=c.pages;}
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartReloadBtn').disabled=!(chartDir&&chartDirOk);
@@ -10451,7 +10457,8 @@ function chartRender(status){
   if(c)document.getElementById('chartOp').value=c.opacity;
   var st=document.getElementById('chartStatus');
   if(status!==undefined){st.textContent=status||'';return;}
-  var src=chartDir&&chartDirOk?'โฟลเดอร์ "'+chartDir.name+'" · '+charts.length+' ไฟล์':charts.length?charts.length+' ไฟล์ (เปิดแอพใหม่ต้องเลือกโฟลเดอร์อีกครั้ง)':'';
+  var nf=charts.filter(function(x){return !x.db;}).length;
+  var src=c&&c.db?'ชาร์ตในแอพ'+(c.labels&&c.labels[(c.page||1)-1]?' · '+c.labels[(c.page||1)-1]:''):chartDir&&chartDirOk?'โฟลเดอร์ "'+chartDir.name+'" · '+nf+' ไฟล์':nf?nf+' ไฟล์ (เปิดแอพใหม่ต้องเลือกโฟลเดอร์อีกครั้ง)':'';
   st.textContent=!c?(src||(Object.keys(chartMeta.items).length?'เลือกโฟลเดอร์ชาร์ตอีกครั้ง (พิกัดที่ตั้งไว้ยังอยู่)':'อ่าน PNG / JPG / PDF จากโฟลเดอร์โดยตรง ไม่ก็อปเข้าแอพ'))
     :src+' · '+(c.w?c.w+'×'+c.h+' px · ':'')+(geo?'ตั้งพิกัดแล้ว ('+c.gcp.length+' จุด)':'ยังไม่ตั้งพิกัด');
 }
@@ -10537,7 +10544,7 @@ function openChartViewer(c,geo){
   var bg=document.createElement('div');bg.id='chartViewer';
   bg.innerHTML='<div class="cv-bar"><b></b>'+
     '<button type="button" data-a="out" title="Zoom out">−</button><button type="button" data-a="in" title="Zoom in">+</button>'+
-    (c.pages>1&&c.onPage?'<button type="button" data-a="pp" title="Previous page"'+(c.page<=1?' disabled':'')+'>◀</button><span class="cv-pg">หน้า '+c.page+'/'+c.pages+'</span><button type="button" data-a="pn" title="Next page"'+(c.page>=c.pages?' disabled':'')+'>▶</button>':'')+
+    (c.pages>1&&c.onPage?'<button type="button" data-a="pp" title="Previous page"'+(c.page<=1?' disabled':'')+'>◀</button>'+(c.labels?'<select class="cv-pgsel" title="Go to page">'+c.labels.map(function(l,i){return '<option value="'+(i+1)+'"'+(i+1===c.page?' selected':'')+'>'+(i+1)+'/'+c.pages+(l?' · '+esc(l):'')+'</option>';}).join('')+'</select>':'<span class="cv-pg">หน้า '+c.page+'/'+c.pages+'</span>')+'<button type="button" data-a="pn" title="Next page"'+(c.page>=c.pages?' disabled':'')+'>▶</button>':'')+
     '<button type="button" data-a="fit">Fit</button><button type="button" data-a="geo">📍</button><button type="button" data-a="x">✕</button></div>'+
     '<div class="cv-geo" hidden><span></span><button type="button" data-a="undo">↶ ลบจุดล่าสุด</button><button type="button" data-a="gx">ยกเลิก</button><button type="button" class="cv-save" data-a="save">บันทึก</button></div>'+
     '<div class="cv-stage"><div class="cv-wrap"><img alt=""></div></div>';
@@ -10604,6 +10611,7 @@ function openChartViewer(c,geo){
   }
   function close(){bg.remove();if(sharpTask)try{sharpTask.cancel();}catch(e){}window.removeEventListener('resize',fit);document.removeEventListener('keydown',onKey);}
   function onKey(e){if(e.key==='Escape')close();}
+  var pgs=bg.querySelector('.cv-pgsel');if(pgs)pgs.onchange=function(){var g=geoOn;close();c.onPage(c,+this.value,g);};
   bg.addEventListener('click',function(e){
     var b=e.target.closest('[data-a]');if(!b)return;
     var a=b.getAttribute('data-a'),W=stage.clientWidth/2,H=stage.clientHeight/2;
@@ -10700,7 +10708,80 @@ document.getElementById('importChartBtn').onclick=function(){
     chartSetList(fs.map(function(f){return {key:(f.webkitRelativePath||f.name).replace(/^[^\/]+\//,''),file:f};}));
   };
 })();
-chartRender();chartLoadSaved();
+/* ---- CHART: ชาร์ตในแอพ = charts in Spidersqdn/DataBase AirNavFlow/charts/, listed by charts/index.json
+   (file, pages, page labels) on the DataBase site. Read online; "⬇ เก็บออฟไลน์" copies them into Cache Storage
+   'fp-charts-db-v1' only when the user asks. Their georeference is saved like folder charts (key 'db:<file>'). */
+var CHART_DB_URL=MAP_SITE+'charts/', CHART_DB_CACHE='fp-charts-db-v1', chartDbIdx=null;
+try{chartDbIdx=JSON.parse(localStorage.getItem('fp-charts-db-idx')||'null');}catch(e){}
+function chartDbItems(){
+  return ((chartDbIdx&&chartDbIdx.charts)||[]).map(function(e){
+    var c=chartMakeItem({key:'db:'+e.f});
+    c.db=e.f;c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
+    if(e.pages)c.pages=e.pages;
+    return c;
+  });
+}
+function chartDbMerge(){
+  var cur=chartMeta.sel;
+  charts=charts.filter(function(c){return !c.db;}).concat(chartDbItems());
+  chartMeta.sel=cur;
+  if(!chartCur())chartSetCur(charts[0]||null);
+}
+function chartDbLoadIndex(){
+  return fetch(CHART_DB_URL+'index.json',{cache:'no-cache'}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    .then(function(j){
+      if(!j||!Array.isArray(j.charts))return;
+      chartDbIdx=j;try{localStorage.setItem('fp-charts-db-idx',JSON.stringify(j));}catch(e){}
+      var had=!!chartCur();chartDbMerge();chartRender();
+      if(!had)chartSelect(chartCur(),false);
+      chartDbOfflineState();
+    }).catch(function(){chartDbOfflineState();}); /* offline: keep the last list */
+}
+function chartDbFile(c){
+  var url=CHART_DB_URL+c.db.split('/').map(encodeURIComponent).join('/');
+  var cp=('caches' in window)?caches.open(CHART_DB_CACHE).then(function(k){return k.match(url);}).catch(function(){return null;}):Promise.resolve(null);
+  return cp.then(function(hit){
+    return hit||fetch(url).then(function(r){if(!r.ok)throw new Error('โหลดชาร์ตไม่ได้ ('+r.status+') ต้องต่ออินเทอร์เน็ต หรือกด ⬇ เก็บออฟไลน์ก่อน');return r;});
+  }).then(function(r){return r.blob();}).then(function(b){return new File([b],c.db.split('/').pop(),{lastModified:0});});
+}
+/* offline copy of every chart in the app (only on request) */
+var chartDbStored=0;
+function chartDbOfflineState(){
+  var btn=document.getElementById('chartDbBtn');if(!btn)return;
+  var list=(chartDbIdx&&chartDbIdx.charts)||[];
+  btn.hidden=!list.length;if(!list.length)return;
+  var tot=list.reduce(function(s,e){return s+(e.bytes||0);},0),mb=function(b){return (b/1048576).toFixed(0)+' MB';};
+  if(!('caches' in window)){btn.disabled=true;return;}
+  caches.open(CHART_DB_CACHE).then(function(k){return k.keys();}).then(function(ks){
+    chartDbStored=ks.length;
+    btn.textContent=ks.length>=list.length?'✓ ชาร์ตในแอพใช้ออฟไลน์ได้ ('+mb(tot)+') · แตะเพื่อลบ':'⬇ เก็บชาร์ตในแอพไว้ใช้ออฟไลน์ ('+list.length+' ไฟล์, '+mb(tot)+')';
+  }).catch(function(){});
+}
+function chartDbOffline(){
+  var list=(chartDbIdx&&chartDbIdx.charts)||[],btn=document.getElementById('chartDbBtn');
+  if(!list.length||!('caches' in window))return;
+  if(chartDbStored>=list.length){
+    if(!confirm('ลบชาร์ตในแอพที่เก็บไว้ออฟไลน์? (ยังเปิดดูออนไลน์ได้ พิกัดที่ตั้งไว้ยังอยู่)'))return;
+    caches.delete(CHART_DB_CACHE).then(chartDbOfflineState);return;
+  }
+  btn.disabled=true;var i=0;
+  caches.open(CHART_DB_CACHE).then(function(k){
+    function next(){
+      if(i>=list.length)return;
+      var url=CHART_DB_URL+list[i].f.split('/').map(encodeURIComponent).join('/');
+      btn.textContent='⬇ กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
+      return k.match(url).then(function(hit){
+        if(hit)return;
+        return fetch(url).then(function(r){if(!r.ok)throw new Error(list[i].f+' '+r.status);return k.put(url,r);});
+      }).then(function(){i++;return next();});
+    }
+    return next();
+  }).then(function(){if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();})
+  .catch(function(e){alert('เก็บออฟไลน์ไม่สำเร็จ: '+((e&&e.message)||e));})
+  .then(function(){btn.disabled=false;chartDbOfflineState();});
+}
+document.getElementById('chartDbBtn').onclick=chartDbOffline;
+chartDbMerge();chartRender();chartLoadSaved();chartDbLoadIndex();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
