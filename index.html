@@ -1276,8 +1276,10 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #flightLogModal .fl-ads{margin-top:8px;font-size:11px;color:var(--mute,#aaa)}
 #flightLogModal #flAdList{display:flex;flex-wrap:wrap;gap:4px 10px;margin:4px 0}
 #flightLogModal .fl-ad{display:flex;align-items:center;gap:3px;font-size:13px;color:var(--text,#fff)}
-#flightLogModal .fl-adadd{display:flex;gap:6px}
-#flightLogModal .fl-adadd input{width:110px;padding:4px 6px;font-size:13px;text-transform:uppercase}
+#flightLogModal .fl-grid .fl-adadd{grid-column:span 2}
+#flightLogModal .fl-adadd span{display:flex;gap:4px}
+#flightLogModal .fl-adadd input{flex:1;min-width:0;text-transform:uppercase}
+#flightLogModal .fl-adadd button{padding:2px 8px;font-size:12px;white-space:nowrap}
 .actions button{
   flex:1 1 calc(33.333% - 8px);
   min-width:92px;
@@ -9247,9 +9249,9 @@ function openFlightLog(){
     [['date','DATE'],['callsign','CALL SIGN'],['type','TYPE'],['rule','FLIGHT RULE'],['step','STEP'],['start','START'],['to','T/O'],['ld','L/D'],
      ['mission','MISSION'],['iff','IFF'],['alt','ALTITUDE'],['ias','IAS',1],['fuel','FUEL',1],['bingo','BINGO']].map(function(x){
       return '<label>'+x[1]+'<input data-fl="'+x[0]+'" type="text"'+(x[2]?' inputmode="decimal"':'')+' value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
-    '</div><div class="fl-ads"><div>AIRPORT INFORMATION (ติ๊กออก = ไม่แสดง)</div><div id="flAdList"></div>'+
-    '<div class="fl-adadd"><input id="flAdNew" type="text" placeholder="ICAO เช่น VTBD" maxlength="4" autocapitalize="characters">'+
-    '<button type="button" id="flAdBtn">+ เพิ่มสนามบิน</button></div></div></details>'+
+    '<label class="fl-adadd">เพิ่มสนามบิน (ICAO)<span><input id="flAdNew" type="text" placeholder="VTBD" maxlength="4" autocapitalize="characters">'+
+    '<button type="button" id="flAdBtn">+ เพิ่ม</button></span></label>'+
+    '</div><div class="fl-ads"><div>AIRPORT INFORMATION (ติ๊กออก = ไม่แสดง)</div><div id="flAdList"></div></div></details>'+
     '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
     '<p class="mm-note">ข้อมูลเส้นทาง/สนามบิน/ความถี่ เติมให้อัตโนมัติ · HDG = CRS(T) · ETE ใช้ Airspeed, EFR ใช้ Fuel Consumption ในแอป · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos</p></div>';
   document.body.appendChild(d);
