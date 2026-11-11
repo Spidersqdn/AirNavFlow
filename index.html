@@ -8881,6 +8881,7 @@ function slPtName(p){   /* airport ICAO -> Thai airport name; other points keep 
   var nm=String(APX[id][2]||id),wing=/กองบิน\s*(\d+)/.exec(nm);
   return wing?'บน.'+wing[1]:'ท่าอากาศยาน'+nm.split('/')[0].trim();   /* RTAF wing bases: "บน.21" (SPD sample) */
 }
+function slOffOn(){try{var a=JSON.parse(localStorage.getItem('fp-sl-offon')||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}   /* off-route WPt ticked for SLIDE (default none) */
 function slRouteKey(){return pts.map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join('>');}
 function buildSlide(f){
   var S=2,W=1600*S,H=900*S,FONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';   /* SPD: TH SarabunPSK */
@@ -8949,6 +8950,22 @@ function buildSlide(f){
       ctx.lineWidth=4*S;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(nm,lx,ly);
       ctx.fillStyle='#fff';ctx.fillText(nm,lx,ly);
     });
+    /* off-route WPt inside the map panel; only the ones ticked in the SLIDE WPt list are drawn (SPD: เลือกใส่ได้) */
+    var onSet={};slOffOn().forEach(function(k){onSet[k]=1;});
+    cv.slOffs=(offRoutePts||[]).filter(function(p){
+      if(!isFinite(p.lat)||!isFinite(p.lng))return false;
+      var q=px(p);return q.x>=4*S&&q.x<=MWd-4*S&&q.y>=4*S&&q.y<=MHt-4*S;
+    });
+    cv.slOffs.filter(function(p){return onSet[mmOffKey(p)];}).forEach(function(p){
+      var q=px(p),r=7*S,nm=p.name||'';
+      ctx.beginPath();ctx.moveTo(q.x,q.y-r);ctx.lineTo(q.x+r*0.87,q.y+r*0.5);ctx.lineTo(q.x-r*0.87,q.y+r*0.5);ctx.closePath();
+      ctx.fillStyle='#00e5ff';ctx.fill();ctx.strokeStyle='#04202a';ctx.lineWidth=1.5*S;ctx.stroke();
+      if(!nm)return;
+      ctx.font=F('600',16);ctx.textBaseline='middle';ctx.textAlign='left';
+      var tw=ctx.measureText(nm).width,lx=q.x+10*S;if(lx+tw>MWd-6*S)lx=q.x-10*S-tw;
+      ctx.lineWidth=4*S;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(nm,lx,q.y);
+      ctx.fillStyle='#fff';ctx.fillText(nm,lx,q.y);
+    });
     ctx.restore();
     ctx.strokeStyle='#9aa0a8';ctx.lineWidth=1*S;ctx.strokeRect(MX,MY,MWd,MHt);
     /* table */
@@ -9009,6 +9026,7 @@ function openSlide(){
     '<details class="fl-form" open><summary>ข้อมูลในตาราง (เติมให้เบื้องต้น แก้ได้ แล้วกด อัปเดต)</summary><div class="fl-grid">'+
     SL_FIELDS.map(function(x){return '<label'+(x[2]?' style="grid-column:1/-1"':'')+'>'+x[1]+'<input data-sl="'+x[0]+'" type="text" value="'+esc(f[x[0]]||'')+'"></label>';}).join('')+
     '</div></details>'+
+    '<details class="fl-form" id="slWpt"><summary>WPt ในแผนที่</summary><div class="fl-grid" id="slWptList"></div></details>'+
     '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
     '<p class="mm-note">16:9 · พื้นหลังแผนที่ดาวเทียม (ออฟไลน์ใช้แผนที่ในแอป) · เวลา = เวลาบิน + 5 นาที ปัดเป็น 0/5 · MSA เบื้องต้น = ภูมิประเทศสูงสุด + 1000 ft · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos</p></div>';
   document.body.appendChild(d);
@@ -9016,10 +9034,28 @@ function openSlide(){
   function read(){d.querySelectorAll('[data-sl]').forEach(function(i){f[i.getAttribute('data-sl')]=i.value.trim();});f.rk=rk;slSave(f);}
   function make(){
     read();imgBox.innerHTML='<p class="mm-note">กำลังสร้าง…</p>';
-    buildSlide(f).then(function(c){cv=c;imgBox.innerHTML='<img alt="Mission overview" src="'+c.toDataURL('image/png')+'">';})
+    buildSlide(f).then(function(c){cv=c;imgBox.innerHTML='<img alt="Mission overview" src="'+c.toDataURL('image/png')+'">';wptList(c.slOffs||[]);})
       .catch(function(err){imgBox.innerHTML='<p class="mm-note">สร้างไม่สำเร็จ ('+esc(err&&err.message||err)+')</p>';});
   }
   document.getElementById('slMake').onclick=make;
+  function wptList(offs){   /* tick which off-route WPt (inside the map panel) go on the slide; remembered on this device */
+    var box=d.querySelector('#slWptList'),sum=d.querySelector('#slWpt summary'),on=slOffOn(),onSet={};
+    on.forEach(function(k){onSet[k]=1;});
+    var n=offs.filter(function(p){return onSet[mmOffKey(p)];}).length;
+    sum.textContent='WPt ในแผนที่ ('+n+'/'+offs.length+')';
+    if(!offs.length){box.innerHTML='<span class="mm-note" style="padding:0">ไม่มี Off-Route WPt ในกรอบแผนที่</span>';return;}
+    box.innerHTML='<label style="flex-direction:row;align-items:center;gap:6px;grid-column:1/-1"><input type="checkbox" id="slWptAll" style="width:auto"'+(n===offs.length?' checked':'')+'> <b>ทั้งหมด</b></label>'+
+      offs.map(function(p,i){return '<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-wi="'+i+'" style="width:auto"'+(onSet[mmOffKey(p)]?' checked':'')+'> '+esc(p.name||('WPt '+(i+1)))+'</label>';}).join('');
+    var cbs=[].slice.call(box.querySelectorAll('input[data-wi]')),all=box.querySelector('#slWptAll');
+    function apply(){
+      var inList={};offs.forEach(function(p){inList[mmOffKey(p)]=1;});
+      var keep=on.filter(function(k){return !inList[k];}).concat(offs.filter(function(p,i){return cbs[i].checked;}).map(mmOffKey));
+      try{localStorage.setItem('fp-sl-offon',JSON.stringify(keep));}catch(e){}
+      make();
+    }
+    all.onchange=function(){cbs.forEach(function(x){x.checked=all.checked;});apply();};
+    cbs.forEach(function(x){x.onchange=apply;});
+  }
   function fillMsa(){
     slAutoMsa().then(function(v){var mi=d.querySelector('[data-sl="msa"]');if(v&&mi&&!mi.value){mi.value=v;make();}});
   }
