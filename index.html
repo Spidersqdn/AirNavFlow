@@ -1196,6 +1196,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .chart-btn:disabled{opacity:.35;cursor:default}
 .chart-import{border-color:var(--orange);background:var(--orange);color:#2a1200}
 .chart-onmap:has(input:disabled){opacity:.45}
+/* big HIDE toggle (MAP box; same look as CHART's) */
+.hide-toggle{font:700 15px system-ui,sans-serif;color:var(--amber);gap:10px;cursor:pointer}
+.hide-toggle input{width:24px;height:24px;margin:0;flex:none;cursor:pointer}
 .chart-panel #chartZoomBtn{border-color:var(--orange);color:var(--orange)}
 #chartViewer{position:fixed;inset:0;z-index:6000;background:#1d2024;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 #chartViewer .cv-bar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);color:var(--text)}
@@ -1882,6 +1885,7 @@ body.panel-hidden #panel{display:none}
 <section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
+  <label class="umap-keep hide-toggle" title="Hide every ENROUTE chart / MAP overlay (selection kept)"><input type="checkbox" id="umapHide"> HIDE ENROUTE Charts / MAPs</label>
   <div class="umap-row" id="umapRow" hidden>
     <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
     <button type="button" id="umapZoomBtn">Zoom</button>
@@ -9467,9 +9471,13 @@ var userMaps=[];
 /* one Layer-menu entry "MAP" = the map selected in the left MAP box (m.on = selected) */
 var umapGroup=L.layerGroup();
 try{if(localStorage.getItem('fp-user-maps-grp')!=='0')umapGroup.addTo(map);}catch(e){umapGroup.addTo(map);}
-layerCtl.addOverlay(umapGroup,'<span style="color:#7ee081;font-weight:600">MAP</span>');
-umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}});
-umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}});
+/* no Layer-menu entry: shown/hidden with HIDE ENROUTE Charts / MAPs in the MAP box */
+umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}umapHideSync();});
+umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}umapHideSync();});
+/* HIDE ENROUTE Charts / MAPs = MAP overlay group off the map */
+function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);}
+document.getElementById('umapHide').onchange=function(){if(this.checked)map.removeLayer(umapGroup);else umapGroup.addTo(map);};
+umapHideSync();
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
 function umapKey(id){return 'user-maps/'+id+'.pmtiles';}
 /* maps built into the app: served from the DataBase site (spidersqdn.github.io/DataBase/AirNavFlow/).
