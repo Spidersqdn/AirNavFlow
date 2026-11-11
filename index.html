@@ -9277,8 +9277,11 @@ function openFlightLog(){
   document.getElementById('flAdBtn').onclick=function(){
     var inp=document.getElementById('flAdNew'),id=inp.value.trim().toUpperCase();
     if(!APX[id]){alert('ไม่พบสนามบิน '+(id||'')+' ในฐานข้อมูล');return;}
-    f.adOff=(f.adOff||[]).filter(function(x){return x!==id;});
-    if(flAdDefaults().onR.concat(flAdDefaults().near).indexOf(id)<0&&(f.adAdd||[]).indexOf(id)<0)f.adAdd=(f.adAdd||[]).concat([id]);
+    var dfl=flAdDefaults();
+    if(dfl.onR.concat(dfl.near,f.adAdd||[]).indexOf(id)>=0){   /* already listed: never add twice */
+      alert(id+' มีอยู่ในรายการแล้ว'+((f.adOff||[]).indexOf(id)>=0?' (ติ๊กที่ชื่อเพื่อแสดง)':''));inp.value='';return;
+    }
+    f.adAdd=(f.adAdd||[]).concat([id]);
     inp.value='';adList();make();
   };
   adList();
