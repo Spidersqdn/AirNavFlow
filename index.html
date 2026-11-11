@@ -7805,7 +7805,7 @@ function buildMiniMap(opt){
     mmMapOffs=offs.map(function(o){return o.p;});   /* SPD: table lists only the off-route points shown on this MINI MAP */
     var many=pts.length+offs.length>10;   /* SPD: more than 10 points -> no ELEV line, off-route type may drop 2 pt more */
 
-    /* ---- leg labels: blue bar along each leg "<- 341° 31.8 NM 161° ->" ----
+    /* ---- leg labels: blue bar along each leg "<341° 31.8 NM 161°>" ----
        the bar must not touch any route leg, waypoint / airport symbol or other box: tried at several
        spots along the leg, on both sides and at growing distance; dropped only if nothing is free */
     var symR=P.map(function(q,i){var id=(pts[i].name||'').toUpperCase();return {q:q,r:(RWY_INFO[id]&&APX[id])?46*S:18*S};});
@@ -7830,8 +7830,8 @@ function buildMiniMap(opt){
       if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
       var dTxt=(d<100?d.toFixed(1):Math.round(d))+' NM';
       /* many waypoints (>7) or a short leg (<10 NM): outbound heading only, arrow in the direction of flight */
-      var txt=(pts.length>7||d<10)?(fwd?dTxt+'  '+mmPad3(crs)+'° ->':'<- '+mmPad3(crs)+'°  '+dTxt)
-        :'<- '+mmPad3(fwd?rec:crs)+'°  '+dTxt+'  '+mmPad3(fwd?crs:rec)+'° ->';
+      var txt=(pts.length>7||d<10)?(fwd?dTxt+'  '+mmPad3(crs)+'°>':'<'+mmPad3(crs)+'°  '+dTxt)   /* SPD: "<180° 26.4 NM 000°>" */
+        :'<'+mmPad3(fwd?rec:crs)+'°  '+dTxt+'  '+mmPad3(fwd?crs:rec)+'°>';
       var nx=-Math.sin(ang),ny=Math.cos(ang),ca=Math.abs(Math.cos(ang)),sa=Math.abs(Math.sin(ang)),got=null;
       [16*S,13*S,11*S].forEach(function(fs0){
         if(got)return;
@@ -8174,6 +8174,8 @@ function mmApplyPos(L,pos){
       var base=o.k==='box'?'b:'+((o.lines&&o.lines[0]&&o.lines[0].t)||''):'g:'+o.t;cnt[base]=(cnt[base]||0)+1;n.key=base+'#'+cnt[base];
       var d=pos&&pos[n.key];if(d){n.x+=d[0];n.y+=d[1];
         var sc=o.k==='box'&&d[2]>0&&d[2]!==1?d[2]:0;   /* SPD: box resized in move mode (text scales with it) */
+        if(o.k==='leg'&&d[2]>0&&d[2]!==1){var lc=d[2],lx=n.x+o.w/2,ly=n.y+o.h/2;   /* HDG bar resized about its centre */
+          n._w0=o.w;n.w=o.w*lc;n.h=o.h*lc;n.x=lx-n.w/2;n.y=ly-n.h/2;n.sz=o.sz*lc;n.font=o.font.replace(/[\d.]+px/,n.sz+'px');}
         if(sc){n.sc=sc;n._w0=o.w;n._h0=o.h;n.w=o.w*sc;n.h=o.h*sc;n.pad=o.pad*sc;n.border=o.border*sc;
           n.lines=o.lines.map(function(l){return Object.assign({},l,{sz:l.sz*sc,lh:l.lh*sc});});}
         if(o.src)moved.push(n);}
@@ -8412,7 +8414,7 @@ function showMiniMap(cv){
     '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     '<button type="button" id="mmShare">แชร์</button></span></div>'+
     '<div class="mm-sharebox" id="mmShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="png">PNG</button> <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="mmShareSt"></span></div>'+
-    '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากมุมส้มขวาล่างเพื่อปรับขนาดกล่อง แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+    '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblView" style="display:none"><div class="mm-bar2" style="background:var(--panel,#1b1f24);padding-top:8px;position:sticky;top:0;z-index:3"><button type="button" id="mmTblEdit">✏️ แก้ไขตาราง</button> <span id="mmTblInfo"></span></div><div id="mmTblPrev"></div><div id="mmTblEd" style="display:none"></div></div></div>'+
     '<p class="mm-note">ขนาด A5 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
@@ -8452,7 +8454,12 @@ function showMiniMap(cv){
   function redraw(){shapes=mmDrawLayers(live,sheet.mmL,pos);
     var bw=live.getBoundingClientRect().width;HS=Math.max(36,bw?22*live.width/bw:36);   /* about 22 px on screen, big enough for a finger */
     var c=live.getContext('2d');c.save();c.fillStyle='#f39c12';c.strokeStyle='#111';c.lineWidth=2;
-    shapes.forEach(function(o){if(o.key&&o.k==='box'){c.fillRect(o.x+o.w-HS/2,o.y+o.h-HS/2,HS,HS);c.strokeRect(o.x+o.w-HS/2,o.y+o.h-HS/2,HS,HS);}});c.restore();}
+    shapes.forEach(function(o){var h=hnd(o);if(h){c.fillRect(h.x-HS/2,h.y-HS/2,HS,HS);c.strokeRect(h.x-HS/2,h.y-HS/2,HS,HS);}});c.restore();}
+  function hnd(o){   /* box: bottom-right corner; HDG bar: its right-hand end */
+    if(!o.key)return null;if(o.k==='box')return {x:o.x+o.w,y:o.y+o.h};
+    if(o.k==='leg'){var a=o.rot*Math.PI/180;return {x:o.x+o.w/2+Math.cos(a)*o.w/2,y:o.y+o.h/2+Math.sin(a)*o.w/2};}
+    return null;
+  }
   mv.onclick=function(){
     moving=!moving;mv.style.background=moving?'#f39c12':'';mv.style.color=moving?'#111':'';
     document.getElementById('mmMoveHint').style.display=moving?'':'none';
@@ -8474,17 +8481,17 @@ function showMiniMap(cv){
   };
   function pt(e){var r=live.getBoundingClientRect();return {x:(e.clientX-r.left)*live.width/r.width,y:(e.clientY-r.top)*live.height/r.height};}
   function hit(p){
-    for(var j=shapes.length-1;j>=0;j--){var b=shapes[j];if(b.key&&b.k==='box'&&Math.abs(p.x-(b.x+b.w))<=HS&&Math.abs(p.y-(b.y+b.h))<=HS)return {key:b.key,rs:b};}
+    for(var j=shapes.length-1;j>=0;j--){var b=shapes[j],h=hnd(b);if(h&&Math.abs(p.x-h.x)<=HS&&Math.abs(p.y-h.y)<=HS)return {key:b.key,rs:b};}
     for(var i=shapes.length-1;i>=0;i--){var o=shapes[i];if(!o.key)continue;
       var x=p.x,y=p.y;
       if(o.k==='leg'){var a=-o.rot*Math.PI/180,cx=o.x+o.w/2,cy=o.y+o.h/2,dx=x-cx,dy=y-cy;x=cx+dx*Math.cos(a)-dy*Math.sin(a);y=cy+dx*Math.sin(a)+dy*Math.cos(a);}
       if(x>=o.x&&x<=o.x+o.w&&y>=o.y&&y<=o.y+o.h)return o;}
     return null;
   }
-  live.addEventListener('pointerdown',function(e){var p=pt(e),o=hit(p);if(!o)return;drag={key:o.key,x:p.x,y:p.y,rs:o.rs?{x:o.rs.x,y:o.rs.y,w0:o.rs._w0||o.rs.w}:null};live.setPointerCapture(e.pointerId);e.preventDefault();});
+  live.addEventListener('pointerdown',function(e){var p=pt(e),o=hit(p);if(!o)return;drag={key:o.key,x:p.x,y:p.y,rs:o.rs?{x:o.rs.x,y:o.rs.y,w0:o.rs._w0||o.rs.w,leg:o.rs.k==='leg',cx:o.rs.x+o.rs.w/2,cy:o.rs.y+o.rs.h/2}:null};live.setPointerCapture(e.pointerId);e.preventDefault();});
   live.addEventListener('pointermove',function(e){
     if(!drag)return;var p=pt(e),d0=pos[drag.key]||[0,0];
-    if(drag.rs)pos[drag.key]=[d0[0],d0[1],Math.max(0.5,Math.min(3,(p.x-drag.rs.x)/drag.rs.w0))];   /* drag the corner: resize */
+    if(drag.rs)pos[drag.key]=[d0[0],d0[1],Math.max(0.5,Math.min(3,drag.rs.leg?Math.hypot(p.x-drag.rs.cx,p.y-drag.rs.cy)/(drag.rs.w0/2):(p.x-drag.rs.x)/drag.rs.w0))];   /* drag the corner: resize */
     else pos[drag.key]=[d0[0]+p.x-drag.x,d0[1]+p.y-drag.y].concat(d0[2]?[d0[2]]:[]);
     drag.x=p.x;drag.y=p.y;
     if(!raf)raf=requestAnimationFrame(function(){raf=0;redraw();});
