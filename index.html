@@ -9471,10 +9471,10 @@ var userMaps=[];
 /* one Layer-menu entry "MAP" = the map selected in the left MAP box (m.on = selected) */
 var umapGroup=L.layerGroup();
 try{if(localStorage.getItem('fp-user-maps-grp')!=='0')umapGroup.addTo(map);}catch(e){umapGroup.addTo(map);}
-layerCtl.addOverlay(umapGroup,'<span style="color:#7ee081;font-weight:600">MAP</span>');
+/* no Layer-menu entry: shown/hidden with HIDE ENROUTE Charts / MAPs in the MAP box */
 umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}umapHideSync();});
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}umapHideSync();});
-/* HIDE ENROUTE Charts / MAPs = MAP overlay group off the map (same as unticking MAP in the layer menu) */
+/* HIDE ENROUTE Charts / MAPs = MAP overlay group off the map */
 function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);}
 document.getElementById('umapHide').onchange=function(){if(this.checked)map.removeLayer(umapGroup);else umapGroup.addTo(map);};
 umapHideSync();
