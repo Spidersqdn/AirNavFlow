@@ -8273,6 +8273,23 @@ function mmTblEditor(host,title,onChange){
   draw();
   return {setTitle:setTitle};
 }
+/* minimal PDF: one A4 landscape page (842 x 595 pt) filled with one JPEG */
+function mmPdfBlob(jpegDataUrl,iw,ih){
+  var bin=atob(jpegDataUrl.split(',')[1]),img=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)img[i]=bin.charCodeAt(i);
+  var PW=842,PH=595,parts=[],off=[],len=0;
+  function add(x){var b=typeof x==='string'?new TextEncoder().encode(x):x;parts.push(b);len+=b.length;}
+  function obj(n,body){off[n]=len;add(n+' 0 obj\n');body();add('\nendobj\n');}
+  add('%PDF-1.4\n%\xE2\xE3\n');
+  var cs='q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
+  obj(1,function(){add('<< /Type /Catalog /Pages 2 0 R >>');});
+  obj(2,function(){add('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');});
+  obj(3,function(){add('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>');});
+  obj(4,function(){add('<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream');});
+  obj(5,function(){add('<< /Type /XObject /Subtype /Image /Width '+iw+' /Height '+ih+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+img.length+' >>\nstream\n');add(img);add('\nendstream');});
+  var x=len,xr='xref\n0 6\n0000000000 65535 f \n';for(var n=1;n<=5;n++)xr+=String(off[n]).padStart(10,'0')+' 00000 n \n';
+  add(xr+'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+x+'\n%%EOF\n');
+  return new Blob(parts,{type:'application/pdf'});
+}
 function showMiniMap(cv){
   var old=document.getElementById('miniMapModal');if(old)old.remove();
   var sheet=cv,view=(function(){try{return localStorage.getItem('fp-mm-view')==='table'?'table':'map';}catch(e){return 'map';}})();
@@ -8290,7 +8307,7 @@ function showMiniMap(cv){
     '</div></details> ':'';
   d.innerHTML='<div class="mm-card"><div class="mm-bar"><input id="mmTitleIn" type="text" maxlength="60" placeholder="'+esc(mmTitleDef())+'" style="flex:1;min-width:0;padding:5px 8px;font:600 14px system-ui,sans-serif;border-radius:6px;border:1px solid #666d76;background:#15181c;color:#fff"><span style="white-space:nowrap">'+wpt+
     '<span class="mm-view" style="display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #666d76"><button type="button" data-v="map" style="border:0;border-radius:0">MINI MAP</button><button type="button" data-v="table" style="border:0;border-radius:0">ตาราง</button></span> '+
-    '<button type="button" id="mmSave">บันทึก PNG</button> <button type="button" id="mmPpt">PPT</button> '+
+    '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     (navigator.canShare?'<button type="button" id="mmShare">แชร์</button> ':'')+
     '<button type="button" id="mmClose">✕</button></span></div>'+
     '<div class="mm-bar2" id="mmMapBar"><button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
@@ -8373,8 +8390,14 @@ function showMiniMap(cv){
     boxesW.forEach(function(x){x.onchange=function(){all.checked=boxesW.every(function(y){return y.checked;});apply();};});
   }
   d.addEventListener('click',function(e){if(e.target===d)d.remove();});
+  /* PDF (SPD): one A4 landscape page like the PPT, MINI MAP left + table right, ready to print */
   document.getElementById('mmSave').onclick=function(){
-    var a=document.createElement('a');a.href=out().toDataURL('image/png');a.download=fname();document.body.appendChild(a);a.click();a.remove();
+    mmDrawLayers(sheet,sheet.mmL,mmPosGet());
+    var H=2480,w=Math.round(H*sheet.width/sheet.height),c=document.createElement('canvas');c.width=2*w;c.height=H;   /* ~300 dpi */
+    var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,H);
+    x.drawImage(sheet,0,0,w,H);x.drawImage(mmTableSheet(sheet),w,0,w,H);
+    var blob=mmPdfBlob(c.toDataURL('image/jpeg',0.92),c.width,H),a=document.createElement('a'),u=URL.createObjectURL(blob);
+    a.href=u;a.download=fbase+'.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},30000);
   };
   /* PowerPoint: A4 landscape slide, MINI MAP (moved boxes kept) left, edited table right */
   var pb=document.getElementById('mmPpt');
