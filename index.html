@@ -708,6 +708,13 @@ input,select,button,textarea{font:inherit;color:var(--text)}
 input,select,textarea{background:#2f3338;border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
 .search input{flex:1}
+.search{position:relative}
+.q-list{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:2000;max-height:60vh;overflow-y:auto;background:#2f3338;border:1px solid var(--cyan);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.q-list.on{display:block}
+.q-list button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:8px 10px}
+.q-list button:hover,.q-list button:focus-visible{background:var(--panel2)}
+.q-list small{color:var(--mute);margin-left:6px}
+.q-list .q-head{padding:6px 10px;font-size:12px;color:var(--cyan)}
 button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
 button:hover{border-color:var(--cyan)}
 .totals{padding:16px 18px;border-bottom:1px solid var(--line)}
@@ -1752,6 +1759,7 @@ body.panel-hidden #panel{display:none}
   <form class="search" id="searchForm">
     <input id="q" type="search" placeholder="ICAO เช่น VTBL, VTBS หรือชื่อสถานที่" aria-label="ค้นหาสถานที่">
     <button type="submit">ค้นหา</button>
+    <div class="q-list" id="qList" role="listbox" aria-label="ผลการค้นหา"></div>
   </form>
 </header>
 
@@ -11035,26 +11043,21 @@ document.querySelectorAll('.units button').forEach(function(b){
   document.getElementById(id).addEventListener('input',drawLines);
 });
 
-document.getElementById('searchForm').addEventListener('submit',function(e){
-  e.preventDefault();
-  var q=document.getElementById('q').value.trim();
-  if(!q)return;
-
-  /* fly to the result, then show the same MAP POINT popup as long-press (Add ROUTE / Add Off-Route) */
-  function showFound(lat,lng,title,sub,name){
-    map.closePopup();
-    map.once('moveend',function(){
-      showMapPointInfo(L.latLng(lat,lng),{force:true,title:title,sub:sub,name:name});
-    });
-    map.flyTo([lat,lng],11);
-  }
-
-  var ap=APX[q.toUpperCase()];
-  if(ap){
-    showFound(ap[4],ap[5],ap[0],ap[2],ap[0]);
-    return;
-  }
-
+/* Search order: ICAO (APX) -> offline place index (DataBase/CoWork/places.json, no signal needed) -> OSM Nominatim online */
+function showFound(lat,lng,title,sub,name){
+  hideQList();
+  map.closePopup();
+  map.once('moveend',function(){
+    showMapPointInfo(L.latLng(lat,lng),{force:true,title:title,sub:sub,name:name});
+  });
+  map.flyTo([lat,lng],12);
+}
+function showPlace(p){
+  showFound(p.lat,p.lng,'SEARCH: '+p.n,(p.e?p.e+' · ':'')+placeKindTh(p.k),p.n);
+}
+function hideQList(){var l=document.getElementById('qList');l.classList.remove('on');l.innerHTML='';}
+function searchOnline(q){
+  if(!navigator.onLine){alert('ไม่พบ "'+q+'" ในดัชนีค้นหาออฟไลน์ (ไม่มีสัญญาณ ค้นออนไลน์ไม่ได้)');return;}
   fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=th&q='+encodeURIComponent(q))
   .then(function(r){return r.json();})
   .then(function(j){
@@ -11063,7 +11066,45 @@ document.getElementById('searchForm').addEventListener('submit',function(e){
     showFound(Number(j[0].lat),Number(j[0].lon),'SEARCH: '+q,full,full.split(',')[0].trim()||q);
   })
   .catch(function(){alert('ค้นหาสถานที่ไม่สำเร็จ');});
+}
+function showQList(q,res){
+  var l=document.getElementById('qList');
+  l.innerHTML='<div class="q-head">ผลค้นหาออฟไลน์ '+res.length+(res.length>=PLACES_MAX?'+':'')+' แห่ง</div>'+
+    res.map(function(p,i){
+      return '<button type="button" data-qi="'+i+'">'+esc(p.n)+(p.e?' <small>'+esc(p.e)+'</small>':'')+'<small>'+esc(placeKindTh(p.k))+'</small></button>';
+    }).join('')+
+    (navigator.onLine?'<button type="button" data-qi="online">🔎 ค้นออนไลน์ (OSM) "'+esc(q)+'"</button>':'');
+  l.classList.add('on');
+  l.onclick=function(e){
+    var b=e.target.closest('[data-qi]');if(!b)return;
+    var k=b.getAttribute('data-qi');
+    if(k==='online'){hideQList();searchOnline(q);return;}
+    showPlace(res[Number(k)]);
+  };
+}
+document.getElementById('searchForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var q=document.getElementById('q').value.trim();
+  hideQList();
+  if(!q)return;
+
+  var ap=APX[q.toUpperCase()];
+  if(ap){
+    showFound(ap[4],ap[5],ap[0],ap[2],ap[0]);
+    return;
+  }
+
+  loadPlaces().then(function(idx){
+    var res=idx?searchPlaces(q):[];
+    if(res.length===1)showPlace(res[0]);
+    else if(res.length)showQList(q,res);
+    else if(!idx&&!navigator.onLine)alert('ไม่มีสัญญาณ และยังไม่มีดัชนีค้นหาสถานที่ในเครื่อง (โหลดพร้อมปุ่ม Download Map)');
+    else searchOnline(q);
+  });
 });
+document.getElementById('q').addEventListener('input',hideQList);
+document.addEventListener('keydown',function(e){if(e.key==='Escape')hideQList();});
+document.addEventListener('pointerdown',function(e){if(!e.target.closest('#searchForm'))hideQList();});
 
 
 function setWpMode(mode){
@@ -11303,7 +11344,8 @@ function renderOfflineInfo(msg){
   else if(offlineState.stored){
     info.innerHTML='✓ มีแผนที่ในเครื่องแล้ว '+fmtMB(offlineState.bytes)+
       (offlineState.savedAt?' (โหลดเมื่อ '+new Date(offlineState.savedAt).toLocaleDateString('th-TH')+')':'')+
-      '<br>ใช้ได้แม้ไม่มีสัญญาณ: เลือกชั้น "แผนที่ออฟไลน์ (OSM)" + ปุ่ม GPS';
+      '<br>ใช้ได้แม้ไม่มีสัญญาณ: เลือกชั้น "แผนที่ออฟไลน์ (OSM)" + ปุ่ม GPS'+
+      (placesState.stored?'<br>🔎 ค้นหาสถานที่ออฟไลน์ได้'+(placesState.count?' '+placesState.count.toLocaleString()+' แห่ง':''):'');
   }else if(offlineState.onServer===false){
     info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (DataBase/AirNavFlow/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
   }else{
@@ -11323,6 +11365,63 @@ function useStoredOfflineMap(){
       return setOfflineSource(new pmtiles.FileSource(new File([blob],'thailand.pmtiles'))).then(function(){return true;});
     });
   }).catch(function(){return false;});
+}
+/* ---- Offline place search index: DataBase/CoWork/places.json (towns, villages, airfields, temples, peaks ...),
+   built by the DataBase workflow from the same OSM map; shared with FalCon2CP. Saved with Download Map. ---- */
+var PLACES_URL='https://spidersqdn.github.io/DataBase/CoWork/places.json', PLACES_CACHE='fp-places-v1', PLACES_MAX=30;
+var placesIdx=null, placesLoading=null, placesState={stored:false,count:0};
+var PLACE_KIND_TH={region:'จังหวัด',county:'อำเภอ',city:'เมือง',town:'เมือง/อำเภอ',locality:'ชุมชน',suburb:'ย่าน',village:'หมู่บ้าน',
+  neighbourhood:'ย่าน',hamlet:'หมู่บ้าน',aerodrome:'สนามบิน',airfield:'สนามบิน',airport:'สนามบิน',helipad:'ลานจอด ฮ.',heliport:'ลานจอด ฮ.',
+  military:'ทหาร',barracks:'ค่ายทหาร',hospital:'โรงพยาบาล',clinic:'คลินิก',school:'โรงเรียน',university:'มหาวิทยาลัย',college:'วิทยาลัย',
+  place_of_worship:'วัด/ศาสนสถาน',temple:'วัด',peak:'ยอดเขา',volcano:'ภูเขาไฟ',waterfall:'น้ำตก',cave_entrance:'ถ้ำ',beach:'ชายหาด',
+  island:'เกาะ',islet:'เกาะ',dam:'เขื่อน',reservoir:'อ่างเก็บน้ำ',lake:'ทะเลสาบ',lighthouse:'ประภาคาร',tower:'เสา/หอ',
+  communications_tower:'เสาสื่อสาร',power_plant:'โรงไฟฟ้า',stadium:'สนามกีฬา',golf_course:'สนามกอล์ฟ',park:'สวน',
+  national_park:'อุทยานแห่งชาติ',nature_reserve:'เขตอนุรักษ์',protected_area:'เขตอนุรักษ์',viewpoint:'จุดชมวิว',museum:'พิพิธภัณฑ์',
+  train_station:'สถานีรถไฟ',station:'สถานี',bus_station:'สถานีขนส่ง',ferry_terminal:'ท่าเรือ',pier:'ท่าเรือ',marina:'ท่าเรือ',
+  harbour:'ท่าเรือ',port:'ท่าเรือ',bridge:'สะพาน',townhall:'ที่ว่าการ',government:'หน่วยราชการ',police:'สถานีตำรวจ',
+  fire_station:'สถานีดับเพลิง',prison:'เรือนจำ',attraction:'สถานที่ท่องเที่ยว',ruins:'โบราณสถาน',archaeological_site:'โบราณสถาน',
+  monument:'อนุสาวรีย์',memorial:'อนุสรณ์',zoo:'สวนสัตว์',theme_park:'สวนสนุก',quarry:'เหมือง',camp_site:'ลานกางเต็นท์'};
+function placeKindTh(k){return PLACE_KIND_TH[k]||k||'';}
+function normQ(s){return String(s||'').toLowerCase().replace(/[\s\-_.,'()\/]/g,'');}
+function placesPrep(j){
+  var kinds=j.kinds||[];
+  placesIdx=(j.p||[]).map(function(r){return {n:r[0],e:r[1]||'',lat:r[2],lng:r[3],k:kinds[r[4]]||'',a:normQ(r[0]),b:normQ(r[1])};});
+  placesState.count=placesIdx.length;
+  return placesIdx;
+}
+function loadPlaces(){
+  if(placesIdx)return Promise.resolve(placesIdx);
+  if(placesLoading)return placesLoading;
+  placesLoading=(('caches' in window)?caches.open(PLACES_CACHE).then(function(c){return c.match(PLACES_URL);}):Promise.resolve(null))
+    .then(function(r){
+      if(r){placesState.stored=true;return r.json();}
+      if(!navigator.onLine)return null;
+      return fetch(PLACES_URL,{cache:'no-store'}).then(function(x){return x.ok?x.json():null;});
+    })
+    .then(function(j){placesLoading=null;return j?placesPrep(j):null;})
+    .catch(function(){placesLoading=null;return null;});
+  return placesLoading;
+}
+function savePlaces(){
+  if(!('caches' in window)||!navigator.onLine)return Promise.resolve(false);
+  return fetch(PLACES_URL,{cache:'no-store'}).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.clone().json().then(function(j){
+      placesPrep(j);
+      return caches.open(PLACES_CACHE).then(function(c){return c.put(PLACES_URL,r);});
+    });
+  }).then(function(){placesState.stored=true;renderOfflineInfo();return true;}).catch(function(){return false;});
+}
+function searchPlaces(q){
+  var t=normQ(q),ex=[],pre=[],inn=[];
+  if(!t||!placesIdx)return [];
+  for(var i=0;i<placesIdx.length;i++){
+    var p=placesIdx[i];
+    if(p.a===t||p.b===t)ex.push(p);
+    else if(p.a.indexOf(t)===0||p.b.indexOf(t)===0)pre.push(p);
+    else if(inn.length<PLACES_MAX&&(p.a.indexOf(t)>0||p.b.indexOf(t)>0))inn.push(p);
+  }
+  return ex.concat(pre,inn).slice(0,PLACES_MAX);
 }
 function downloadOfflineMap(){
   if(offlineState.busy)return;
@@ -11352,6 +11451,9 @@ function downloadOfflineMap(){
     if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
     return useStoredOfflineMap();
   }).then(function(){
+    renderOfflineInfo('กำลังโหลดดัชนีค้นหาสถานที่…');
+    return savePlaces();
+  }).then(function(){
     offlineState.busy=false;bar.classList.remove('on');
     if(!map.hasLayer(offlineBase)){map.eachLayer(function(l){if(l===sat||l===osm||l===topo)map.removeLayer(l);});offlineBase.addTo(map);}
     renderOfflineInfo();
@@ -11362,6 +11464,8 @@ function downloadOfflineMap(){
 }
 function deleteOfflineMap(){
   if(!confirm('ลบแผนที่ออฟไลน์ออกจากเครื่อง?'))return;
+  caches.delete(PLACES_CACHE).catch(function(){});
+  placesState.stored=false;placesIdx=null;
   caches.delete(OFFLINE_CACHE).then(function(){
     offlineState.stored=false;offlineState.bytes=0;offlineState.savedAt=0;
     if(navigator.onLine)return mapSrc('thailand.pmtiles').then(setOfflineSource).catch(function(){});
@@ -11372,6 +11476,11 @@ function initOfflineMap(){
   useStoredOfflineMap().then(function(stored){
     if(stored){
       map.removeLayer(sat);offlineBase.addTo(map);
+      /* map downloaded before the place index existed: fetch the small index once */
+      caches.open(PLACES_CACHE).then(function(c){return c.match(PLACES_URL);}).then(function(r){
+        if(r)return loadPlaces().then(function(){renderOfflineInfo();});
+        return savePlaces();
+      }).catch(function(){});
       return;
     }
     return mapSrc('thailand.pmtiles').then(setOfflineSource).then(function(){offlineState.onServer=true;})
