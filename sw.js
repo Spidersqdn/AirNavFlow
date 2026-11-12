@@ -3,7 +3,7 @@
    - Pages: network-first, falls back to cached shell when offline
    - Province borders / fonts: stale-while-revalidate
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v154';
+var APP_CACHE='fp-app-v155';
 var RUNTIME_CACHE='fp-runtime-v1';
 var SHELL=['./'];
 var OPTIONAL=['index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png','icons/slide-bg.jpg'];
@@ -34,7 +34,7 @@ self.addEventListener('fetch',function(e){
     if(/\.pmtiles$/i.test(url.pathname))return;
     if(/\/notam\//.test(url.pathname))return;   // daily NOTAM file: always from network (app keeps its own offline copy)
     if(/\/data\//.test(url.pathname))return;    // data/*.txt (มทบ., CSAR, ผบ.ฝูง): same, app keeps its own offline copy
-    if(/\/DataBase\/CoWork\//.test(url.pathname))return;   // shared AD/RWY/สนามบิน ทบ. (DataBase repo): app keeps its own offline copy
+    if(/\/DataBase\/CoWork\//.test(url.pathname))return;   // shared AD/RWY/สนามบิน ทบ. + places.json (DataBase repo): app keeps its own offline copy
     if(req.mode==='navigate'){
       e.respondWith(fetch(req).then(function(res){
         var copy=res.clone();
