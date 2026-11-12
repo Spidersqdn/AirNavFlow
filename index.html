@@ -7655,7 +7655,8 @@ function buildMiniMap(opt){
   }
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
   /* route + nearby off-route points in world px at z=0 */
-  var all=pts.map(function(p){return mmWorld(p.lat,p.lng,0);});
+  var ALT=(otherPts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});   /* the other route (main / alternate): dashed on the sheet */
+  var all=pts.concat(ALT).map(function(p){return mmWorld(p.lat,p.lng,0);});
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
@@ -7849,6 +7850,18 @@ function buildMiniMap(opt){
       ctx.strokeStyle='#111';ctx.lineWidth=4*S;
       ctx.beginPath();P.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();
     }
+    /* ---- other route (alternate / main): magenta dashed line + dots; its names are boxed after the off-route points ---- */
+    var ALTC='#c2188b',AQ=ALT.map(px);
+    function altDraw(){
+      ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=ALTC;ctx.lineWidth=3.5*S;ctx.setLineDash([14*S,10*S]);
+      ctx.beginPath();AQ.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();ctx.setLineDash([]);
+      AQ.forEach(function(q){ctx.beginPath();ctx.arc(q.x,q.y,6*S,0,2*Math.PI);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3*S;ctx.strokeStyle=ALTC;ctx.stroke();});
+      ctx.restore();
+    }
+    if(AQ.length){
+      if(REC)layerPic(routeActive==='main'?'Alternate route':'Main route',0,HEAD,W,H-HEAD,altDraw);else altDraw();
+      for(var ai=1;ai<AQ.length;ai++)segs.push([AQ[ai-1],AQ[ai]]);
+    }
 
     /* ---- off-route waypoints inside the frame ---- */
     /* off-route points: drop duplicates of route points and anything more than 20 NM from the route */
@@ -7984,6 +7997,7 @@ function buildMiniMap(opt){
     var nearAD=AP.filter(function(a){return !(a[0] in adIdx);}).map(function(a){return {id:a[0],q:px({lat:a[4],lng:a[5]})};})
       .filter(function(o){return o.q.x>40*S&&o.q.x<W-40*S&&o.q.y>HEAD+40*S&&o.q.y<H-40*S;});
     offs.forEach(function(o){symPts.push(o.q);});
+    AQ.forEach(function(q){symPts.push(q);});
     nearAD.forEach(function(o){
       symPts.push(o.q);
       if(!runwaySym(o.id,o.q))ring(o.q,9*S);
@@ -8203,6 +8217,15 @@ function buildMiniMap(opt){
     offs.forEach(function(o,i){   /* 9 pt; 7 pt when the sheet is crowded or the 9 pt box finds no room */
       if(!many&&wpBox(o.p,o.q,i,true,PTO,true))return;
       wpBox(o.p,o.q,i,true,PT(7));
+    });
+    /* other route: name tag per point (points shared with the drawn route already have a box) */
+    var altSeen={};
+    ALT.forEach(function(p,i){
+      var nm=(p.name||'').trim()||('WP'+(i+1));
+      if(pts.some(function(r){return dist(r,p)<0.5;})||altSeen[nm.toUpperCase()])return;
+      altSeen[nm.toUpperCase()]=1;
+      var f='600 '+PTO+'px '+WFONT;
+      placeAndDraw(AQ[i],[{t:nm,f:f,lh:LH(PTO),sz:PTO,c:ALTC,center:true}],4*S,true,'left');
     });
     /* airports off the route: info box in smaller type (8 pt, then 7 pt if space is short), name tag only as a last resort */
     nearAD.forEach(function(o){
