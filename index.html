@@ -11043,7 +11043,7 @@ document.querySelectorAll('.units button').forEach(function(b){
   document.getElementById(id).addEventListener('input',drawLines);
 });
 
-/* Search order: ICAO (APX) -> offline place index (DataBase/CoWork/places.json, no signal needed) -> OSM Nominatim online */
+/* Search order: ICAO (APX) -> online: OSM Nominatim / no signal: offline place index (DataBase/CoWork/places.json, saved by Download Map) */
 function showFound(lat,lng,title,sub,name){
   hideQList();
   map.closePopup();
@@ -11056,16 +11056,27 @@ function showPlace(p){
   showFound(p.lat,p.lng,'SEARCH: '+p.n,(p.e?p.e+' · ':'')+placeKindTh(p.k),p.n);
 }
 function hideQList(){var l=document.getElementById('qList');l.classList.remove('on');l.innerHTML='';}
-function searchOnline(q){
+function searchOnline(q,orOffline){
   if(!navigator.onLine){alert('ไม่พบ "'+q+'" ในดัชนีค้นหาออฟไลน์ (ไม่มีสัญญาณ ค้นออนไลน์ไม่ได้)');return;}
+  function fallback(msg){if(orOffline&&placesState.stored)searchOffline(q,msg);else alert(msg);}
   fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=th&q='+encodeURIComponent(q))
   .then(function(r){return r.json();})
   .then(function(j){
-    if(!j.length){alert('ไม่พบสถานที่');return;}
+    if(!j.length){fallback('ไม่พบสถานที่');return;}
     var full=String(j[0].display_name||q);
     showFound(Number(j[0].lat),Number(j[0].lon),'SEARCH: '+q,full,full.split(',')[0].trim()||q);
   })
-  .catch(function(){alert('ค้นหาสถานที่ไม่สำเร็จ');});
+  .catch(function(){fallback('ค้นหาสถานที่ไม่สำเร็จ');});
+}
+/* offline index: only when the map was downloaded (Download Map saves it with the map) */
+function searchOffline(q,notFound){
+  loadPlaces().then(function(idx){
+    var res=idx?searchPlaces(q):[];
+    if(res.length===1)showPlace(res[0]);
+    else if(res.length)showQList(q,res);
+    else if(!idx)alert('ไม่มีสัญญาณ: ค้นหาสถานที่แบบออฟไลน์ได้หลังกด Download Map (โหลดแผนที่ลงเครื่อง) ตอนมีเน็ต');
+    else alert(notFound||('ไม่พบ "'+q+'" ในดัชนีค้นหาออฟไลน์ (ไม่มีสัญญาณ)'));
+  });
 }
 function showQList(q,res){
   var l=document.getElementById('qList');
@@ -11094,13 +11105,9 @@ document.getElementById('searchForm').addEventListener('submit',function(e){
     return;
   }
 
-  loadPlaces().then(function(idx){
-    var res=idx?searchPlaces(q):[];
-    if(res.length===1)showPlace(res[0]);
-    else if(res.length)showQList(q,res);
-    else if(!idx&&!navigator.onLine)alert('ไม่มีสัญญาณ และยังไม่มีดัชนีค้นหาสถานที่ในเครื่อง (โหลดพร้อมปุ่ม Download Map)');
-    else searchOnline(q);
-  });
+  /* online: OSM search as before (offline index only as backup); no signal: offline index from Download Map */
+  if(navigator.onLine)searchOnline(q,true);
+  else searchOffline(q);
 });
 document.getElementById('q').addEventListener('input',hideQList);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')hideQList();});
@@ -11395,8 +11402,7 @@ function loadPlaces(){
   placesLoading=(('caches' in window)?caches.open(PLACES_CACHE).then(function(c){return c.match(PLACES_URL);}):Promise.resolve(null))
     .then(function(r){
       if(r){placesState.stored=true;return r.json();}
-      if(!navigator.onLine)return null;
-      return fetch(PLACES_URL,{cache:'no-store'}).then(function(x){return x.ok?x.json():null;});
+      return null;
     })
     .then(function(j){placesLoading=null;return j?placesPrep(j):null;})
     .catch(function(){placesLoading=null;return null;});
