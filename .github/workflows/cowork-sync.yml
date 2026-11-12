@@ -1,0 +1,48 @@
+# Keeps a backup copy of the shared data in this repo. The master files live in
+# Spidersqdn/DataBase/CoWork/ (edit them there). Every 6 hours, or by hand, this copies
+# CoWork/AD.txt, RWY.txt and สนามบิน ทบ.txt into data/, commits if anything changed and
+# redeploys the app. The app reads CoWork first and uses data/ only as a fallback.
+name: CoWork sync
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: cowork-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy CoWork files into data/
+        run: |
+          for f in "AD.txt" "RWY.txt" "สนามบิน ทบ.txt"; do
+            enc=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$f")
+            if curl -sfL "https://raw.githubusercontent.com/Spidersqdn/DataBase/main/CoWork/$enc" -o /tmp/cw.txt && [ -s /tmp/cw.txt ]; then
+              cp /tmp/cw.txt "data/$f"
+            else
+              echo "skip $f (not found in DataBase)"
+            fi
+          done
+
+      - name: Commit and redeploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "data/ already matches CoWork"; exit 0; fi
+          git commit -m "data: sync from DataBase/CoWork"
+          git push
+          # a push made with GITHUB_TOKEN does not start other workflows
+          gh workflow run build-map-and-deploy.yml --ref main
