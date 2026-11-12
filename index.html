@@ -7851,7 +7851,7 @@ function buildMiniMap(opt){
       ctx.beginPath();P.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();
     }
     /* ---- other route (alternate / main): magenta dashed line + dots; its names are boxed after the off-route points ---- */
-    var ALTC='#c2188b',AQ=ALT.map(px);
+    var ALTC='#7b1fa2',AQ=ALT.map(px);
     function altDraw(){
       ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=ALTC;ctx.lineWidth=3.5*S;ctx.setLineDash([14*S,10*S]);
       ctx.beginPath();AQ.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();ctx.setLineDash([]);
@@ -7903,10 +7903,13 @@ function buildMiniMap(opt){
       for(var r=0;r<symR.length;r++){var l2=loc(symR[r].q),dx=Math.max(Math.abs(l2.x)-hw,0),dy=Math.max(Math.abs(l2.y)-hh,0);if(Math.hypot(dx,dy)<symR[r].r)return true;}
       return false;
     }
-    var legLbl=[];
+    var legLbl=[],MAINP=pts;
+    function addLegs(pts,P,col){   /* HDG / NM bars for one route (col: bar colour, default blue) */
     for(var li=1;li<pts.length;li++){
       var A=P[li-1],B=P[li],len=Math.hypot(B.x-A.x,B.y-A.y);
       var crs=course(pts[li-1],pts[li]),d=dist(pts[li-1],pts[li]),rec=(crs+180)%360;
+      if(d<0.05)continue;
+      if(col&&MAINP.some(function(r,k){return k&&((dist(MAINP[k-1],pts[li-1])<0.5&&dist(r,pts[li])<0.5)||(dist(r,pts[li-1])<0.5&&dist(MAINP[k-1],pts[li])<0.5));}))continue;   /* leg shared with the drawn route: one bar */
       var ang=Math.atan2(B.y-A.y,B.x-A.x),fwd=true;
       if(ang>Math.PI/2||ang<=-Math.PI/2){ang+=Math.PI;fwd=false;}
       var dTxt=(d<100?d.toFixed(1):Math.round(d))+' NM';
@@ -7932,9 +7935,12 @@ function buildMiniMap(opt){
         });
       });
       if(!got)continue;
-      got.ang=ang;got.txt=txt;legLbl.push(got);   /* drawn last, so no box can ever cover it */
+      got.ang=ang;got.txt=txt;got.col=col;legLbl.push(got);   /* drawn last, so no box can ever cover it */
       got.bb.leg=true;boxes.push(got.bb);
     }
+    }
+    addLegs(pts,P,null);
+    addLegs(ALT,AQ,ALTC);   /* other route: same leg data, purple bars */
 
     /* ---- waypoint circles ---- */
     function ring(q,r){if(REC){REC.push({k:'ring',x:q.x-r,y:q.y-r,w:2*r,h:2*r,cx:q.x,cy:q.y,lw:4*S});return;}ctx.beginPath();ctx.arc(q.x,q.y,r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();ctx.lineWidth=4*S;ctx.strokeStyle='#111';ctx.stroke();}
@@ -8238,9 +8244,9 @@ function buildMiniMap(opt){
     boxes.forEach(function(b){if(b.ad)DB(ctx,b,b.lines,b.pad,'left',3*S);});
     /* leg HDG / distance bars on top of everything */
     legLbl.forEach(function(g){
-      if(REC){REC.push({k:'leg',font:'600 '+g.fs+'px '+FONT,x:g.cx-g.tw/2,y:g.cy-g.bh/2,w:g.tw,h:g.bh,rot:g.ang*180/Math.PI,t:g.txt,sz:g.fs});return;}
+      if(REC){REC.push({k:'leg',font:'600 '+g.fs+'px '+FONT,x:g.cx-g.tw/2,y:g.cy-g.bh/2,w:g.tw,h:g.bh,rot:g.ang*180/Math.PI,t:g.txt,sz:g.fs,col:g.col||null});return;}
       ctx.save();ctx.translate(g.cx,g.cy);ctx.rotate(g.ang);ctx.font='600 '+g.fs+'px '+FONT;
-      ctx.fillStyle='#1f2fd6';ctx.fillRect(-g.tw/2,-g.bh/2,g.tw,g.bh);
+      ctx.fillStyle=g.col||'#1f2fd6';ctx.fillRect(-g.tw/2,-g.bh/2,g.tw,g.bh);
       ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.txt,0,g.fs*0.05);
       ctx.restore();
     });
@@ -8304,7 +8310,7 @@ function mmDrawLayers(cv,c2,pos){
     else if(o.k==='ring'){c.beginPath();c.arc(o.cx,o.cy,o.w/2,0,2*Math.PI);c.fillStyle='rgba(255,255,255,.35)';c.fill();c.lineWidth=o.lw;c.strokeStyle='#111';c.stroke();}
     else if(o.k==='lead'){c.strokeStyle='#111';c.lineWidth=o.lw;c.beginPath();c.moveTo(o.x1,o.y1);c.lineTo(o.x2,o.y2);c.stroke();}
     else if(o.k==='text'){c.font=o.font;c.fillStyle=o.c;c.textAlign='left';c.textBaseline='alphabetic';c.fillText(o.t,o.cx,o.cy);}
-    else if(o.k==='leg'){c.translate(o.x+o.w/2,o.y+o.h/2);c.rotate(o.rot*Math.PI/180);c.font=o.font;c.fillStyle='#1f2fd6';c.fillRect(-o.w/2,-o.h/2,o.w,o.h);
+    else if(o.k==='leg'){c.translate(o.x+o.w/2,o.y+o.h/2);c.rotate(o.rot*Math.PI/180);c.font=o.font;c.fillStyle=o.col||'#1f2fd6';c.fillRect(-o.w/2,-o.h/2,o.w,o.h);
       c.fillStyle='#fff';c.textAlign='center';c.textBaseline='middle';c.fillText(o.t,0,o.sz*0.05);}
     else if(o.k==='box'){
       if(o.sc){c.translate(o.x,o.y);c.scale(o.sc,o.sc);o=Object.assign({},o,{x:0,y:0,w:o._w0,h:o._h0,border:o.border/o.sc});}
@@ -8941,7 +8947,7 @@ function mmPptxShapes(list,k,media){
     if(o.k==='lead')return lead(o);
     if(o.k==='ring')return ring(o);
     if(o.k==='box')return sp('Box',o,'FFFFFF',[o.border,hex(o.col)],o.pad,o.mid?'ctr':'t',o.lines.map(para).join(''));
-    if(o.k==='leg')return sp('HDG',o,'1F2FD6',null,0,'ctr',para({t:o.t,sz:o.sz,b:true,c:'#fff',lh:o.h*0.9,ctr:true}),o.rot);
+    if(o.k==='leg')return sp('HDG',o,(o.col||'#1F2FD6').replace('#','').toUpperCase(),null,0,'ctr',para({t:o.t,sz:o.sz,b:true,c:'#fff',lh:o.h*0.9,ctr:true}),o.rot);
     return sp('Title',o,null,null,0,o.anchor==='b'?'b':'t',para({t:o.t,sz:o.sz,b:o.b,c:o.c,lh:o.sz*1.2,ctr:false}));
   }).join('');
 }
