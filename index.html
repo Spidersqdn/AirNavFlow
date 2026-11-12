@@ -8253,6 +8253,8 @@ function buildMiniMap(opt){
       altSeen[nm.toUpperCase()]=1;
       var f='600 '+PTO+'px '+WFONT,ln=[{t:nm,f:f,lh:LH(PTO),sz:PTO,c:ALTC,center:true}];
       if(p.remark)ln.push({t:'('+p.remark+')',f:PTO+'px '+WFONT,lh:LH(PTO),sz:PTO,c:ALTC,center:true});
+      var arr=APX[nm.toUpperCase()]?'':mmRadial(p);   /* SPD: radial / DME from the nearest airport */
+      if(arr)ln.push({t:arr,f:PTO+'px '+WFONT,lh:LH(PTO),sz:PTO,center:true});
       placeAndDraw(AQ[i],ln,4*S,true,'left');
     });
     /* airports off the route: info box in smaller type (8 pt, then 7 pt if space is short), name tag only as a last resort */
