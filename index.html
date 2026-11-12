@@ -7854,8 +7854,8 @@ function buildMiniMap(opt){
     /* ---- other route (alternate / main): magenta dashed line + dots; its names are boxed after the off-route points ---- */
     var ALTC='#1f2fd6',GRN='#14a03c',GTX='#0e8a32',BLU='#1f2fd6',AQ=ALT.map(px);   /* SPD 12 NOV: main black / alternate blue; route Wpts green triangles, off-route blue */
     function altDraw(){
-      ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=ALTC;ctx.lineWidth=4*S;
-      ctx.beginPath();AQ.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();
+      ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=ALTC;ctx.lineWidth=4*S;ctx.setLineDash([16*S,10*S]);   /* SPD: alternate = blue dashed */
+      ctx.beginPath();AQ.forEach(function(q,i){if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.stroke();ctx.setLineDash([]);
       ctx.restore();
     }
     if(AQ.length){
@@ -8020,7 +8020,7 @@ function buildMiniMap(opt){
       if(!runwaySym(o.id,o.q))ring(o.q,9*S);
       boxes.push({x:o.q.x-36*S,y:o.q.y-36*S,w:72*S,h:72*S});
     });
-    offs.forEach(function(o){ring(o.q,10*S,BLU);});
+    offs.forEach(function(o){ring(o.q,10*S,'#4da3ff');});   /* SPD: light-blue triangle */
 
     /* ---- waypoint info boxes (route + off-route) ---- */
     function wpBox(p,q,i,small,sz,noTag){
