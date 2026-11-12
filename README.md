@@ -74,8 +74,9 @@
 | `data/มทบ.txt` | layer "มทบ." (ผู้ติดต่อ มทบ.) |
 | `data/CSAR.txt` | layer "RTAF POC" (หน่วยบินค้นหาและช่วยชีวิต) |
 | `data/ผบ.ฝูง.txt` | layer "RTAF POC" (ทำเนียบ ผบ.ฝูง) |
-| `data/AD.txt` | กล่องข้อมูลสนามบินใน MINI MAP |
-| `data/RWY.txt` | รูปทางวิ่ง + บรรทัด RWY ใน MINI MAP |
+| `data/สนามบิน ทบ.txt` | layer "สนามบิน ทบ." (สำเนาสำรอง ต้นฉบับอยู่ DataBase/CoWork) |
+| **DataBase** `CoWork/AD.txt` | กล่องข้อมูลสนามบินใน MINI MAP (ใช้ร่วม FalCon2CP) แก้ที่ repo DataBase |
+| **DataBase** `CoWork/RWY.txt` | รูปทางวิ่ง + บรรทัด RWY ใน MINI MAP (ใช้ร่วม FalCon2CP) แก้ที่ repo DataBase |
 
 ## ระบบอัตโนมัติ (GitHub Actions)
 | Workflow | ทำอะไร | ทำงานเมื่อ |

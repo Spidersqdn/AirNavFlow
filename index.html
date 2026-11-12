@@ -7357,7 +7357,7 @@ function importRouteKmz(file){
 /* ---- MINI MAP export: one PNG strip chart of the route (title bar, AD info boxes, waypoint boxes, leg labels) ----
    Background = the base map now on screen: offline PMTiles (drawn with protomaps Static, works offline)
    or the online raster layer (tiles loaded with CORS). Falls back to offline PMTiles, then to a plain grid. */
-var AD_INFO={};   /* ICAO -> [[kind,text],...] from data/AD.txt */
+var AD_INFO={};   /* ICAO -> [[kind,text],...] from DataBase/CoWork/AD.txt */
 function loadAdInfoFile(){
   fetchDataTxt('AD').then(function(t){
     var got={};
@@ -7368,7 +7368,7 @@ function loadAdInfoFile(){
     AD_INFO=got;
   }).catch(function(){});
 }
-var RWY_INFO={};   /* ICAO -> [[endA,endB],...] from data/RWY.txt, end = {id,brg,dim,lat,lng} */
+var RWY_INFO={};   /* ICAO -> [[endA,endB],...] from DataBase/CoWork/RWY.txt, end = {id,brg,dim,lat,lng} */
 function rwyDMS(v){   /* 135349.24N / 1003545.38E -> decimal degrees */
   var m=/^(\d{2,3})(\d{2})(\d{2}(?:\.\d+)?)([NSEW])$/i.exec(String(v||'').trim());
   if(!m)return null;
@@ -7958,7 +7958,7 @@ function buildMiniMap(opt){
         if(REC){REC.push({k:'ring',tri:tri,x:q.x-r,y:q.y-r*0.95,w:2*r,h:1.75*r,cx:q.x,cy:q.y,lw:2*S});return;}
         mmTri(ctx,q.x-r,q.y-r*0.95,2*r,1.75*r,tri,2*S);return;}
       if(REC){REC.push({k:'ring',x:q.x-r,y:q.y-r,w:2*r,h:2*r,cx:q.x,cy:q.y,lw:4*S});return;}ctx.beginPath();ctx.arc(q.x,q.y,r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();ctx.lineWidth=4*S;ctx.strokeStyle='#111';ctx.stroke();}
-    /* runway symbol (from data/RWY.txt) at airports, magnified so it stays readable; plain ring otherwise */
+    /* runway symbol (from DataBase/CoWork/RWY.txt) at airports, magnified so it stays readable; plain ring otherwise */
     var rwDone={};
     function runwaySym(id,q){   /* PPT: each airport symbol is its own picture */
       if(!REC)return runwaySym0(id,q);
@@ -9293,7 +9293,7 @@ function slPptxBlob(f){
 }
 
 /* ---- FLIGHT LOG: Pilot Mission Data Card (PNG), layout after the squadron's paper card.
-   Auto-filled: date, route, airport info (AIRPORT DB + data/AD.txt + data/RWY.txt), FROM/DEST, IAS, swing radials,
+   Auto-filled: date, route, airport info (AIRPORT DB + DataBase/CoWork/AD.txt + RWY.txt), FROM/DEST, IAS, swing radials,
    nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
    Typed fields (call sign, type, mission ...) come from the form and are remembered on this device. ---- */
 var FL_KEY='fp-flightlog-v1';
@@ -9367,7 +9367,7 @@ function buildFlightLog(f){
   var ref=APX[(dep.name||'').toUpperCase()]||nearestAirportForPoint(dep);
   var sw=pts.filter(function(p,i){var id=(p.name||'').toUpperCase();return !(APX[id]&&ref&&id===ref[0]);});
   var swSeen={};sw=sw.filter(function(p){var k=(p.name||'')+p.lat+p.lng;if(swSeen[k])return false;swSeen[k]=1;return true;});
-  /* ---- nav aid ident list (morse): idents + frequency from data/AD.txt; rows like "NDB | 280 [LB]" give LB=280,
+  /* ---- nav aid ident list (morse): idents + frequency from DataBase/CoWork/AD.txt; rows like "NDB | 280 [LB]" give LB=280,
      MORSE rows add idents without a frequency. Route airports first (departure, destination, then the rest) ---- */
   var ids=[],frq={};
   function addId(n,fq){n=n.toUpperCase();if(ids.indexOf(n)<0)ids.push(n);if(fq&&!frq[n])frq[n]=fq;}
@@ -11478,7 +11478,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 
 /* ---- Editable data files in data/ (edit on GitHub). Network first, offline copy in Cache Storage. ----
    Shared files (COWORK_FILES) live in Spidersqdn/DataBase/CoWork/ (also used by FalCon2CP): read from the DataBase
-   site first, then the offline copy, then this app's own data/ copy (fallback, may be older). */
+   site first, then the offline copy, then this app's own data/ copy if there is one (AD + RWY live only in CoWork). */
 var DATA_CACHE='fp-mtb-v1';
 var COWORK_SITE='https://spidersqdn.github.io/DataBase/CoWork/';
 var COWORK_FILES={'AD':1,'RWY':1,'สนามบิน ทบ':1};
