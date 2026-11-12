@@ -82,7 +82,7 @@
 |---|---|---|
 | `build-map-and-deploy.yml` | เผยแพร่เว็บแอป (~2 MB) | push เข้า `main` หรือกด Run workflow |
 | repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/AirNavFlow/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
-| `aip-watch.yml` | ตรวจ eAIP (aip.caat.or.th) หา AIRAC ใหม่ เทียบ ENR 3/4/5.1, AD 2, AMDT, SUP, AIC แล้วเปิด Issue "AIP AIRAC ..." | Claude routine ทุกวันจันทร์ 18:00 |
+| `aip-watch.yml` | ย้ายไป repo DataBase แล้ว: ตรวจ AIRAC ใหม่ เก็บหน้า AIP เป็นข้อความใน `DataBase/CoWork/AIP/` และเปิด Issue ที่ DataBase | GitHub cron จันทร์ 14:00 |
 
 - ตั้งค่า Pages: **Settings → Pages → Source: `GitHub Actions`**
 - ปุ่มดาวน์โหลดแผนที่ในแอปจะกดได้หลังจาก workflow สร้างแผนที่เสร็จแล้ว
@@ -103,8 +103,8 @@ icons/                   ไอคอนแอป
 data/                    ไฟล์ข้อมูลที่แก้เองได้ (ดูด้านบน)
 notam/                   NOTAM รายวัน + latest.txt (ระบบอัตโนมัติเขียน)
 map/                     thailand.pmtiles, elevation.pmtiles (Actions สร้าง ไม่ต้องอัปโหลด)
-.github/workflows/       สร้างแผนที่ + เผยแพร่เว็บ, ตรวจ AIP
-.github/scripts/         สคริปต์เทียบ AIP
+.github/workflows/       สร้างแผนที่ + เผยแพร่เว็บ (ตรวจ AIP อยู่ที่ repo DataBase)
+.github/scripts/         สคริปต์ NOTAM
 ```
 
 ## ข้อมูล AIP ในแอป

@@ -6,7 +6,7 @@
 | NOTAM รายวัน | Claude routine 20:50 | Google Apps Script ทุก 1 ชม. → GitHub Actions แปลงไฟล์ |
 
 ## 1. ตรวจ AIP
-ไม่ต้องทำอะไร หลัง merge PR นี้ workflow "AIP AIRAC watch" จะรันเองทุกวันจันทร์
+ไม่ต้องทำอะไร workflow "AIP AIRAC watch" อยู่ที่ repo **DataBase** (ย้ายมา 12 NOV 2026) รันเองทุกวันจันทร์ เก็บหน้า AIP ลง `CoWork/AIP/` และเปิด Issue ที่ DataBase
 
 ## 2. NOTAM รายวัน (ตั้งครั้งเดียว ~10 นาที)
 
