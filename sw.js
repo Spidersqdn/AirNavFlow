@@ -34,7 +34,7 @@ self.addEventListener('fetch',function(e){
     if(/\.pmtiles$/i.test(url.pathname))return;
     if(/\/notam\//.test(url.pathname))return;   // daily NOTAM file: always from network (app keeps its own offline copy)
     if(/\/data\//.test(url.pathname))return;    // data/*.txt (มทบ., CSAR, ผบ.ฝูง): same, app keeps its own offline copy
-    if(/\/CoWork\/places\.json$/.test(url.pathname))return;   // place-search index: app keeps its own offline copy (fp-places-v1)
+    if(/\/DataBase\/CoWork\//.test(url.pathname))return;   // shared AD/RWY/สนามบิน ทบ. + places.json (DataBase repo): app keeps its own offline copy
     if(req.mode==='navigate'){
       e.respondWith(fetch(req).then(function(res){
         var copy=res.clone();
