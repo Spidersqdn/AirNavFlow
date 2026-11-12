@@ -74,9 +74,11 @@
 | `data/มทบ.txt` | layer "มทบ." (ผู้ติดต่อ มทบ.) |
 | `data/CSAR.txt` | layer "RTAF POC" (หน่วยบินค้นหาและช่วยชีวิต) |
 | `data/ผบ.ฝูง.txt` | layer "RTAF POC" (ทำเนียบ ผบ.ฝูง) |
-| `data/สนามบิน ทบ.txt` | layer "สนามบิน ทบ." (สำเนาสำรอง ต้นฉบับอยู่ DataBase/CoWork) |
-| **DataBase** `CoWork/AD.txt` | กล่องข้อมูลสนามบินใน MINI MAP (ใช้ร่วม FalCon2CP) แก้ที่ repo DataBase |
-| **DataBase** `CoWork/RWY.txt` | รูปทางวิ่ง + บรรทัด RWY ใน MINI MAP (ใช้ร่วม FalCon2CP) แก้ที่ repo DataBase |
+| **DataBase** `CoWork/AD.txt` | กล่องข้อมูลสนามบินใน MINI MAP |
+| **DataBase** `CoWork/RWY.txt` | รูปทางวิ่ง + บรรทัด RWY ใน MINI MAP |
+| **DataBase** `CoWork/สนามบิน ทบ.txt` | layer "สนามบิน ทบ." |
+
+ไฟล์ 3 ตัวล่างใช้ร่วมกับ FalCon2CP ให้แก้ที่ repo DataBase เท่านั้น workflow `cowork-sync.yml` จะคัดลอกมาเก็บไว้ที่ `data/` ของ repo นี้ทุก 6 ชม. เป็นสำเนาสำรอง (อย่าแก้ที่ `data/` เพราะจะถูกทับ)
 
 ## ระบบอัตโนมัติ (GitHub Actions)
 | Workflow | ทำอะไร | ทำงานเมื่อ |
@@ -84,6 +86,7 @@
 | `build-map-and-deploy.yml` | เผยแพร่เว็บแอป (~2 MB) | push เข้า `main` หรือกด Run workflow |
 | repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/AirNavFlow/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
 | `aip-watch.yml` | ย้ายไป repo DataBase แล้ว: ตรวจ AIRAC ใหม่ เก็บหน้า AIP เป็นข้อความใน `DataBase/CoWork/AIP/` และเปิด Issue ที่ DataBase | GitHub cron จันทร์ 14:00 |
+| `cowork-sync.yml` | คัดลอก AD.txt, RWY.txt, สนามบิน ทบ.txt จาก DataBase/CoWork มาไว้ที่ `data/` แล้วเผยแพร่ใหม่ | ทุก 6 ชม. หรือกด Run workflow |
 
 - ตั้งค่า Pages: **Settings → Pages → Source: `GitHub Actions`**
 - ปุ่มดาวน์โหลดแผนที่ในแอปจะกดได้หลังจาก workflow สร้างแผนที่เสร็จแล้ว

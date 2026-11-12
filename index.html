@@ -11478,7 +11478,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 
 /* ---- Editable data files in data/ (edit on GitHub). Network first, offline copy in Cache Storage. ----
    Shared files (COWORK_FILES) live in Spidersqdn/DataBase/CoWork/ (also used by FalCon2CP): read from the DataBase
-   site first, then the offline copy, then this app's own data/ copy if there is one (AD + RWY live only in CoWork). */
+   site first, then the offline copy, then this app's own data/ copy (backup, synced from CoWork by cowork-sync.yml). */
 var DATA_CACHE='fp-mtb-v1';
 var COWORK_SITE='https://spidersqdn.github.io/DataBase/CoWork/';
 var COWORK_FILES={'AD':1,'RWY':1,'สนามบิน ทบ':1};
