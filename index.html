@@ -816,8 +816,10 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   font-size:11px;
   line-height:1.5;
 }
+.rpt-popup .rpt-add-row{display:flex;gap:6px;margin-top:7px}
+.rpt-popup .rpt-add-alt{background:#3b82f6!important;color:#fff!important}
 .rpt-popup .rpt-add-btn{
-  margin-top:7px;
+  margin-top:0;
   background:#f5b335;
   color:#1a1200;
   border:none;
@@ -4466,16 +4468,16 @@ function addReportingPointLayer(data,layer,kind){
       '<b>BKK VOR:</b> '+esc(radial)+'<br>'+
       '<b>Coordinates:</b> '+esc(dmsText(lat,lng))+'<br>'+
       '<span style="color:#8fa8bd">AIP VTBD AD 2.20</span></div>'+
-      '<button type="button" class="rpt-add-btn">Add ROUTE</button></div>'
+      '<div class="rpt-add-row"><button type="button" class="rpt-add-btn" data-rt="main">Add ROUTE หลัก</button>'+
+      '<button type="button" class="rpt-add-btn rpt-add-alt" data-rt="alt">Add ROUTE สำรอง</button></div></div>'
     ).addTo(layer)
     .on('popupopen',function(e){
-      var btn=e.popup.getElement().querySelector('.rpt-add-btn');
-      if(btn){
+      e.popup.getElement().querySelectorAll('.rpt-add-btn').forEach(function(btn){
         btn.onclick=function(){
-          addPt(lat,lng,name);
+          addPtToRoute(btn.getAttribute('data-rt'),lat,lng,name);
           map.closePopup();
         };
-      }
+      });
     });
 
     L.marker([lat,lng],{
@@ -5170,6 +5172,14 @@ function addBackTrack(){
   refresh();
   st.textContent='BACK TRACK: route reversed '+(pts[0].name||'WP 1')+' → '+(pts[pts.length-1].name||('WP '+pts.length));
   return true;
+}
+/* add to the main or alternate route, whichever is being edited (the other one is kept in otherPts) */
+function addPtToRoute(which,lat,lng,name,refIcao,remark){
+  if(which===routeActive){addPt(lat,lng,name,refIcao,remark);return;}
+  var p={lat:lat,lng:lng,name:name||'',remark:remark||'',place:'',refIcao:(refIcao||'').toUpperCase()};
+  otherPts.push(p);
+  refresh();
+  geocode(p);
 }
 function addPt(lat,lng,name,refIcao,remark){
   var p={
@@ -8884,6 +8894,8 @@ function mmTableRows(offs){
     if(!isFinite(p.lat)||!isFinite(p.lng))return;
     out.push({n:p.name||'',coord:dm(p.lat,true)+' '+dm(p.lng,false),rad:rad(p),lm:p.remark||'',c:c});
   }
+  /* SPD 12 NOV: separate blocks, each under its own heading row: main route, alternate route, Off Route W.Pt. */
+  if(pts.length)out.push({sep:1,n:routeActive==='main'?'เส้นทางหลัก':'เส้นทางสำรอง',c:'1E8C3A'});
   pts.forEach(function(p){add(p,'1E8C3A');});
   /* the other route (main / alternate): its own titled block in purple; points shared with the drawn route are listed once */
   var alt=(otherPts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng)&&!pts.some(function(r){return dist(r,p)<0.5;});});
@@ -8891,7 +8903,9 @@ function mmTableRows(offs){
     out.push({sep:1,n:routeActive==='main'?'เส้นทางสำรอง':'เส้นทางหลัก',c:'1F2FD6'});
     alt.forEach(function(p){add(p,'1F2FD6');});
   }
-  (offs||[]).forEach(function(p){add(p,'1F2FD6');});
+  var offOk=(offs||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});
+  if(offOk.length)out.push({sep:1,n:'Off Route W.Pt.',c:'2F80ED'});
+  offOk.forEach(function(p){add(p,'2F80ED');});
   return out;
 }
 function mmPptxShapes(list,k,media){
