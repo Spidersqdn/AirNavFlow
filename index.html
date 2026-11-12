@@ -1621,6 +1621,11 @@ td .wp-delete{
 /* Four waypoint buttons (On MAP + 3 tabs): one row, equal width, one line */
 .wp-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 .wp-tabs button{overflow:hidden;text-overflow:ellipsis}
+/* Main / alternate route selector (like FalCon2CP) */
+.route-sel{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr) 40px;gap:6px;margin-bottom:8px}
+.route-sel button{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:7px 5px;font-size:12px;line-height:1.2}
+.route-sel button[aria-pressed="true"]{background:var(--cyan);color:#04202a;border-color:var(--cyan);font-weight:700}
+.route-sel #rtSwap,.route-sel #rtClose{padding:7px 0;font-size:14px}
 #onMapBtn{border-color:var(--amber);color:var(--amber);background:transparent}
 #onMapBtn[aria-pressed="true"]{background:var(--amber);color:#04202a;font-weight:600}
 #map{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
@@ -1774,6 +1779,12 @@ body.panel-hidden #panel{display:none}
 </div>
 <section class="waypoint-input-panel">
   <h3>FLIGHT ROUTE Waypoint</h3>
+  <div class="route-sel">
+    <button type="button" id="rtMain" aria-pressed="true" title="แก้ไข/แสดงเส้นทางหลัก">เส้นทางหลัก</button>
+    <button type="button" id="rtSwap" title="สลับเส้นทางหลัก ⇄ เส้นทางสำรอง">⇄</button>
+    <button type="button" id="rtAlt" aria-pressed="false" title="แก้ไข/แสดงเส้นทางสำรอง">เส้นทางสำรอง</button>
+    <button type="button" id="rtClose" title="ลบเส้นทางสำรอง">✕</button>
+  </div>
   <div class="wp-tabs">
     <button type="button" id="onMapBtn" aria-pressed="false" title="Toggle On MAP mode: tap the map, then choose Add ROUTE / Add Off-ROUTE W.Pt / CANCEL">On MAP</button>
     <button type="button" id="wpTabAirport" aria-pressed="true">AIRPORT</button>
@@ -3784,7 +3795,7 @@ var pmtiles = (() => {
 
 var R_NM=3440.065, rad=Math.PI/180, deg=180/Math.PI;
 var UF={nm:1,km:1.852,m:1852,ft:6076.11549}, UL={nm:'NM',km:'KM',m:'m',ft:'Ft'};
-var unit='nm', pts=[], pendingInsertIndex=null, routeMapEditIndex=null, routeMapEditDraft=null;
+var unit='nm', pts=[], otherPts=[], routeActive='main', pendingInsertIndex=null, routeMapEditIndex=null, routeMapEditDraft=null;
 function unitLabel(){
   return (UL && UL[unit]) ? UL[unit] : 'NM';
 }
@@ -5835,8 +5846,55 @@ function startInsertWaypoint(index){
   if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+function drawOtherRoute(){
+  if(!otherPts.length)return;
+  var col=routeActive==='main'?'#e040fb':'#f5b335';
+  var lbl=routeActive==='main'?'สำรอง':'หลัก';
+  for(var i=1;i<otherPts.length;i++){
+    L.polyline(arc(otherPts[i-1],otherPts[i]),{color:col,weight:2.5,opacity:.8,dashArray:'8 7',interactive:false}).addTo(lineLayer);
+  }
+  otherPts.forEach(function(p,i){
+    L.circleMarker([p.lat,p.lng],{radius:4,color:col,weight:2,fillColor:'#fff',fillOpacity:.9})
+      .bindTooltip(lbl+' '+(i+1)+(p.name?': '+p.name:''),{direction:'top'}).addTo(lineLayer);
+  });
+}
+function updateRouteSel(){
+  var m=document.getElementById('rtMain'),a=document.getElementById('rtAlt');
+  if(!m)return;
+  var nMain=routeActive==='main'?pts.length:otherPts.length,nAlt=routeActive==='alt'?pts.length:otherPts.length;
+  m.setAttribute('aria-pressed',routeActive==='main'?'true':'false');
+  a.setAttribute('aria-pressed',routeActive==='alt'?'true':'false');
+  m.textContent='เส้นทางหลัก'+(nMain?' ('+nMain+')':'');
+  a.textContent='เส้นทางสำรอง'+(nAlt?' ('+nAlt+')':'');
+}
+function resetRouteEdit(){
+  pendingInsertIndex=null;routeMapEditIndex=null;routeMapEditDraft=null;updateInsertModeBanner();
+}
+function fitActiveRoute(){
+  if(pts.length)map.fitBounds(L.latLngBounds(pts.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:10});
+}
+function switchRoute(k){
+  if(k===routeActive)return;
+  var t=pts;pts=otherPts;otherPts=t;routeActive=k;
+  resetRouteEdit();refresh();fitActiveRoute();
+}
+function swapRoutes(){
+  if(!pts.length&&!otherPts.length)return;
+  var t=pts;pts=otherPts;otherPts=t;
+  resetRouteEdit();refresh();
+}
+function clearAltRoute(){
+  var alt=routeActive==='alt'?pts:otherPts;
+  if(alt.length&&!confirm('ลบเส้นทางสำรอง ('+alt.length+' Wpt)?'))return;
+  if(routeActive==='alt'){pts=otherPts;routeActive='main';}
+  otherPts=[];
+  resetRouteEdit();refresh();
+}
+
 function drawLines(){
   lineLayer.clearLayers();
+  drawOtherRoute();
+  updateRouteSel();
 
   var total=0,legs=[],top=null,pend=false;
   for(var i=1;i<pts.length;i++){
@@ -10829,6 +10887,10 @@ document.getElementById('exportMiniMap').onclick=exportMiniMap;
 document.getElementById('flightLogBtn').onclick=openFlightLog;
 document.getElementById('slideBtn').onclick=openSlide;
 
+document.getElementById('rtMain').onclick=function(){switchRoute('main');};
+document.getElementById('rtAlt').onclick=function(){switchRoute('alt');};
+document.getElementById('rtSwap').onclick=swapRoutes;
+document.getElementById('rtClose').onclick=clearAltRoute;
 document.getElementById('undo').onclick=function(){
   if(!pts.length)return;
   pts.pop();routeMapEditIndex=null;routeMapEditDraft=null;refresh();
@@ -11118,8 +11180,11 @@ function saveRoute(){
       var k=legKey(pts[i-1],pts[i]),ev=elevCache[k];
       if(ev&&ev.ft!==undefined)elev[k]=ev;
     }
+    var ser=function(a){return a.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};});};
     localStorage.setItem(ROUTE_KEY,JSON.stringify({
-      pts:pts.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};}),
+      pts:ser(routeActive==='main'?pts:otherPts),
+      alt:ser(routeActive==='main'?otherPts:pts),
+      active:routeActive,
       speed:document.getElementById('speed').value,
       burn:document.getElementById('burn').value,
       fuel:document.getElementById('fuel').value,
@@ -11131,10 +11196,14 @@ function loadRoute(){
   try{
     var d=JSON.parse(localStorage.getItem(ROUTE_KEY)||'null');
     if(!d||!Array.isArray(d.pts))return;
-    pts=d.pts.filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}).map(function(p){
+    var clean=function(a){return (Array.isArray(a)?a:[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);}).map(function(p){
       p.refIcao=(p.refIcao||'').toUpperCase();
       return p;
-    });
+    });};
+    var mainPts=clean(d.pts),altPts=clean(d.alt);
+    routeActive=d.active==='alt'?'alt':'main';
+    pts=routeActive==='main'?mainPts:altPts;
+    otherPts=routeActive==='main'?altPts:mainPts;
     if(d.speed)document.getElementById('speed').value=d.speed;
     if(d.burn)document.getElementById('burn').value=d.burn;
     if(d.fuel)document.getElementById('fuel').value=d.fuel;
