@@ -8347,11 +8347,12 @@ function mmBuildSheet(skip){return buildMiniMap({skip:skip,layers:true}).then(mm
 /* ---- editable waypoint table (rows / columns / merged cells / text), kept per route + off-route set ---- */
 var mmMapOffs=null;
 function mmTblOffs(){return mmMapOffs||offRoutePts||[];}
-function mmTblKey(){return mmRouteKey()+'|'+mmTblOffs().map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3)+':'+(p.remark||'');}).join(';');}
+function mmTblKey(){return mmRouteKey()+'|'+(otherPts||[]).map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3);}).join(';')+'|'+mmTblOffs().map(function(p){return (p.name||'')+'@'+(+p.lat).toFixed(3)+','+(+p.lng).toFixed(3)+':'+(p.remark||'');}).join(';');}
 function mmTblDefault(){
   var rows=mmTableRows(mmTblOffs()),a=[];
   ['Waypoint','Coordinate','Radial / DME','Landmark'].forEach(function(h,c){a.push({r:0,c:c,rs:1,cs:1,t:h,col:'FFFFFF',b:1});});
   rows.forEach(function(r,i){var y=i+1;
+    if(r.sep){a.push({r:y,c:0,rs:1,cs:4,t:r.n,col:r.c,b:1});return;}
     a.push({r:y,c:0,rs:1,cs:1,t:r.n,col:r.c,u:1},{r:y,c:1,rs:1,cs:1,t:r.coord,col:'111111'},{r:y,c:2,rs:1,cs:1,t:r.rad,col:'111111'},{r:y,c:3,rs:1,cs:1,t:r.lm,col:r.c,u:r.lm?1:0});
   });
   return {k:mmTblKey(),R:rows.length+1,C:4,kinds:['h'].concat(rows.map(function(){return 'r';})),a:a};
@@ -8871,6 +8872,12 @@ function mmTableRows(offs){
     out.push({n:p.name||'',coord:dm(p.lat,true)+' '+dm(p.lng,false),rad:rad(p),lm:p.remark||'',c:c});
   }
   pts.forEach(function(p){add(p,'1E8C3A');});
+  /* the other route (main / alternate): its own titled block in purple; points shared with the drawn route are listed once */
+  var alt=(otherPts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng)&&!pts.some(function(r){return dist(r,p)<0.5;});});
+  if(alt.length){
+    out.push({sep:1,n:routeActive==='main'?'เส้นทางสำรอง':'เส้นทางหลัก',c:'7B1FA2'});
+    alt.forEach(function(p){add(p,'7B1FA2');});
+  }
   (offs||[]).forEach(function(p){add(p,'1F2FD6');});
   return out;
 }
