@@ -85,7 +85,7 @@
 |---|---|---|
 | `build-map-and-deploy.yml` | เผยแพร่เว็บแอป (~2 MB) | push เข้า `main` หรือกด Run workflow |
 | repo `DataBase` | สร้าง `thailand.pmtiles` + `elevation.pmtiles` ไว้ที่ spidersqdn.github.io/DataBase/AirNavFlow/ | ทุกวันที่ 2 ของเดือน หรือกด Run workflow |
-| `aip-watch.yml` | ย้ายไป repo DataBase แล้ว: ตรวจ AIRAC ใหม่ เก็บหน้า AIP เป็นข้อความใน `DataBase/CoWork/AIP/` และเปิด Issue ที่ DataBase | GitHub cron จันทร์ 14:00 |
+| `aip-watch.yml` | ย้ายไป repo DataBase แล้ว: ตรวจ AIRAC ใหม่ เก็บหน้า AIP เป็นข้อความใน `DataBase/CoWork/AIP/` และเปิด Issue ที่ DataBase | GitHub cron จันทร์ 14:00 + 18:00 |
 | `cowork-sync.yml` | คัดลอก AD.txt, RWY.txt, สนามบิน ทบ.txt จาก DataBase/CoWork มาไว้ที่ `data/` แล้วเผยแพร่ใหม่ | ทุก 6 ชม. หรือกด Run workflow |
 
 - ตั้งค่า Pages: **Settings → Pages → Source: `GitHub Actions`**

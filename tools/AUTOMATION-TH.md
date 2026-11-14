@@ -2,7 +2,7 @@
 
 | งาน | ของเดิม (ใช้ Claude) | ของใหม่ (ฟรี) |
 |---|---|---|
-| ตรวจ AIP | Claude routine จันทร์ 18:00 | GitHub Actions cron จันทร์ 14:00 (อาจช้า 1–4 ชม.) |
+| ตรวจ AIP | Claude routine จันทร์ 18:00 (ปิดได้แล้ว) | GitHub Actions cron จันทร์ 14:00 + 18:00 (อาจช้า 1–4 ชม.) |
 | NOTAM รายวัน | Claude routine 20:50 | Google Apps Script ทุก 1 ชม. → GitHub Actions แปลงไฟล์ |
 
 ## 1. ตรวจ AIP
