@@ -7696,7 +7696,11 @@ function buildMiniMap(opt){
     if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
     return mmNmFromRoute(p)<=OFF_NM;
   });
-  var all=pts.concat(ALT,OFF_IN).map(function(p){return mmWorld(p.lat,p.lng,0);});
+  /* SPD 14 NOV: airports within the same radius also set the frame (before, only route + off-route points did, so nearby airports could fall outside) */
+  var rteAD={};pts.forEach(function(p){rteAD[(p.name||'').toUpperCase()]=1;});
+  var AD_IN=AP.filter(function(a){return !rteAD[a[0]]&&isFinite(a[4])&&isFinite(a[5])&&mmNmFromRoute({lat:a[4],lng:a[5]})<=OFF_NM;}).map(function(a){return {lat:a[4],lng:a[5]};});
+  var MUST=OFF_IN.concat(AD_IN);
+  var all=pts.concat(ALT,MUST).map(function(p){return mmWorld(p.lat,p.lng,0);});
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
@@ -7710,6 +7714,14 @@ function buildMiniMap(opt){
   var cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
   /* nudge the route toward the side away from the AD boxes column (portrait: boxes left) */
   if(spanY>=spanX)cxW-=W*0.06;
+  /* make sure every point that must be shown sits inside the map with room for its symbol: zoom out a little until it does */
+  (function(){
+    var mg=60*S;
+    function ok(){return pts.concat(MUST).every(function(p){var q=mmWorld(p.lat,p.lng,z);var x=q.x-cxW+W/2,y=q.y-cyW+MH/2+HEAD;return x>mg&&x<W-mg&&y>HEAD+mg&&y<HEAD+MH-mg;});}
+    for(var g=0;g<40&&z>5&&!ok();g++){
+      z-=0.05;sc=Math.pow(2,z);cxW=(minX+maxX)/2*sc;cyW=(minY+maxY)/2*sc;if(spanY>=spanX)cxW-=W*0.06;
+    }
+  })();
   var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
   function px(p){var q=mmWorld(p.lat,p.lng,z);return {x:q.x-cxW+W/2,y:q.y-cyW+MH/2+HEAD};}
 
@@ -8051,7 +8063,7 @@ function buildMiniMap(opt){
     });
     /* nearby airports inside the sheet that are not on the route: symbol now, info box after the waypoint boxes */
     var nearAD=AP.filter(function(a){return !(a[0] in adIdx);}).map(function(a){return {id:a[0],q:px({lat:a[4],lng:a[5]})};})
-      .filter(function(o){return o.q.x>40*S&&o.q.x<W-40*S&&o.q.y>HEAD+40*S&&o.q.y<H-40*S;});
+      .filter(function(o){return o.q.x>40*S&&o.q.x<W-40*S&&o.q.y>HEAD+40*S&&o.q.y<HEAD+MH-40*S;});   /* above the profile strip */
     offs.forEach(function(o){symPts.push(o.q);});
     AQ.forEach(function(q){symPts.push(q);});
     nearAD.forEach(function(o){
