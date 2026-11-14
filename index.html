@@ -7693,7 +7693,7 @@ function buildMiniMap(opt){
   var OFF_NM=mmOffNm(),OFF_IN=(offRoutePts||[]).filter(function(p){
     if(!isFinite(p.lat)||!isFinite(p.lng))return false;   /* unticked points still count, so they stay in the WPt list */
     var nm=(p.name||'').toUpperCase().trim();
-    if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
+    if(pts.some(function(r){return dist(r,p)<0.1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
     return mmNmFromRoute(p)<=OFF_NM;
   });
   /* SPD 14 NOV: airports within the same radius also set the frame (before, only route + off-route points did, so nearby airports could fall outside) */
@@ -7930,7 +7930,7 @@ function buildMiniMap(opt){
     var offCand=(offRoutePts||[]).filter(function(p){
       var nm=(p.name||'').toUpperCase();
       nm=nm.trim();
-      if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
+      if(pts.some(function(r){return dist(r,p)<0.1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
       return nmFromRoute(p)<=OFF_NM;
     }).map(function(p){return {p:p,q:px(p)};}).filter(function(o){return o.q.x>20*S&&o.q.x<W-20*S&&o.q.y>HEAD+20*S&&o.q.y<H-20*S;});
     var offs=offCand.filter(function(o){return !offSkip[mmOffKey(o.p)];});
