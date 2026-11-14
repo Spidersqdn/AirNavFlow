@@ -4052,7 +4052,7 @@ var lightRptLayer=L.layerGroup();
 var heliRptLayer=L.layerGroup();
 var lineLayer=L.layerGroup().addTo(map);
 var markerLayer=L.layerGroup().addTo(map);
-var offRouteLayer=L.layerGroup().addTo(map);
+var offRouteLayer=L.layerGroup(); /* SPD 14 NOV: hidden when the app opens (Layer menu OFF-ROUTE Wpt shows it) */
 var elevHoverLayer=L.layerGroup().addTo(map);
 var gpsLayer=L.layerGroup().addTo(map);
 var measureLayer=L.layerGroup().addTo(map);
@@ -4908,6 +4908,7 @@ function geocodeOffRoute(p){
 }
 
 function addOffRoutePt(lat,lng,name,refIcao,remark){
+  if(!map.hasLayer(offRouteLayer))offRouteLayer.addTo(map); /* a point just added is shown */
   var p={
     lat:lat,
     lng:lng,
@@ -9891,7 +9892,7 @@ var UMAP_MIME={2:'image/png',3:'image/jpeg',4:'image/webp',5:'image/avif'};
 var userMaps=[];
 /* one Layer-menu entry "MAP" = the map selected in the left MAP box (m.on = selected) */
 var umapGroup=L.layerGroup();
-try{if(localStorage.getItem('fp-user-maps-grp')!=='0')umapGroup.addTo(map);}catch(e){umapGroup.addTo(map);}
+/* SPD 14 NOV: HIDE ENROUTE Charts / MAPs ticked whenever the app opens (untick to show) */
 /* no Layer-menu entry: shown/hidden with HIDE ENROUTE Charts / MAPs in the MAP box */
 umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}umapHideSync();});
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}umapHideSync();});
@@ -10335,6 +10336,8 @@ umapBuiltinInit();loadUserMaps();umapRender();
 var CHART_META='fp-charts-v1', CHART_RE=/\.(png|jpe?g|webp|pdf)$/i, CHART_FSA=typeof window.showOpenFilePicker==='function';
 var charts=[], chartLayer=null, chartFhPend=null, chartMeta={sel:'',items:{}};
 try{var cm=JSON.parse(localStorage.getItem(CHART_META)||'null');if(cm&&cm.items)chartMeta=cm;}catch(e){}
+/* SPD 14 NOV: HIDE CHARTs ticked whenever the app opens (georeference kept; untick to show) */
+Object.keys(chartMeta.items).forEach(function(k){chartMeta.items[k].onMap=false;});
 var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.style.pointerEvents='none';
 function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
 /* PDF with several pages: each page has its own georeference, saved under 'path#pN'; 'path' keeps the page shown */
@@ -10860,12 +10863,13 @@ function chartDbItems(){
     var c=chartMakeItem({key:'db:'+e.f});
     c.db=e.f;c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
     if(e.pages)c.pages=e.pages;
-    c.geo=e.geo||null;c.ntsIdx=e.nts||null;chartDbPreset(c,chartMeta.items[c.key]?c.onMap:true);
+    c.geo=e.geo||null;c.ntsIdx=e.nts||null;chartDbPreset(c,chartMeta.items[c.key]?c.onMap:chartDbShow);
     return c;
   });
 }
 /* preset georeference from the chart's grid labels (index.json 'geo': per page [[x,y,lat,lon],...] in px of
    the standard render, long side 2600 px); a georeference set with SET CHARTs wins */
+var chartDbShow=false; /* built-in charts start hidden (HIDE CHARTs) */
 function chartDbPreset(c,on){
   var g=c.geo&&c.geo[(c.page||1)-1];
   if(c.gcp&&c.gcp.length>=2&&!c.gcpAuto)return;
