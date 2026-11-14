@@ -4938,6 +4938,8 @@ function openOffRouteEditor(marker,p,index){
       wpCoordHtml(editPoint)+
       '<label>Name<input id="offEditName" type="text" value="'+esc(p.name||'')+'"></label>'+
       '<label>หมายเหตุ / Remark<input id="offEditRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
+      '<label>สัญลักษณ์ / Symbol<select id="offEditSym" onchange="mmSymToggle(this)">'+['','E','H'].map(function(v){return '<option value="'+v+'"'+((p.sym||'')===v?' selected':'')+'>'+(v===''?'▲ Waypoint':v==='E'?'E (EMER)':'H (Helipad)')+'</option>';}).join('')+'</select></label>'+
+      '<div class="wp-sym-rwy" style="display:'+(p.sym?'':'none')+'"><label>ร่อนลง (L/D)°<input id="offEditLd" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.ld||'')+'"></label><label>วิ่งขึ้น (T/O)°<input id="offEditTo" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.to||'')+'"></label></div>'+
       '<div class="wp-edit-tabs offroute-tabs">'+
         '<button type="button" id="offEditLatBtn" class="active">LAT / LONG</button>'+
         '<button type="button" id="offEditRadBtn">RADIAL / DME</button>'+
@@ -5064,6 +5066,8 @@ function openOffRouteEditor(marker,p,index){
       committed=true;
       p.name=name;
       p.remark=root.querySelector('#offEditRemark').value.trim();
+      p.sym=root.querySelector('#offEditSym').value||'';
+      p.ld=p.sym?root.querySelector('#offEditLd').value.replace(/\D/g,'').slice(0,3):'';p.to=p.sym?root.querySelector('#offEditTo').value.replace(/\D/g,'').slice(0,3):'';   /* SPD 14 NOV: MINI MAP symbol E (emergency) / H (helipad) */
       p.lat=lat;
       p.lng=lng;
       p.place='';
@@ -6021,6 +6025,8 @@ function openWaypointEditor(marker,p,index){
       wpCoordHtml(editPoint)+
       '<label>Name<input id="editWpName" type="text" value="'+esc(p.name||'')+'"></label>'+
       '<label>หมายเหตุ / Remark<input id="editWpRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
+      '<label>สัญลักษณ์ / Symbol<select id="editWpSym" onchange="mmSymToggle(this)">'+['','E','H'].map(function(v){return '<option value="'+v+'"'+((p.sym||'')===v?' selected':'')+'>'+(v===''?'▲ Waypoint':v==='E'?'E (EMER)':'H (Helipad)')+'</option>';}).join('')+'</select></label>'+
+      '<div class="wp-sym-rwy" style="display:'+(p.sym?'':'none')+'"><label>ร่อนลง (L/D)°<input id="editWpLd" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.ld||'')+'"></label><label>วิ่งขึ้น (T/O)°<input id="editWpTo" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.to||'')+'"></label></div>'+
       '<div class="wp-edit-tabs route-tabs">'+
         '<button type="button" id="editModeLatBtn" class="active">LAT / LONG</button>'+
         '<button type="button" id="editModeRadBtn">RADIAL / DME</button>'+
@@ -6188,6 +6194,8 @@ function openWaypointEditor(marker,p,index){
         committed=true;
         p.name=edited.name;
         p.remark=edited.remark||'';
+        p.sym=root.querySelector('#editWpSym').value||'';
+        p.ld=p.sym?root.querySelector('#editWpLd').value.replace(/\D/g,'').slice(0,3):'';p.to=p.sym?root.querySelector('#editWpTo').value.replace(/\D/g,'').slice(0,3):'';   /* SPD 14 NOV: MINI MAP symbol E (emergency) / H (helipad) */
         p.lat=edited.lat;
         p.lng=edited.lng;
         p.place='';
@@ -7614,6 +7622,21 @@ function mmDrawDistFt(ctx,x0,y0,w,h,tot,S,FONT){
   ctx.restore();
 }
 function mmTri(c,x,y,w,h,fill,lw){c.beginPath();c.moveTo(x+w/2,y);c.lineTo(x+w,y+h);c.lineTo(x,y+h);c.closePath();c.fillStyle=fill;c.fill();c.lineJoin='miter';c.lineWidth=lw;c.strokeStyle='#111';c.stroke();}
+/* SPD 14 NOV: waypoint symbol E (red square, emergency) / H (light-blue circle, helipad) */
+function mmSym(c,cx,cy,r,sym,lw){
+  c.save();c.beginPath();
+  if(sym==='E'){var k=r*0.25,x=cx-r,y=cy-r,w=2*r;c.moveTo(x+k,y);c.arcTo(x+w,y,x+w,y+w,k);c.arcTo(x+w,y+w,x,y+w,k);c.arcTo(x,y+w,x,y,k);c.arcTo(x,y,x+w,y,k);c.closePath();
+    c.fillStyle='#d81414';c.fill();c.lineWidth=lw;c.strokeStyle='#7a0000';c.stroke();c.fillStyle='#fff';}
+  else{c.arc(cx,cy,r,0,2*Math.PI);c.fillStyle='#8fd0e8';c.fill();c.lineWidth=lw;c.strokeStyle='#111';c.stroke();c.fillStyle='#111';}
+  c.font='600 '+Math.round(r*1.35)+'px Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(sym,cx,cy+r*0.06);c.restore();
+}
+var MM_RED='#e00000';
+window.mmSymToggle=function(sel){var d=sel.closest('.wp-editor').querySelector('.wp-sym-rwy');if(d)d.style.display=sel.value?'':'none';}
+function mmSymRwy(p){   /* "ร่อนลง 150 วิ่งขึ้น 330" for an E / H point (blank headings when not filled in) */
+  if(!p||!(p.sym==='E'||p.sym==='H'))return '';
+  function h(v){return v===''||v==null?'      ':String(Math.round(+v)%360).padStart(3,'0');}
+  return 'ร่อนลง '+h(p.ld)+' วิ่งขึ้น '+h(p.to);
+}
 function mmRoundRect(ctx,x,y,w,h){ctx.beginPath();ctx.rect(x,y,w,h);}
 function mmBoxOverlap(a,b){return a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;}
 function mmSegHitsBox(p,q,b){   /* segment vs rectangle (sampled) */
@@ -7635,9 +7658,9 @@ function mmMeasure(ctx,lines,pad){   /* real glyph extents, so Thai marks and de
   });
   return {w:Math.ceil(w+pad*2+4),h:Math.ceil(h)};
 }
-function mmDrawBox(ctx,b,lines,pad,align,border){
+function mmDrawBox(ctx,b,lines,pad,align,border,col){
   ctx.fillStyle='rgba(255,255,255,.96)';ctx.fillRect(b.x,b.y,b.w,b.h);
-  ctx.lineWidth=border||2;ctx.strokeStyle='#111';ctx.strokeRect(b.x,b.y,b.w,b.h);
+  ctx.lineWidth=border||2;ctx.strokeStyle=col||'#111';ctx.strokeRect(b.x,b.y,b.w,b.h);
   var y=b.y+pad,mw=Math.max(4,b.w-pad*2-2);
   ctx.save();ctx.beginPath();ctx.rect(b.x+1,b.y+1,b.w-2,b.h-2);ctx.clip();   /* text can never be painted outside its box */
   lines.forEach(function(l,i){
@@ -7650,7 +7673,7 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
     var tw=ctx.measureText(l.t).width,k=tw>mw?mw/tw:1,x0=left?b.x+pad:b.x+(b.w-tw*k)/2;
     if(k<1){ctx.save();ctx.translate(x0,base);ctx.scale(k,1);ctx.fillText(l.t,0,0);ctx.restore();}
     else ctx.fillText(l.t,x0,base);
-    if(l.u){var tw=ctx.measureText(l.u).width;ctx.fillRect(b.x+pad,base+Math.max(2,desc*0.4),tw,2);}
+    if(l.u){var uw=ctx.measureText(l.u).width*k;ctx.fillRect(left?b.x+pad:x0,base+Math.max(2,desc*0.4),uw,2);}   /* centred line (E point name): underline under the text */
     if(l.rule){ctx.fillStyle='#9aa3ad';ctx.fillRect(b.x+pad,y+l.lh-2,b.w-pad*2,1.5);}
     y+=l.lh;
   });
@@ -7682,8 +7705,8 @@ function buildMiniMap(opt){
   /* PPT export: info boxes, tags, leg bars and the title are recorded as editable shapes instead of being painted */
   var REC=opt&&opt.layers?[]:null;
   function DB(c,b,lines,pad,align,border,col){
-    if(!REC){mmDrawBox(c,b,lines,pad,align,border);return;}
-    REC.push({k:'box',src:b,raw:{lines:lines,pad:pad,align:align,border:border},x:b.x,y:b.y,w:b.w,h:b.h,pad:pad,border:border||2,col:col||'#111',lines:lines.map(function(l,i){
+    if(!REC){mmDrawBox(c,b,lines,pad,align,border,col);return;}
+    REC.push({k:'box',src:b,raw:{lines:lines,pad:pad,align:align,border:border,col:col},x:b.x,y:b.y,w:b.w,h:b.h,pad:pad,border:border||2,col:col||'#111',lines:lines.map(function(l,i){
       return {t:l.t||'',sz:l.sz,b:/^[6-9]00 /.test(l.f||''),c:l.c||'#111',u:l.u||'',lh:l.lh,ctr:!(align==='left'&&!(i===0&&l.center))};})});
   }
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
@@ -7753,7 +7776,9 @@ function buildMiniMap(opt){
   }).then(function(){
     return mmLoadImg('icons/sqn201.png',4000).then(function(im){logo=im;});
   }).then(function(){
-    return mmElevFt(pts.concat(prof.pts)).then(function(e){elevFt=e.slice(0,pts.length);profFt=e.slice(pts.length);});
+    var symP=(offRoutePts||[]).concat(otherPts||[]).filter(function(p){return (p.sym==='E'||p.sym==='H')&&isFinite(p.lat)&&isFinite(p.lng);});   /* SPD 14 NOV: E / H boxes show ELEV */
+    return mmElevFt(pts.concat(prof.pts,symP)).then(function(e){elevFt=e.slice(0,pts.length);profFt=e.slice(pts.length,pts.length+prof.pts.length);
+      symP.forEach(function(p,k){p._mmFt=e[pts.length+prof.pts.length+k];});});
   }).then(function(){
     var HF=H;H=HF-PROF;   /* from here on H = bottom of the map area; the profile strip sits below it */
     mctx.fillStyle='rgba(255,255,255,.28)';mctx.fillRect(0,0,W,MH);   /* fade like a printed strip chart */
@@ -7994,7 +8019,10 @@ function buildMiniMap(opt){
     addLegs(ALT,AQ,ALTC);   /* other route: same leg data, purple bars */
 
     /* ---- waypoint circles ---- */
-    function ring(q,r,tri){   /* tri = fill colour: waypoint triangle (SPD 12 NOV), else a plain circle */
+    function ring(q,r,tri,sym){   /* tri = fill colour: waypoint triangle (SPD 12 NOV), else a plain circle; sym E / H replaces the triangle (SPD 14 NOV) */
+      if(sym==='E'||sym==='H'){r*=1.2;
+        if(REC){REC.push({k:'ring',sym:sym,x:q.x-r,y:q.y-r,w:2*r,h:2*r,cx:q.x,cy:q.y,lw:2*S});return;}
+        mmSym(ctx,q.x,q.y,r,sym,2*S);return;}
       if(tri){r*=1.25;
         if(REC){REC.push({k:'ring',tri:tri,x:q.x-r,y:q.y-r*0.95,w:2*r,h:1.75*r,cx:q.x,cy:q.y,lw:2*S});return;}
         mmTri(ctx,q.x-r,q.y-r*0.95,2*r,1.75*r,tri,2*S);return;}
@@ -8052,14 +8080,14 @@ function buildMiniMap(opt){
     }
     P.forEach(function(q,i){
       if(runwaySym((pts[i].name||'').toUpperCase(),q))boxes.push({x:q.x-36*S,y:q.y-36*S,w:72*S,h:72*S});
-      else ring(q,11*S,GRN);
+      else ring(q,11*S,GRN,pts[i].sym);
     });
     /* other route: airports get their runway symbol, other points a green triangle */
     AQ.forEach(function(q,i){
       if(pts.some(function(r){return dist(r,ALT[i])<0.5;}))return;
       var id=(ALT[i].name||'').toUpperCase();
       if(APX[id]&&runwaySym(id,q)){boxes.push({x:q.x-36*S,y:q.y-36*S,w:72*S,h:72*S});return;}
-      ring(q,10*S,GRN);
+      ring(q,10*S,GRN,ALT[i].sym);
     });
     /* nearby airports inside the sheet that are not on the route: symbol now, info box after the waypoint boxes */
     var nearAD=AP.filter(function(a){return !(a[0] in adIdx);}).map(function(a){return {id:a[0],q:px({lat:a[4],lng:a[5]})};})
@@ -8071,7 +8099,7 @@ function buildMiniMap(opt){
       if(!runwaySym(o.id,o.q))ring(o.q,9*S);
       boxes.push({x:o.q.x-36*S,y:o.q.y-36*S,w:72*S,h:72*S});
     });
-    offs.forEach(function(o){ring(o.q,10*S,'#4da3ff');});   /* SPD: light-blue triangle */
+    offs.forEach(function(o){ring(o.q,10*S,'#4da3ff',o.p.sym);});   /* SPD: light-blue triangle */
 
     /* ---- waypoint info boxes (route + off-route) ---- */
     function wpBox(p,q,i,small,sz,noTag){
@@ -8079,12 +8107,16 @@ function buildMiniMap(opt){
       /* off-route point: name, lat, long, radial; TH SarabunPSK 2 pt smaller than route points, all black */
       var lh=LH(sz),pad=5*S,lines=[];
       var rr=mmRadial(p);ctx.font=sz+'px '+WFONT;
-      var cw=Math.max(ctx.measureText('R-000/00 VTXX').width,rr?ctx.measureText(rr).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
-      lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw,BLU));
-      if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,BLU));
-      /* SPD 3 NOV: off-route points show no lat / long */
+      var cw=Math.max(ctx.measureText('R-000/00 VTXX').width,rr?ctx.measureText(rr).width:0,p.sym?ctx.measureText(mmSymRwy(p)).width:0)*1.05;   /* wrap the name only when it is wider than the other lines */
+      var isE=p.sym==='E',nc=isE?MM_RED:BLU;   /* SPD 14 NOV: E point = red name (underlined), red frame + leader line */
+      lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+sz+'px '+WFONT,sz,cw,nc));
+      if(isE)lines[0].u=lines[0].t;
+      if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,nc));
+      /* SPD 3 NOV: off-route points show no lat / long; SPD 14 NOV: except E / H points */
+      if(p.sym==='E'||p.sym==='H'){lines.push({t:'ELEV '+(p._mmFt==null?'-':Math.round(p._mmFt).toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});}
       if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});
-      return placeAndDraw(q,lines,pad,small,'center',noTag);
+      var sr=mmSymRwy(p);if(sr)lines.push({t:sr,f:'600 '+sz+'px '+WFONT,lh:lh,sz:sz,c:BLU});
+      return placeAndDraw(q,lines,pad,small,'center',noTag,isE?MM_RED:null);
     }
     function leadOk(q,b){   /* a box's leader line may not run through another box */
       var bx=Math.max(b.x,Math.min(q.x,b.x+b.w)),by=Math.max(b.y,Math.min(q.y,b.y+b.h));
@@ -8093,7 +8125,7 @@ function buildMiniMap(opt){
         if(mmSegHitsBox(q,{x:bx,y:by},{x:o.x+2,y:o.y+2,w:o.w-4,h:o.h-4}))return false;}
       return true;
     }
-    function placeAndDraw(q,lines,pad,small,align,noTag){
+    function placeAndDraw(q,lines,pad,small,align,noTag,col){
       var m=mmMeasure(ctx,lines,pad),gap=22*S,placed=null;
       var cands=[[1,-1],[1,0],[-1,-1],[-1,0],[1,1],[-1,1],[0,-1],[0,1]];
       for(var g=1;g<=4&&!placed;g++)for(var k=0;k<cands.length&&!placed;k++){
@@ -8127,11 +8159,11 @@ function buildMiniMap(opt){
       /* leader line when the box ended up far from its point */
       var bx=Math.max(placed.x,Math.min(q.x,placed.x+placed.w)),by=Math.max(placed.y,Math.min(q.y,placed.y+placed.h));
       if(Math.hypot(bx-q.x,by-q.y)>(small?16:30)*S){
-        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:placed,lw:1.5*S});
-        else{ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
+        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:placed,lw:(col?2.5:1.5)*S,col:col});
+        else{ctx.strokeStyle=col||'#111';ctx.lineWidth=(col?2.5:1.5)*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
         leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);
       }
-      DB(ctx,placed,lines,pad,align,(small?1.5:2)*S);
+      DB(ctx,placed,lines,pad,align,(col?3:small?1.5:2)*S,col);
       return true;
     }
     /* small ident tag next to airport points (AD details are in the corner box) */
@@ -8159,12 +8191,15 @@ function buildMiniMap(opt){
         var end=(i===0||i===pts.length-1),lines=[],ef=elevFt[i];
         var nsz=end?PTE:sz,rr0=end?'':(mmRadial(p)||'');ctx.font=sz+'px '+WFONT;
         var cw=Math.max(ctx.measureText(mmDDM(p.lng,false)).width*1.05,ctx.measureText(rr0).width*1.05);   /* wrap only names wider than the other lines */
-        lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+nsz+'px '+WFONT,nsz,cw,GTX));
-        if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,GTX));
+        var isE=p.sym==='E',nc=isE?MM_RED:GTX;   /* SPD 14 NOV: E point = red name (underlined), red frame + leader line */
+        lines=lines.concat(nameLines(p.name||('WP'+(i+1)),'600 '+nsz+'px '+WFONT,nsz,cw,nc));
+        if(isE)lines[0].u=lines[0].t;
+        if(p.remark)lines=lines.concat(nameLines('('+p.remark+')',sz+'px '+WFONT,sz,cw,nc));
         lines.push({t:mmDDM(p.lat,true),f:sz+'px '+WFONT,lh:lh,sz:sz});
         lines.push({t:mmDDM(p.lng,false),f:sz+'px '+WFONT,lh:lh,sz:sz});
         if(!end){var rr=mmRadial(p);if(rr)lines.push({t:rr,f:sz+'px '+WFONT,lh:lh,sz:sz});}
-        if(end||!many)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
+        if(end||!many||p.sym)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
+        var sr=end?'':mmSymRwy(p);if(sr)lines.push({t:sr,f:'600 '+sz+'px '+WFONT,lh:lh,sz:sz,c:BLU});   /* SPD 14 NOV: E / H point landing + take-off headings */
         if(end){   /* SPD: PZ (start) / LZ (destination) that is not an airport -> take-off / landing headings (typed in the MINI MAP window) + radial / DME */
           var rw0=mmRwyGet(),rw=i===0?{to:rw0.pto||(mmSameEnds()?rw0.to:''),ld:rw0.pld||(mmSameEnds()?rw0.ld:''),ref:rw0.pref||(mmSameEnds()?rw0.ref:'')}:rw0;
           var ap=rw.ref?mmRefPt(rw.ref):((p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p));
@@ -8174,7 +8209,7 @@ function buildMiniMap(opt){
           if(ap){var rd=dist({lat:ap[4],lng:ap[5]},p);lines.push({t:'R-'+mmPad3(course({lat:ap[4],lng:ap[5]},p))+' / '+rd.toFixed(1)+' '+ap[0],f:sz+'px '+WFONT,lh:lh,sz:sz});}
         }
         var m=mmMeasure(ctx,lines,pad);   /* SPD 11 NOV: box fits its text (no blank rows / minimum width) */
-        items.push({p:p,q:P[i],lines:lines,m:m,pad:pad});
+        items.push({p:p,q:P[i],lines:lines,m:m,pad:pad,col:isE?MM_RED:null});
       });
       if(!items.length)return;
       var mid=P.reduce(function(a,q){return a+q.x;},0)/P.length,gap=6*S,E=8*S;
@@ -8273,12 +8308,12 @@ function buildMiniMap(opt){
         var b=it.b,q=it.q,bx,by;
         if((q.y<b.y||q.y>b.y+b.h)&&q.x>b.x-40*S&&q.x<b.x+b.w+40*S){bx=Math.max(b.x+6*S,Math.min(q.x,b.x+b.w-6*S));by=q.y<b.y?b.y:b.y+b.h;}   /* point above / below: leave from the top / bottom edge */
         else{bx=b.x+b.w/2<q.x?b.x+b.w:b.x;by=Math.max(b.y+6*S,Math.min(q.y,b.y+b.h-6*S));}
-        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:b,lw:1.5*S});
-        else{ctx.strokeStyle='#111';ctx.lineWidth=1.5*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
+        if(REC)REC.push({k:'lead',x1:q.x,y1:q.y,x2:bx,y2:by,b:b,lw:(it.col?2.5:1.5)*S,col:it.col});
+        else{ctx.strokeStyle=it.col||'#111';ctx.lineWidth=(it.col?2.5:1.5)*S;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(bx,by);ctx.stroke();}
         leaders.push([{x:q.x,y:q.y},{x:bx,y:by}]);
       });
       items.forEach(function(it){
-        DB(ctx,it.b,it.lines,it.pad,'center',2*S);
+        DB(ctx,it.b,it.lines,it.pad,'center',(it.col?3:2)*S,it.col);
       });
     }
     edgeBoxes();
@@ -8372,9 +8407,10 @@ function mmDrawLayers(cv,c2,pos){
     if(o.k==='rect'){c.fillStyle='#'+o.fill;c.fillRect(o.x,o.y,o.w,o.h);}
     else if(o.k==='pic'){if(o._im)c.drawImage(o._im,o.x,o.y,o.w,o.h);}
     else if(o.k==='route'){c.lineCap='round';c.lineJoin='round';c.strokeStyle='#111';c.lineWidth=o.lw;c.beginPath();o.pts.forEach(function(q,i){if(i)c.lineTo(q.x,q.y);else c.moveTo(q.x,q.y);});c.stroke();}
+    else if(o.k==='ring'&&o.sym)mmSym(c,o.cx,o.cy,o.w/2,o.sym,o.lw);
     else if(o.k==='ring'&&o.tri)mmTri(c,o.x,o.y,o.w,o.h,o.tri,o.lw);
     else if(o.k==='ring'){c.beginPath();c.arc(o.cx,o.cy,o.w/2,0,2*Math.PI);c.fillStyle='rgba(255,255,255,.35)';c.fill();c.lineWidth=o.lw;c.strokeStyle='#111';c.stroke();}
-    else if(o.k==='lead'){c.strokeStyle='#111';c.lineWidth=o.lw;c.beginPath();c.moveTo(o.x1,o.y1);c.lineTo(o.x2,o.y2);c.stroke();}
+    else if(o.k==='lead'){c.strokeStyle=o.col||'#111';c.lineWidth=o.lw;c.beginPath();c.moveTo(o.x1,o.y1);c.lineTo(o.x2,o.y2);c.stroke();}
     else if(o.k==='text'){c.font=o.font;c.fillStyle=o.c;c.textAlign='left';c.textBaseline='alphabetic';c.fillText(o.t,o.cx,o.cy);}
     else if(o.k==='leg'){c.translate(o.x+o.w/2,o.y+o.h/2);c.rotate(o.rot*Math.PI/180);c.font=o.font;c.fillStyle='#fff';c.fillRect(-o.w/2,-o.h/2,o.w,o.h);c.strokeStyle='#111';c.lineWidth=o.lw||3;c.strokeRect(-o.w/2,-o.h/2,o.w,o.h);
       c.fillStyle=o.col||'#111';c.textAlign='center';c.textBaseline='middle';c.fillText(o.t,0,o.sz*0.05);}
@@ -8382,7 +8418,7 @@ function mmDrawLayers(cv,c2,pos){
       if(o.sc){c.translate(o.x,o.y);c.scale(o.sc,o.sc);o=Object.assign({},o,{x:0,y:0,w:o._w0,h:o._h0,border:o.border/o.sc});}
       if(o.tag){c.font=o.tag.font;c.fillStyle='#fff';c.fillRect(o.x,o.y,o.w,o.h);c.strokeStyle=o.col;c.lineWidth=o.border;c.strokeRect(o.x,o.y,o.w,o.h);
         c.fillStyle=o.col;c.textAlign='left';c.textBaseline='middle';c.fillText(o.tag.t,o.x+(o.w-c.measureText(o.tag.t).width)/2,o.y+o.h/2+1);}
-      else if(o.raw)mmDrawBox(c,{x:o.x,y:o.y,w:o.w,h:o.h},o.raw.lines,o.raw.pad,o.raw.align,o.raw.border);
+      else if(o.raw)mmDrawBox(c,{x:o.x,y:o.y,w:o.w,h:o.h},o.raw.lines,o.raw.pad,o.raw.align,o.raw.border,o.raw.col);
     }
     c.restore();
   });
@@ -8980,6 +9016,10 @@ function mmPptxShapes(list,k,media){
   }
   list.forEach(function(o,i){o.id=id+i;});
   function ring(o){   /* waypoint circle: movable / resizable ellipse (triangle: SPD 12 NOV) */
+    if(o.sym){var isE=o.sym==='E',fz=Math.round(o.w/S*0.65*0.75*100);   /* SPD 14 NOV: E red rounded square / H light-blue circle, letter inside */
+      return '<p:sp><p:nvSpPr><p:cNvPr id="'+o.id+'" name="Waypoint '+o.sym+' '+o.id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
+        '<a:prstGeom prst="'+(isE?'roundRect':'ellipse')+'"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="'+(isE?'D81414':'8FD0E8')+'"/></a:solidFill><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="'+(isE?'7A0000':'111111')+'"/></a:solidFill></a:ln></p:spPr>'+
+        '<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="'+Math.max(600,fz)+'" b="1"><a:solidFill><a:srgbClr val="'+(isE?'FFFFFF':'111111')+'"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>'+o.sym+'</a:t></a:r></a:p></p:txBody></p:sp>';}
     if(o.tri)return '<p:sp><p:nvSpPr><p:cNvPr id="'+o.id+'" name="Waypoint '+o.id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
       '<a:prstGeom prst="triangle"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="'+o.tri.replace('#','').toUpperCase()+'"/></a:solidFill><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:ln></p:spPr></p:sp>';
     return '<p:sp><p:nvSpPr><p:cNvPr id="'+o.id+'" name="Waypoint '+o.id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
@@ -8997,6 +9037,10 @@ function mmPptxShapes(list,k,media){
       var tx0=st.x,ty0=st.y,tw0=st.w,th0=st.h,sites=[[tx0+tw0/2,ty0],[tx0+tw0/4,ty0+th0/2],[tx0,ty0+th0],[tx0+tw0/2,ty0+th0],[tx0+tw0,ty0+th0],[tx0+tw0*3/4,ty0+th0/2]],bd=Infinity;
       sites.forEach(function(p,k){var dd=Math.hypot(p[0]-x2,p[1]-y2);if(dd<bd){bd=dd;si=k;x1=p[0];y1=p[1];}});
     }
+    else if(st&&st.sym==='E'){   /* rounded square sites: 0 top, 1 left, 2 bottom, 3 right */
+      var sq=[[st.cx,st.y],[st.x,st.cy],[st.cx,st.y+st.h],[st.x+st.w,st.cy]],bq=Infinity;
+      sq.forEach(function(p,k){var dd=Math.hypot(p[0]-x2,p[1]-y2);if(dd<bq){bq=dd;si=k;x1=p[0];y1=p[1];}});
+    }
     else if(st){   /* start on the circle's edge, at the nearest of its 8 connection points */
       var a=Math.atan2(y2-y1,x2-x1),k8=Math.round(a/(Math.PI/4)),r0=st.w/2;
       var ang=k8*Math.PI/4;x1=st.cx+Math.cos(ang)*r0;y1=st.cy+Math.sin(ang)*r0;
@@ -9006,7 +9050,7 @@ function mmPptxShapes(list,k,media){
     var fh=x2<x1,fv=y2<y1;
     return '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="'+o.id+'" name="Leader '+o.id+'"/><p:cNvCxnSpPr>'+(st?'<a:stCxn id="'+st.id+'" idx="'+si+'"/>':'')+(en?'<a:endCxn id="'+en.id+'" idx="'+ei+'"/>':'')+'</p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr>'+
       '<p:spPr><a:xfrm'+(fh?' flipH="1"':'')+(fv?' flipV="1"':'')+'><a:off x="'+E(Math.min(x1,x2))+'" y="'+E(Math.min(y1,y2))+'"/><a:ext cx="'+E(Math.abs(x2-x1))+'" cy="'+E(Math.abs(y2-y1))+'"/></a:xfrm>'+
-      '<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:ln></p:spPr></p:cxnSp>';
+      '<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="'+(o.col?o.col.replace('#','').toUpperCase():'111111')+'"/></a:solidFill></a:ln></p:spPr></p:cxnSp>';
   }
   function xf(o){return '<a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+Math.max(1,E(o.w))+'" cy="'+Math.max(1,E(o.h))+'"/></a:xfrm>';}
   function pic(o){   /* separate picture: movable / resizable / deletable */
@@ -11315,7 +11359,7 @@ function saveOffRoute(){
   try{
     localStorage.setItem(OFFROUTE_KEY,JSON.stringify(
       offRoutePts.map(function(p){
-        return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};
+        return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',sym:p.sym||'',to:p.to||'',ld:p.ld||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};
       })
     ));
   }catch(e){}
@@ -11341,7 +11385,7 @@ function saveRoute(){
       var k=legKey(pts[i-1],pts[i]),ev=elevCache[k];
       if(ev&&ev.ft!==undefined)elev[k]=ev;
     }
-    var ser=function(a){return a.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};});};
+    var ser=function(a){return a.map(function(p){return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',sym:p.sym||'',to:p.to||'',ld:p.ld||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};});};
     localStorage.setItem(ROUTE_KEY,JSON.stringify({
       pts:ser(routeActive==='main'?pts:otherPts),
       alt:ser(routeActive==='main'?otherPts:pts),
