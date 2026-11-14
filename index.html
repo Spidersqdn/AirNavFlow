@@ -5127,7 +5127,7 @@ function drawOffRouteMarkers(){
       autoPan:isMapEdit,
       icon:L.divIcon({
         className:'',
-        html:'<div class="offroute-pin'+(isMapEdit?' map-edit':'')+'">'+esc(label)+(p.remark?' <span class="wp-rmk">('+esc(p.remark)+')</span>':'')+'</div>',
+        html:'<div class="offroute-pin'+(isMapEdit?' map-edit':'')+'">'+esc(label)+'</div>',   /* SPD 14 NOV: main-map label = name only (remark stays in the tooltip) */
         iconSize:null,
         iconAnchor:[15,12]
       })
