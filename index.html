@@ -7658,6 +7658,7 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
 }
 
 /* shortest distance (NM) from a point to the route legs */
+function mmOffNm(){try{return localStorage.getItem('fp-mm-nm')==='20'?20:30;}catch(e){return 30;}}   /* SPD: off-route radius 30 (default) or 20 NM, remembered on this device */
 function mmNmFromRoute(p){
   var best=Infinity,c=Math.cos(p.lat*Math.PI/180);
   function xy(a){return {x:a.lng*60*c,y:a.lat*60};}
@@ -7689,7 +7690,7 @@ function buildMiniMap(opt){
   /* route + nearby off-route points in world px at z=0 */
   var ALT=(otherPts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});   /* the other route (main / alternate): dashed on the sheet */
   /* SPD 14 NOV: off-route waypoints within 30 NM of the route are shown, and the sheet is framed to include them */
-  var OFF_NM=30,OFF_IN=(offRoutePts||[]).filter(function(p){
+  var OFF_NM=mmOffNm(),OFF_IN=(offRoutePts||[]).filter(function(p){
     if(!isFinite(p.lat)||!isFinite(p.lng))return false;   /* unticked points still count, so they stay in the WPt list */
     var nm=(p.name||'').toUpperCase().trim();
     if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
@@ -8607,7 +8608,7 @@ function showMiniMap(cv){
     '<button type="button" id="mmShare">แชร์</button></span></div>'+
     '<div class="mm-sharebox" id="mmShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="png">PNG</button> <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="mmShareSt"></span></div>'+
     '<div class="mm-bar2" id="mmMapBar">'+(mmNotAD(pts[0])&&!mmSameEnds()?'<span class="mm-rwy"><b>PZ</b> T/O <input id="mmPTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmPLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmPRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+
-      (mmNotAD(pts[pts.length-1])?'<span class="mm-rwy"><b>LZ</b> T/O <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+      (mmNotAD(pts[pts.length-1])?'<span class="mm-rwy"><b>LZ</b> T/O <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <button type="button" id="mmNm" title="รัศมี off-route waypoint จากเส้นทาง">◎ '+mmOffNm()+' NM</button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblView" style="display:none"><div class="mm-bar2" style="background:var(--panel,#1b1f24);padding-top:8px;position:sticky;top:0;z-index:3"><button type="button" id="mmTblEdit">✏️ แก้ไขตาราง</button> <span id="mmTblInfo"></span></div><div id="mmTblPrev"></div><div id="mmTblEd" style="display:none"></div></div></div>'+
     '<p class="mm-note">ขนาด A5 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
@@ -8664,6 +8665,12 @@ function showMiniMap(cv){
   var bgb=document.getElementById('mmBg');
   function bgLbl(){var w=mmBgWhite();bgb.textContent=w?'🗺 แสดงแผนที่':'⬜ พื้นหลังขาว';}
   bgLbl();
+  var nmb=document.getElementById('mmNm');
+  nmb.onclick=function(){   /* 30 <-> 20 NM: rebuild the sheet (frame and WPt list change) */
+    try{localStorage.setItem('fp-mm-nm',mmOffNm()===30?'20':'30');}catch(e){}
+    nmb.disabled=true;nmb.textContent='◎ '+mmOffNm()+' NM ...';
+    mmBuildSheet(mmOffSkip()).then(showMiniMap).catch(function(err){nmb.disabled=false;alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');});
+  };
   bgb.onclick=function(){
     try{if(mmBgWhite())localStorage.removeItem('fp-mm-bg');else localStorage.setItem('fp-mm-bg','white');}catch(e){}
     bgLbl();mmDrawLayers(sheet,sheet.mmL,pos);refreshImg();if(moving)redraw();
