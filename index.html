@@ -7657,6 +7657,18 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
   ctx.restore();
 }
 
+/* shortest distance (NM) from a point to the route legs */
+function mmNmFromRoute(p){
+  var best=Infinity,c=Math.cos(p.lat*Math.PI/180);
+  function xy(a){return {x:a.lng*60*c,y:a.lat*60};}
+  var o=xy(p);
+  for(var k=1;k<pts.length;k++){
+    var a=xy(pts[k-1]),b=xy(pts[k]),dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+    var t=L2?Math.max(0,Math.min(1,((o.x-a.x)*dx+(o.y-a.y)*dy)/L2)):0;
+    best=Math.min(best,Math.hypot(o.x-a.x-t*dx,o.y-a.y-t*dy));
+  }
+  return best;
+}
 function buildMiniMap(opt){
   var S=2,W=900*S,HEAD=61*S,FONT='"IBM Plex Sans Thai","Sarabun",Tahoma,"Noto Sans Thai",sans-serif';
   var WFONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';   /* waypoint boxes: TH SarabunPSK (Sarabun web font as fallback) */
@@ -7676,7 +7688,14 @@ function buildMiniMap(opt){
   function LH(sz){return Math.round(sz*1.2);}   /* line height with room for Thai marks so text stays inside its box */
   /* route + nearby off-route points in world px at z=0 */
   var ALT=(otherPts||[]).filter(function(p){return isFinite(p.lat)&&isFinite(p.lng);});   /* the other route (main / alternate): dashed on the sheet */
-  var all=pts.concat(ALT).map(function(p){return mmWorld(p.lat,p.lng,0);});
+  /* SPD 14 NOV: off-route waypoints within 30 NM of the route are shown, and the sheet is framed to include them */
+  var OFF_NM=30,OFF_IN=(offRoutePts||[]).filter(function(p){
+    if(!isFinite(p.lat)||!isFinite(p.lng))return false;   /* unticked points still count, so they stay in the WPt list */
+    var nm=(p.name||'').toUpperCase().trim();
+    if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
+    return mmNmFromRoute(p)<=OFF_NM;
+  });
+  var all=pts.concat(ALT,OFF_IN).map(function(p){return mmWorld(p.lat,p.lng,0);});
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   all.forEach(function(q){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var spanX=Math.max(maxX-minX,1e-4),spanY=Math.max(maxY-minY,1e-4);
@@ -7883,7 +7902,7 @@ function buildMiniMap(opt){
     }
 
     /* ---- off-route waypoints inside the frame ---- */
-    /* off-route points: drop duplicates of route points and anything more than 20 NM from the route */
+    /* off-route points: drop duplicates of route points and anything more than 30 NM from the route (SPD 14 NOV, was 20) */
     function nmFromRoute(p){
       var best=Infinity,c=Math.cos(p.lat*rad);
       function xy(a){return {x:a.lng*60*c,y:a.lat*60};}
@@ -7899,7 +7918,7 @@ function buildMiniMap(opt){
       var nm=(p.name||'').toUpperCase();
       nm=nm.trim();
       if(pts.some(function(r){return dist(r,p)<1||(nm&&(r.name||'').toUpperCase().trim()===nm);}))return false;
-      return nmFromRoute(p)<=20;
+      return nmFromRoute(p)<=OFF_NM;
     }).map(function(p){return {p:p,q:px(p)};}).filter(function(o){return o.q.x>20*S&&o.q.x<W-20*S&&o.q.y>HEAD+20*S&&o.q.y<H-20*S;});
     var offs=offCand.filter(function(o){return !offSkip[mmOffKey(o.p)];});
     mmMapOffs=offs.map(function(o){return o.p;});   /* SPD: table lists only the off-route points shown on this MINI MAP */
