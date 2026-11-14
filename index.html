@@ -6026,7 +6026,7 @@ function openWaypointEditor(marker,p,index){
       '<label>Name<input id="editWpName" type="text" value="'+esc(p.name||'')+'"></label>'+
       '<label>หมายเหตุ / Remark<input id="editWpRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
       '<label>สัญลักษณ์ / Symbol<select id="editWpSym" onchange="mmSymToggle(this)">'+['','E','H'].map(function(v){return '<option value="'+v+'"'+((p.sym||'')===v?' selected':'')+'>'+(v===''?'▲ Waypoint':v==='E'?'E (EMER)':'H (Helipad)')+'</option>';}).join('')+'</select></label>'+
-      '<div class="wp-sym-rwy" style="display:'+(p.sym?'':'none')+'"><label>ร่อนลง (L/D)°<input id="editWpLd" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.ld||'')+'"></label><label>วิ่งขึ้น (T/O)°<input id="editWpTo" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.to||'')+'"></label></div>'+
+      '<div class="wp-sym-rwy"'+((index===0||index===pts.length-1)?' data-end="1"':'')+' style="display:'+((p.sym||index===0||index===pts.length-1)?'':'none')+'"><label>ร่อนลง (L/D)°<input id="editWpLd" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.ld||'')+'"></label><label>วิ่งขึ้น (T/O)°<input id="editWpTo" type="text" inputmode="numeric" maxlength="3" value="'+esc(p.to||'')+'"></label></div>'+
       '<div class="wp-edit-tabs route-tabs">'+
         '<button type="button" id="editModeLatBtn" class="active">LAT / LONG</button>'+
         '<button type="button" id="editModeRadBtn">RADIAL / DME</button>'+
@@ -6195,7 +6195,8 @@ function openWaypointEditor(marker,p,index){
         p.name=edited.name;
         p.remark=edited.remark||'';
         p.sym=root.querySelector('#editWpSym').value||'';
-        p.ld=p.sym?root.querySelector('#editWpLd').value.replace(/\D/g,'').slice(0,3):'';p.to=p.sym?root.querySelector('#editWpTo').value.replace(/\D/g,'').slice(0,3):'';   /* SPD 14 NOV: MINI MAP symbol E (emergency) / H (helipad) */
+        var rwOn=p.sym||index===0||index===pts.length-1;
+        p.ld=rwOn?root.querySelector('#editWpLd').value.replace(/\D/g,'').slice(0,3):'';p.to=rwOn?root.querySelector('#editWpTo').value.replace(/\D/g,'').slice(0,3):'';   /* SPD 14 NOV: MINI MAP symbol E (emergency) / H (helipad) */
         p.lat=edited.lat;
         p.lng=edited.lng;
         p.place='';
@@ -7631,7 +7632,7 @@ function mmSym(c,cx,cy,r,sym,lw){
   c.font='600 '+Math.round(r*1.35)+'px Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(sym,cx,cy+r*0.06);c.restore();
 }
 var MM_RED='#e00000';
-window.mmSymToggle=function(sel){var d=sel.closest('.wp-editor').querySelector('.wp-sym-rwy');if(d)d.style.display=sel.value?'':'none';}
+window.mmSymToggle=function(sel){var d=sel.closest('.wp-editor').querySelector('.wp-sym-rwy');if(d)d.style.display=(sel.value||d.getAttribute('data-end'))?'':'none';}   /* route start / end: always (SPD 14 NOV: PZ / LZ headings set here) */
 function mmSymRwy(p){   /* "ร่อนลง 150 วิ่งขึ้น 330" for an E / H point (blank headings when not filled in) */
   if(!p||!(p.sym==='E'||p.sym==='H'))return '';
   function h(v){return v===''||v==null?'      ':String(Math.round(+v)%360).padStart(3,'0');}
@@ -8201,7 +8202,10 @@ function buildMiniMap(opt){
         if(end||!many||p.sym)lines.push({t:'ELEV '+(ef==null?'-':ef.toLocaleString('en-US'))+' ft',f:sz+'px '+WFONT,lh:lh,sz:sz});
         var sr=end?'':mmSymRwy(p);if(sr)lines.push({t:sr,f:'600 '+sz+'px '+WFONT,lh:lh,sz:sz,c:BLU});   /* SPD 14 NOV: E / H point landing + take-off headings */
         if(end){   /* SPD: PZ (start) / LZ (destination) that is not an airport -> take-off / landing headings (typed in the MINI MAP window) + radial / DME */
-          var rw0=mmRwyGet(),rw=i===0?{to:rw0.pto||(mmSameEnds()?rw0.to:''),ld:rw0.pld||(mmSameEnds()?rw0.ld:''),ref:rw0.pref||(mmSameEnds()?rw0.ref:'')}:rw0;
+          /* SPD 14 NOV: T/O / L/D now set in Edit Waypoint (start = PZ, destination = LZ); MINI MAP window row removed. Old window values kept as fallback */
+          var rw0=mmRwyGet(),rwOld=i===0?{to:rw0.pto||(mmSameEnds()?rw0.to:''),ld:rw0.pld||(mmSameEnds()?rw0.ld:''),ref:rw0.pref||(mmSameEnds()?rw0.ref:'')}:rw0;
+          var q2=mmSameEnds()?pts[i===0?pts.length-1:0]:null;
+          var rw={to:p.to||(q2&&q2.to)||rwOld.to||'',ld:p.ld||(q2&&q2.ld)||rwOld.ld||'',ref:rwOld.ref||''};
           var ap=rw.ref?mmRefPt(rw.ref):((p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p));
           lines.push({t:'วิ่งขึ้น '+(rw.to?mmPad3(+rw.to):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
           lines.push({t:'ร่อนลง '+(rw.ld?mmPad3(+rw.ld):'      ')+'°',f:sz+'px '+WFONT,lh:lh,sz:sz});
@@ -8655,8 +8659,7 @@ function showMiniMap(cv){
     '<button type="button" id="mmSave" title="A4 แนวนอน: MINI MAP + ตาราง พร้อมพิมพ์">PDF</button> <button type="button" id="mmPpt">PPT</button> '+
     '<button type="button" id="mmShare">แชร์</button></span></div>'+
     '<div class="mm-sharebox" id="mmShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="png">PNG</button> <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="mmShareSt"></span></div>'+
-    '<div class="mm-bar2" id="mmMapBar">'+(mmNotAD(pts[0])&&!mmSameEnds()?'<span class="mm-rwy"><b>PZ</b> T/O <input id="mmPTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmPLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmPRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+
-      (mmNotAD(pts[pts.length-1])?'<span class="mm-rwy"><b>LZ</b> T/O <input id="mmTo" inputmode="numeric" maxlength="3" placeholder="---">° L/D <input id="mmLd" inputmode="numeric" maxlength="3" placeholder="---">° REF <input id="mmRef" class="mm-ref" maxlength="8" placeholder="อัตโนมัติ" autocapitalize="characters"></span> ':'')+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <button type="button" id="mmNm" title="รัศมี off-route waypoint จากเส้นทาง">◎ '+mmOffNm()+' NM</button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
+    '<div class="mm-bar2" id="mmMapBar">'+'<button type="button" id="mmMove">✋ ย้ายกล่อง</button> <button type="button" id="mmPosReset">↺ ตำแหน่งเดิม</button> <button type="button" id="mmBg"></button> <button type="button" id="mmNm" title="รัศมี off-route waypoint จากเส้นทาง">◎ '+mmOffNm()+' NM</button> <span id="mmMoveHint" style="display:none">ลากกล่องข้อมูลหรือแถบ HDG ไปวางตำแหน่งใหม่ · ลากจุดส้ม (มุมขวาล่างกล่อง / ปลายแถบ leg) เพื่อปรับขนาด แล้วกด ✋ อีกครั้งเมื่อเสร็จ</span></div>'+
     '<div class="mm-img"><img alt="Mini map"><canvas id="mmLive" style="display:none;width:100%;height:auto;touch-action:none;cursor:move"></canvas><div id="mmTblView" style="display:none"><div class="mm-bar2" style="background:var(--panel,#1b1f24);padding-top:8px;position:sticky;top:0;z-index:3"><button type="button" id="mmTblEdit">✏️ แก้ไขตาราง</button> <span id="mmTblInfo"></span></div><div id="mmTblPrev"></div><div id="mmTblEd" style="display:none"></div></div></div>'+
     '<p class="mm-note">ขนาด A5 แนวตั้ง · iPad/iPhone: กดค้างที่รูปเพื่อบันทึกลง Photos ได้'+
     (elevPM?'':' · ยังไม่มีเส้น contour: ดาวน์โหลดข้อมูลความสูงออฟไลน์ก่อน')+'</p></div>';
