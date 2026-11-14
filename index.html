@@ -7658,7 +7658,7 @@ function mmDrawBox(ctx,b,lines,pad,align,border){
 }
 
 /* shortest distance (NM) from a point to the route legs */
-function mmOffNm(){try{return localStorage.getItem('fp-mm-nm')==='20'?20:30;}catch(e){return 30;}}   /* SPD: off-route radius 30 (default) or 20 NM, remembered on this device */
+function mmOffNm(){try{var v=+localStorage.getItem('fp-mm-nm');return v===20||v===10?v:30;}catch(e){return 30;}}   /* SPD: off-route radius 30 (default) / 20 / 10 NM, remembered on this device */
 function mmNmFromRoute(p){
   var best=Infinity,c=Math.cos(p.lat*Math.PI/180);
   function xy(a){return {x:a.lng*60*c,y:a.lat*60};}
@@ -8666,8 +8666,8 @@ function showMiniMap(cv){
   function bgLbl(){var w=mmBgWhite();bgb.textContent=w?'🗺 แสดงแผนที่':'⬜ พื้นหลังขาว';}
   bgLbl();
   var nmb=document.getElementById('mmNm');
-  nmb.onclick=function(){   /* 30 <-> 20 NM: rebuild the sheet (frame and WPt list change) */
-    try{localStorage.setItem('fp-mm-nm',mmOffNm()===30?'20':'30');}catch(e){}
+  nmb.onclick=function(){   /* 30 / 20 / 10 NM: rebuild the sheet (frame and WPt list change) */
+    try{localStorage.setItem('fp-mm-nm',String({30:20,20:10,10:30}[mmOffNm()]));}catch(e){}   /* 30 -> 20 -> 10 -> 30 */
     nmb.disabled=true;nmb.textContent='◎ '+mmOffNm()+' NM ...';
     mmBuildSheet(mmOffSkip()).then(showMiniMap).catch(function(err){nmb.disabled=false;alert('สร้าง MINI MAP ไม่สำเร็จ ('+(err&&err.message||err)+')');});
   };
