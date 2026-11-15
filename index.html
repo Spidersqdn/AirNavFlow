@@ -796,6 +796,11 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 @media (max-width:760px){
   .big{font-size:30px}
 }
+/* Touch menu: allow scrolling, but no page pinch/double-tap zoom or iOS input zoom. */
+@media (any-pointer:coarse){
+  #panel{touch-action:pan-x pan-y}
+  #panel input,#panel select,#panel textarea{font-size:16px}
+}
 
 .rpt-light,.rpt-heli{
   white-space:nowrap;
@@ -4016,6 +4021,13 @@ function setOfflineSource(source){
 }
 
 var map=L.map('map',{center:[13.5,101],zoom:6,layers:[sat],worldCopyJump:true});
+/* Safari gesture fallback stays on the menu; Leaflet handles map gestures independently. */
+(function(){
+  var panel=document.getElementById('panel'),touchMenu=window.matchMedia('(any-pointer:coarse)');
+  function preventMenuZoom(e){if(touchMenu.matches&&e.cancelable)e.preventDefault();}
+  panel.addEventListener('gesturestart',preventMenuZoom,{passive:false});
+  panel.addEventListener('gesturechange',preventMenuZoom,{passive:false});
+})();
 /* Hide-menu bar: toggle the side panel; state remembered in localStorage */
 (function(){
   var KEY='fp-panel-hidden-v1',btn=document.getElementById('panelToggle');
