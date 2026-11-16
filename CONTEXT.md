@@ -26,6 +26,7 @@ data/*.txt            editable data, pipe-separated "a | b | c", "#" = comment
 notam/                NOTAMyyMMMdd.txt + latest.txt (written by automation)
 map/                  empty fallback; real pmtiles live in DataBase
 tools/                notam-gmail.gs (Apps Script) + AUTOMATION-TH.md
+KM/                   knowledge notes; start at KM/README.md
 .github/workflows/    build-map-and-deploy.yml, cowork-sync.yml, notam-import.yml
 .github/scripts/      notam_import.py
 ```
