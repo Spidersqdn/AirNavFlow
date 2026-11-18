@@ -19,7 +19,6 @@ Read this file first, every session. It replaces the memory of earlier AI sessio
 ### AirNavFlow layout
 ```
 index.html            whole app in ONE file (~1.1 MB: JS, CSS, libs, embedded AIP data)
-airnavflow.html       redirect stub to ./ (old URL)
 sw.js                 service worker; bump APP_CACHE (fp-app-vNNN) on EVERY index.html change
 manifest.webmanifest, icons/
 data/*.txt            editable data, pipe-separated "a | b | c", "#" = comment

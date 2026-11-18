@@ -100,7 +100,6 @@
 ## โครงสร้างไฟล์
 ```
 index.html               ตัวแอป (รวมไลบรารีและข้อมูล AIP ไว้ในไฟล์เดียว)
-airnavflow.html          หน้าพาลิงก์เก่ามาที่ index.html
 sw.js                    service worker (เปิดออฟไลน์ได้) แก้ index.html แล้วต้องเพิ่ม APP_CACHE
 manifest.webmanifest     ข้อมูลการติดตั้งแอป
 icons/                   ไอคอนแอป
