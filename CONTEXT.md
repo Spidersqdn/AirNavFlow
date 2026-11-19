@@ -1,7 +1,7 @@
 # AirNavFlow: project context for AI assistants
 
 Read this file first, every session. It replaces the memory of earlier AI sessions
-(Claude, 2026-10 to 2026-11). User-facing docs are in `README.md` (Thai).
+(Claude, 2026-10 to 2026-11). User-facing docs are in `README.md` and `KM/USER_GUIDE.md` (Thai).
 
 ## 1. Project
 - **Goal:** flight-planning app usable on any device, anywhere, also offline (PWA).
@@ -113,6 +113,8 @@ KM/                   knowledge notes; start at KM/README.md
 - **Hide-menu bar:** ◀/▶ left edge (landscape) or ▼/▲ bottom (portrait), remembered.
 
 ## 7. Parked / future
+- Support bot knowledge: `KM/BOT_GUIDE.md`, `USER_GUIDE.md`, `FAQ.md`, `FEEDBACK.md`.
+  Docs are prepared first; bot channel and feedback storage integration are not selected yet.
 - Native app (Capacitor android/ios in this repo, Android APK via Actions, iOS via SPD's Mac):
   parked until SPD says go (planned Dec 2026).
 - FalCon2CP will read DataBase/CoWork too.
