@@ -10775,19 +10775,19 @@ function chartImgSize(blob){
     im.src=u;
   });
 }
-/* PDF: pdf.js loaded on demand (needs internet once), chosen page rendered to PNG (long side ~2600 px) */
-var PDFJS_V='3.11.174';
+/* PDF: pdf.js 3.11.174 from lib/ (kept in this repo, no CDN), loaded on demand; the service worker stores it for offline use.
+   Chosen page rendered to PNG (long side ~2600 px) */
 function chartLoadPdfJs(){
   if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
   if(!chartLoadPdfJs.p)chartLoadPdfJs.p=new Promise(function(res,rej){
     var s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.min.js';
+    s.src='lib/pdf.min.js';
     s.onload=function(){
       if(!window.pdfjsLib){rej(new Error('pdf.js'));return;}
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc='lib/pdf.worker.min.js';
       res(pdfjsLib);
     };
-    s.onerror=function(){chartLoadPdfJs.p=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ตตอน import PDF ครั้งแรก)'));};
+    s.onerror=function(){chartLoadPdfJs.p=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต่ออินเทอร์เน็ตแล้วเปิดแอพใหม่หนึ่งครั้ง)'));};
     document.head.appendChild(s);
   });
   return chartLoadPdfJs.p;
