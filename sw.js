@@ -3,7 +3,7 @@
    - Pages: network-first, falls back to cached shell when offline
    - Province borders / fonts: stale-while-revalidate
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v169';
+var APP_CACHE='fp-app-v170';
 var RUNTIME_CACHE='fp-runtime-v1';
 var SHELL=['./'];
 var OPTIONAL=['index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/sqn201.png','icons/slide-bg.jpg'];
@@ -37,8 +37,10 @@ self.addEventListener('fetch',function(e){
     if(/\/DataBase\/CoWork\//.test(url.pathname))return;   // shared AD/RWY/สนามบิน ทบ. + places.json (DataBase repo): app keeps its own offline copy
     if(req.mode==='navigate'){
       e.respondWith(fetch(req).then(function(res){
-        var copy=res.clone();
-        caches.open(APP_CACHE).then(function(c){if(/(\/|index\.html)$/.test(url.pathname))c.put('./',copy);});
+        if(res.ok&&/(\/|index\.html)$/.test(url.pathname)){   /* never store an error page (404 / 5xx) as the offline app shell */
+          var copy=res.clone();
+          caches.open(APP_CACHE).then(function(c){c.put('./',copy);});
+        }
         return res;
       }).catch(function(){return caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||caches.match('./');});}));
       return;
@@ -51,7 +53,8 @@ self.addEventListener('fetch',function(e){
     e.respondWith(caches.open(RUNTIME_CACHE).then(function(c){
       return c.match(req).then(function(hit){
         var net=fetch(req).then(function(res){if(res&&(res.ok||res.type==='opaque'))c.put(req,res.clone());return res;});
-        return hit||net;
+        if(hit){e.waitUntil(net.catch(function(){}));return hit;}   /* refresh in the background; offline is not an error */
+        return net;
       });
     }));
   }
