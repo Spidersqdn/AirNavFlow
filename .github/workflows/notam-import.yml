@@ -24,7 +24,7 @@ jobs:
   import:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install pandoc + pdftotext
         run: sudo apt-get update -qq && sudo apt-get install -y -qq pandoc poppler-utils
@@ -39,12 +39,13 @@ jobs:
       - name: Commit and redeploy
         env:
           GH_TOKEN: ${{ github.token }}
+          NAMES: ${{ steps.conv.outputs.names }}   # passed as data, never pasted into the script
         run: |
           git add -A notam
           if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "NOTAM: ${{ steps.conv.outputs.names }}"
+          git commit -m "NOTAM: $NAMES"
           git pull --rebase -q origin main
           git push origin HEAD:main
           # Pushes made with the workflow token do not start other workflows, so start the deploy.
