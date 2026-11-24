@@ -1767,7 +1767,10 @@ body.panel-hidden #panelResizer{display:none}
 /* Phone portrait: NAVIGATION TRACKING docked in the bottom strip (below the menu, always visible) */
 @media (orientation:portrait) and (max-width:820px){
   html{background:#383d43}
-  body{padding-bottom:0}
+  /* full screen: map runs under the status bar, app height = whole screen (iOS standalone 100% is short by the status bar) */
+  html,body{height:100vh;height:var(--app-h,100vh)}
+  body{padding-top:0;padding-bottom:0}
+  #mapwrap .leaflet-top{top:env(safe-area-inset-top,0)}
   #navDock{display:block;order:-1;flex:none;background:#383d43;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
   #navDock .nav-track{padding:6px 10px 6px;border-bottom:none}
   #navDock .nav-track-head{display:none}
@@ -4073,6 +4076,17 @@ var map=L.map('map',{center:[13.5,101],zoom:6,layers:[sat],worldCopyJump:true});
   btn.addEventListener('click',function(e){e.stopPropagation();apply(!document.body.classList.contains('panel-hidden'),true);});
   L.DomEvent.disableClickPropagation(btn);
   if(portrait){if(portrait.addEventListener)portrait.addEventListener('change',label);else if(portrait.addListener)portrait.addListener(label);}
+})();
+/* iOS Home Screen app: html height:100% leaves a gap at the bottom; size the app to the real screen */
+(function(){
+  var st=window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
+  function fit(){
+    var h=window.innerHeight;
+    if(st&&window.screen){var pt=window.innerHeight>=window.innerWidth;var sh=pt?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);if(Math.abs(sh-h)<=120)h=Math.max(h,sh);}
+    document.documentElement.style.setProperty('--app-h',h+'px');
+    try{map.invalidateSize();}catch(e){}
+  }
+  fit();window.addEventListener('resize',fit);window.addEventListener('orientationchange',function(){setTimeout(fit,300);});
 })();
 /* Desktop: drag #panelResizer to set the menu width; phone portrait: NAVIGATION TRACKING moves to #navDock */
 (function(){
