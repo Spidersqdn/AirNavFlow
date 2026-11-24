@@ -20,6 +20,7 @@ Read this file first, every session. It replaces the memory of earlier AI sessio
 ```
 index.html            whole app in ONE file (~1.1 MB: JS, CSS, libs, embedded AIP data)
 sw.js                 service worker; bump APP_CACHE (fp-app-vNNN) on EVERY index.html change
+lib/                  pdf.js 3.11.174 (PDF chart import; kept here, no CDN). Replace a file -> rename LIB_CACHE in sw.js
 manifest.webmanifest, icons/
 data/*.txt            editable data, pipe-separated "a | b | c", "#" = comment
 notam/                NOTAMyyMMMdd.txt + latest.txt (written by automation)
