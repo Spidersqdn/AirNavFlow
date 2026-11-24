@@ -5971,7 +5971,7 @@ function drawOtherRoute(){
   }
   otherPts.forEach(function(p,i){
     L.circleMarker([p.lat,p.lng],{radius:4,color:col,weight:2,fillColor:'#fff',fillOpacity:.9})
-      .bindTooltip(lbl+' '+(i+1)+(p.name?': '+p.name:''),{direction:'top'}).addTo(lineLayer);
+      .bindTooltip(lbl+' '+(i+1)+(p.name?': '+esc(p.name):''),{direction:'top'}).addTo(lineLayer);
   });
 }
 function updateRouteSel(){
@@ -9123,7 +9123,7 @@ function mmPptxShapes(list,k,media){
   }
   list.forEach(function(o,i){o.id=id+i;});
   function ring(o){   /* waypoint circle: movable / resizable ellipse (triangle: SPD 12 NOV) */
-    if(o.sym){var isE=o.sym==='E',fz=Math.round(o.w/S*0.65*0.75*100);   /* SPD 14 NOV: E red rounded square / H light-blue circle, letter inside */
+    if(o.sym){var isE=o.sym==='E',fz=Math.round(o.w*0.65*k/12700*100);   /* SPD 14 NOV: E red rounded square / H light-blue circle, letter inside */
       return '<p:sp><p:nvSpPr><p:cNvPr id="'+o.id+'" name="Waypoint '+o.sym+' '+o.id+'"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(o.x)+'" y="'+E(o.y)+'"/><a:ext cx="'+E(o.w)+'" cy="'+E(o.h)+'"/></a:xfrm>'+
         '<a:prstGeom prst="'+(isE?'roundRect':'ellipse')+'"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="'+(isE?'D81414':'8FD0E8')+'"/></a:solidFill><a:ln w="'+E(o.lw)+'"><a:solidFill><a:srgbClr val="'+(isE?'7A0000':'111111')+'"/></a:solidFill></a:ln></p:spPr>'+
         '<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="'+Math.max(600,fz)+'" b="1"><a:solidFill><a:srgbClr val="'+(isE?'FFFFFF':'111111')+'"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>'+o.sym+'</a:t></a:r></a:p></p:txBody></p:sp>';}
@@ -10795,19 +10795,19 @@ function chartImgSize(blob){
     im.src=u;
   });
 }
-/* PDF: pdf.js loaded on demand (needs internet once), chosen page rendered to PNG (long side ~2600 px) */
-var PDFJS_V='3.11.174';
+/* PDF: pdf.js 3.11.174 from lib/ (kept in this repo, no CDN), loaded on demand; the service worker stores it for offline use.
+   Chosen page rendered to PNG (long side ~2600 px) */
 function chartLoadPdfJs(){
   if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
   if(!chartLoadPdfJs.p)chartLoadPdfJs.p=new Promise(function(res,rej){
     var s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.min.js';
+    s.src='lib/pdf.min.js';
     s.onload=function(){
       if(!window.pdfjsLib){rej(new Error('pdf.js'));return;}
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_V+'/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc='lib/pdf.worker.min.js';
       res(pdfjsLib);
     };
-    s.onerror=function(){chartLoadPdfJs.p=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ตตอน import PDF ครั้งแรก)'));};
+    s.onerror=function(){chartLoadPdfJs.p=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต่ออินเทอร์เน็ตแล้วเปิดแอพใหม่หนึ่งครั้ง)'));};
     document.head.appendChild(s);
   });
   return chartLoadPdfJs.p;
