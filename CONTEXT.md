@@ -108,6 +108,7 @@ KM/                   knowledge notes; start at KM/README.md
 - **NAVIGATION TRACKING** panel (yellow) above profile: TRACK (Wake Lock) | PPOS | ROUTE | RESET |
   EXPORT; DISTANCE NM, GROUND SPEED KT, FLIGHT TIME, ALTITUDE. PWA stops when backgrounded.
   Phone portrait (≤820px): panel moves to bottom strip #navDock (always visible).
+  Phone portrait is full screen: map under status bar, height --app-h (screen height in iOS Home Screen app).
 - **Desktop menu width:** drag #panelResizer (menu/map edge), saved fp-panel-w-v1; double-click = 390px.
 - **Layers:** มทบ., VFR BKK A/C & Helicopter Wpt, RTAF POC (CSAR + ผบ.ฝูง), สนามบิน ทบ., airspace,
   reporting points, Imported NOTAM, rain radar. NOTAM list in side panel hidden by default.
