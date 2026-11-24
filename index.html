@@ -697,7 +697,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-family:var(--sans)}
 body{display:flex;flex-direction:row;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
-#panel{width:390px;flex:none;display:flex;flex-direction:column;background:#3d4249;border-right:1px solid var(--line);overflow-y:auto}
+#panel{width:var(--panel-w,390px);flex:none;display:flex;flex-direction:column;background:#3d4249;border-right:1px solid var(--line);overflow-y:auto}
 #mapwrap{flex:1;position:relative;min-width:0}
 #map{position:absolute;inset:0;background:#555b63;cursor:crosshair}
 header{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
@@ -1751,8 +1751,29 @@ td .wp-delete{
 #panelToggle{position:absolute;z-index:1001;left:0;top:50%;transform:translateY(-50%);width:22px;height:72px;padding:0;margin:0;border:1px solid var(--line);border-left:none;border-radius:0 8px 8px 0;background:rgba(58,63,70,.92);color:var(--amber);font:bold 14px/1 var(--sans);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.4);-webkit-tap-highlight-color:transparent}
 #panelToggle:active{background:var(--panel2)}
 body.panel-hidden #panel{display:none}
+/* Desktop / landscape: drag the bar between menu and map to resize the menu (width in localStorage fp-panel-w-v1) */
+#panelResizer{flex:none;width:0;position:relative;z-index:1000;cursor:col-resize;touch-action:none}
+#panelResizer::before{content:"";position:absolute;top:0;bottom:0;left:-2px;width:10px}
+#panelResizer::after{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:transparent;pointer-events:none}
+#panelResizer:hover::after,body.panel-resizing #panelResizer::after{background:var(--amber)}
+body.panel-resizing{cursor:col-resize;user-select:none;-webkit-user-select:none}
+body.panel-resizing #map{pointer-events:none}
+body.panel-hidden #panelResizer{display:none}
+#navDock{display:none}
 @media (orientation:portrait){
   #panelToggle{left:50%;top:auto;bottom:0;transform:translateX(-50%);width:72px;height:22px;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0}
+  #panelResizer{display:none}
+}
+/* Phone portrait: NAVIGATION TRACKING docked in the bottom strip (below the menu, always visible) */
+@media (orientation:portrait) and (max-width:820px){
+  html{background:#383d43}
+  body{padding-bottom:0}
+  #navDock{display:block;order:-1;flex:none;background:#383d43;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+  #navDock .nav-track{padding:6px 10px 6px;border-bottom:none}
+  #navDock .nav-track-head{display:none}
+  #navDock .nav-track .actions button{padding-top:6px;padding-bottom:6px;font-size:12px;min-height:0}
+  #navDock .nav-track-stats{margin-top:5px;gap:5px}
+  #navDock .nav-track-stats div{padding:3px 2px}
 }
 </style>
 </head>
@@ -2004,6 +2025,8 @@ body.panel-hidden #panel{display:none}
 
 
 </aside>
+<div id="panelResizer" role="separator" aria-orientation="vertical" aria-label="ลากเพื่อปรับความกว้างเมนู" title="ลากเพื่อปรับความกว้างเมนู (ดับเบิลคลิก = ค่าเริ่มต้น)"></div>
+<div id="navDock"></div>
 
 <div id="mapwrap">
   <div id="map"></div>
@@ -4050,6 +4073,30 @@ var map=L.map('map',{center:[13.5,101],zoom:6,layers:[sat],worldCopyJump:true});
   btn.addEventListener('click',function(e){e.stopPropagation();apply(!document.body.classList.contains('panel-hidden'),true);});
   L.DomEvent.disableClickPropagation(btn);
   if(portrait){if(portrait.addEventListener)portrait.addEventListener('change',label);else if(portrait.addListener)portrait.addListener(label);}
+})();
+/* Desktop: drag #panelResizer to set the menu width; phone portrait: NAVIGATION TRACKING moves to #navDock */
+(function(){
+  var KEY='fp-panel-w-v1',DEF=390,root=document.documentElement,rz=document.getElementById('panelResizer'),panel=document.getElementById('panel');
+  if(!rz||!panel)return;
+  function clamp(w){var mx=Math.max(300,Math.round(window.innerWidth*0.75));return Math.max(280,Math.min(mx,Math.round(w)));}
+  var cur=DEF;try{var v=parseFloat(localStorage.getItem(KEY));if(v>0)cur=v;}catch(e){}
+  function set(w,save){cur=clamp(w);root.style.setProperty('--panel-w',cur+'px');if(save){try{localStorage.setItem(KEY,String(cur));}catch(e){}}}
+  function fix(){try{map.invalidateSize();}catch(e){}}
+  set(cur,false);
+  var drag=null;
+  rz.addEventListener('pointerdown',function(e){e.preventDefault();drag={x:e.clientX,w:panel.getBoundingClientRect().width};document.body.classList.add('panel-resizing');try{rz.setPointerCapture(e.pointerId);}catch(_){}});
+  rz.addEventListener('pointermove',function(e){if(!drag)return;set(drag.w+e.clientX-drag.x,false);fix();});
+  function end(){if(!drag)return;drag=null;document.body.classList.remove('panel-resizing');set(cur,true);fix();}
+  rz.addEventListener('pointerup',end);rz.addEventListener('pointercancel',end);
+  rz.addEventListener('dblclick',function(){set(DEF,true);fix();});
+  window.addEventListener('resize',function(){set(cur,false);});
+  var nav=document.querySelector('.nav-track'),dock=document.getElementById('navDock');
+  if(!nav||!dock||!window.matchMedia)return;
+  var home=document.createComment('nav-track'),mq=window.matchMedia('(orientation:portrait) and (max-width:820px)');
+  nav.parentNode.insertBefore(home,nav);
+  function place(){if(mq.matches){if(nav.parentNode!==dock)dock.appendChild(nav);}else if(nav.parentNode===dock){home.parentNode.insertBefore(nav,home.nextSibling);}setTimeout(fix,50);}
+  place();
+  if(mq.addEventListener)mq.addEventListener('change',place);else if(mq.addListener)mq.addListener(place);
 })();
 var terrainPane=map.createPane('terrainTop');
 terrainPane.style.zIndex=450;
