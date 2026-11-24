@@ -1778,6 +1778,24 @@ body.panel-hidden #panelResizer{display:none}
   #navDock .nav-track-stats{margin-top:5px;gap:5px}
   #navDock .nav-track-stats div{padding:3px 2px}
 }
+/* iPad / touch tablet (any orientation): NAVIGATION TRACKING fixed at the bottom of the screen, app full screen */
+@media (any-pointer:coarse) and (min-width:700px) and (min-height:700px){
+  html{background:#383d43}
+  html,body{height:100vh;height:var(--app-h,100vh)}
+  body{padding-top:0;padding-bottom:var(--dock-h,0px)}
+  #mapwrap .leaflet-top{top:env(safe-area-inset-top,0)}
+  #navDock{display:block;position:fixed;left:0;right:0;bottom:0;z-index:1500;background:#383d43;border-top:1px solid var(--line);padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+  #navDock .nav-track{padding:6px 12px;border-bottom:none}
+  #navDock .nav-track-head{display:none}
+  #navDock .nav-track .actions button{padding-top:7px;padding-bottom:7px;font-size:13px;min-height:0}
+  #navDock .nav-track-stats{margin-top:5px;gap:6px}
+  #navDock .nav-track-stats div{padding:3px 2px}
+}
+@media (any-pointer:coarse) and (min-width:700px) and (min-height:700px) and (orientation:landscape){
+  #panel{padding-top:env(safe-area-inset-top,0)}
+  #navDock .nav-track{display:grid;grid-template-columns:5fr 4fr;gap:10px;align-items:center}
+  #navDock .nav-track-stats{margin-top:0}
+}
 </style>
 </head>
 <body>
@@ -4106,10 +4124,12 @@ var map=L.map('map',{center:[13.5,101],zoom:6,layers:[sat],worldCopyJump:true});
   window.addEventListener('resize',function(){set(cur,false);});
   var nav=document.querySelector('.nav-track'),dock=document.getElementById('navDock');
   if(!nav||!dock||!window.matchMedia)return;
-  var home=document.createComment('nav-track'),mq=window.matchMedia('(orientation:portrait) and (max-width:820px)');
+  var home=document.createComment('nav-track'),mq=window.matchMedia('(orientation:portrait) and (max-width:820px), (any-pointer:coarse) and (min-width:700px) and (min-height:700px)');
   nav.parentNode.insertBefore(home,nav);
   function place(){if(mq.matches){if(nav.parentNode!==dock)dock.appendChild(nav);}else if(nav.parentNode===dock){home.parentNode.insertBefore(nav,home.nextSibling);}setTimeout(fix,50);}
   place();
+  function dh(){root.style.setProperty('--dock-h',(mq.matches?dock.offsetHeight:0)+'px');fix();}
+  if(window.ResizeObserver)new ResizeObserver(dh).observe(dock);dh();
   if(mq.addEventListener)mq.addEventListener('change',place);else if(mq.addListener)mq.addListener(place);
 })();
 var terrainPane=map.createPane('terrainTop');
