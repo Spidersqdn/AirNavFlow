@@ -5951,7 +5951,7 @@ function drawOtherRoute(){
   }
   otherPts.forEach(function(p,i){
     L.circleMarker([p.lat,p.lng],{radius:4,color:col,weight:2,fillColor:'#fff',fillOpacity:.9})
-      .bindTooltip(lbl+' '+(i+1)+(p.name?': '+p.name:''),{direction:'top'}).addTo(lineLayer);
+      .bindTooltip(lbl+' '+(i+1)+(p.name?': '+esc(p.name):''),{direction:'top'}).addTo(lineLayer);
   });
 }
 function updateRouteSel(){
