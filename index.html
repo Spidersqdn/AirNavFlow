@@ -856,7 +856,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .cb-l2 small{font:600 10px var(--mono);color:var(--c);flex:none}
 .cb-l2 input{flex:1;min-width:0;margin:0;accent-color:var(--c)}
 .cb-l2 input:disabled{opacity:.35}
-@media (orientation:portrait){.cb-l2 small{display:none}}
+@media (orientation:portrait){.cb-l2 small{display:none}.cb-box{padding:6px 4px 2px;gap:2px}.cb-l2 input{height:18px}}
+@media (orientation:portrait) and (max-width:640px){.cb-box{padding:6px 4px 1px;gap:1px}.cb-l1,.cb-l2{gap:2px}.cb-l1 select{padding:1px 3px}.cb-box button{height:18px;width:22px;font-size:11px}.cb-show input{width:14px;height:14px}.cb-l2 input{height:14px}}
 @media (max-width:640px){.cb-box{padding:7px 4px 4px}.cb-l1 select{font-size:11px;padding:3px 2px}.cb-l1{flex-wrap:wrap}.cb-l1 select{order:-1;flex:1 0 100%}.cb-chart .cb-l1 .cb-show,.cb-map .cb-l1 select+.cb-show{margin-left:auto}.cb-l2 small{font-size:9px}}
 .nav-track-head{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
 .nav-track .actions{padding:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
