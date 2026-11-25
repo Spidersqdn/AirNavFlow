@@ -4,7 +4,7 @@
    - Province borders / fonts: stale-while-revalidate
    - lib/ (pdf.js, 1.4 MB): fetched once into its own cache, kept across app versions
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v172';
+var APP_CACHE='fp-app-v173';
 var RUNTIME_CACHE='fp-runtime-v1';
 var LIB_CACHE='fp-lib-v1';   /* rename when a file in lib/ is replaced */
 var LIB=['lib/pdf.min.js','lib/pdf.worker.min.js'];
