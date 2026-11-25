@@ -1384,13 +1384,19 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 }
 
 /* offline map panel */
-.offline-panel{padding:14px 18px;border-top:1px solid var(--line)}
-.offline-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.offline-panel{padding:8px 18px;border-top:1px solid var(--line)}
+.off-row{display:flex;align-items:center;gap:5px;margin-top:4px;min-width:0}
+.off-name{flex:none;width:58px;font:600 11px var(--mono);color:var(--text)}
+.off-row .offline-info{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.off-row button{flex:none;width:auto;min-height:0;margin:0;padding:4px 8px;font-size:11px;line-height:1.2}
+.off-row button:disabled{opacity:.5;cursor:not-allowed}
+.offline-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.offline-head b{font-size:12px}
 .offline-head small{font:11px var(--mono);padding:2px 8px;border-radius:10px;background:#2f3338;border:1px solid var(--line)}
 .offline-head small.on{color:#7dff9a;border-color:#3f8f55}
 .offline-head small.off{color:var(--orange);border-color:var(--orange)}
 .offline-info{font-size:12px;color:var(--mute);line-height:1.5}
-.offline-bar{height:8px;background:#2f3338;border:1px solid var(--line);border-radius:4px;margin:8px 0;overflow:hidden;display:none}
+.offline-bar{height:5px;background:#2f3338;border:1px solid var(--line);border-radius:3px;margin:4px 0;overflow:hidden;display:none}
 .offline-bar.on{display:block}
 .offline-bar div{height:100%;width:0;background:var(--cyan);transition:width .2s}
 .offline-actions{display:flex;gap:6px;margin-top:8px}
@@ -2095,20 +2101,11 @@ body.panel-hidden #panelResizer{display:none}
 </section>
 
 <section class="offline-panel">
-  <div class="offline-head"><b>Offline Maps</b><small id="netStatus">…</small></div>
-  <div class="offline-info" id="offlineInfo">กำลังตรวจสอบ…</div>
+  <div class="offline-head"><b>OFFLINE DATA</b><small id="netStatus">…</small></div>
+  <div class="off-row"><span class="off-name">MAP</span><span class="offline-info" id="offlineInfo">…</span><button type="button" id="offlineDl">Download</button><button type="button" id="offlineDel">ลบ</button></div>
   <div class="offline-bar" id="offlineBar"><div></div></div>
-  <div class="offline-actions">
-    <button type="button" id="offlineDl">Download Map</button>
-    <button type="button" id="offlineDel">ลบ</button>
-  </div>
-  <div class="offline-head" style="margin-top:14px"><b>Elevation &amp; Terrain Data</b></div>
-  <div class="offline-info" id="elevInfo">กำลังตรวจสอบ…</div>
+  <div class="off-row"><span class="off-name">TERRAIN</span><span class="offline-info" id="elevInfo">…</span><button type="button" id="elevDl">Download</button><button type="button" id="elevDel">ลบ</button></div>
   <div class="offline-bar" id="elevBar"><div></div></div>
-  <div class="offline-actions">
-    <button type="button" id="elevDl">Download Terrain</button>
-    <button type="button" id="elevDel">ลบ</button>
-  </div>
 </section>
 
 
@@ -11791,17 +11788,16 @@ function renderOfflineInfo(msg){
   var dl=document.getElementById('offlineDl'),del=document.getElementById('offlineDel');
   if(msg){info.textContent=msg;}
   else if(offlineState.stored){
-    info.innerHTML='✓ มีแผนที่ในเครื่องแล้ว '+fmtMB(offlineState.bytes)+
-      (offlineState.savedAt?' (โหลดเมื่อ '+new Date(offlineState.savedAt).toLocaleDateString('th-TH')+')':'')+
-      '<br>ใช้ได้แม้ไม่มีสัญญาณ: เลือกชั้น "แผนที่ออฟไลน์ (OSM)" + ปุ่ม GPS'+
-      (placesState.stored?'<br>🔎 ค้นหาสถานที่ออฟไลน์ได้'+(placesState.count?' '+placesState.count.toLocaleString()+' แห่ง':''):'');
+    info.textContent='✓ '+fmtMB(offlineState.bytes)+
+      (offlineState.savedAt?' · '+new Date(offlineState.savedAt).toLocaleDateString('th-TH',{day:'numeric',month:'numeric',year:'2-digit'}):'')+
+      (placesState.stored&&placesState.count?' · 🔎 '+placesState.count.toLocaleString():'');
   }else if(offlineState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์แผนที่บนเว็บไซต์ (DataBase/AirNavFlow/thailand.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์บนเว็บ';
   }else{
-    info.textContent='ยังไม่ได้โหลดแผนที่ลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi ก่อนออกบิน';
+    info.textContent='ยังไม่โหลด';
   }
   dl.disabled=offlineState.busy||!navigator.onLine||offlineState.onServer===false;
-  dl.textContent=offlineState.stored?'Update Map':'Download Map';
+  dl.textContent=offlineState.stored?'Update':'Download';
   del.disabled=offlineState.busy||!offlineState.stored;
 }
 function useStoredOfflineMap(){
@@ -11956,16 +11952,15 @@ function renderElevInfo(msg){
   var dl=document.getElementById('elevDl'),del=document.getElementById('elevDel');
   if(msg){info.textContent=msg;}
   else if(elevState.stored){
-    info.innerHTML='✓ มีข้อมูลความสูงในเครื่องแล้ว '+fmtMB(elevState.bytes)+
-      (elevState.savedAt?' (โหลดเมื่อ '+new Date(elevState.savedAt).toLocaleDateString('th-TH')+')':'')+
-      '<br>กราฟความสูง + Highest ELEV ใช้ได้แม้ไม่มีสัญญาณ เปิดชั้น "เส้นชั้นความสูง (Contour ft)" ได้';
+    info.textContent='✓ '+fmtMB(elevState.bytes)+
+      (elevState.savedAt?' · '+new Date(elevState.savedAt).toLocaleDateString('th-TH',{day:'numeric',month:'numeric',year:'2-digit'}):'');
   }else if(elevState.onServer===false){
-    info.textContent='ยังไม่มีไฟล์ความสูงบนเว็บไซต์ (DataBase/AirNavFlow/elevation.pmtiles) ต้องให้ GitHub Actions สร้างก่อน';
+    info.textContent='ยังไม่มีไฟล์บนเว็บ';
   }else{
-    info.textContent='ยังไม่ได้โหลดข้อมูลความสูงลงเครื่อง กดดาวน์โหลดตอนมี Wi-Fi';
+    info.textContent='ยังไม่โหลด';
   }
   dl.disabled=elevState.busy||!navigator.onLine||elevState.onServer===false;
-  dl.textContent=elevState.stored?'Update Terrain':'Download Terrain';
+  dl.textContent=elevState.stored?'Update':'Download';
   del.disabled=elevState.busy||!elevState.stored;
 }
 function useStoredElev(){
