@@ -10173,7 +10173,7 @@ function umapBuiltinInit(){
   UMAP_BUILTIN.slice().reverse().forEach(function(d){
     var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,bgClear:s.bgClear,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
     userMaps.unshift(m);
-    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m);}).catch(function(){});
+    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m,true);}).catch(function(){}); /* selected, not shown: SHOW MAP off when the app opens */
   });
 }
 function umapBuiltinOpen(m){
@@ -10550,9 +10550,9 @@ function cbMapRender(){
   var bg=document.getElementById('cbMapBg');bg.disabled=!(cur&&(umapIsImg(cur)||cur.builtin));bg.checked=!!(cur&&umapBgOn(cur));
   var op=document.getElementById('cbMapOp');op.disabled=!on;if(cur)op.value=cur.opacity;
 }
-function umapShow(m){
+function umapShow(m,quiet){
   userMaps.forEach(function(x){x.on=(x===m);if(x.layer&&x!==m)umapGroup.removeLayer(x.layer);});
-  if(m&&m.layer){umapGroup.addLayer(m.layer);if(!map.hasLayer(umapGroup))umapGroup.addTo(map);}
+  if(m&&m.layer){umapGroup.addLayer(m.layer);if(!quiet&&!map.hasLayer(umapGroup))umapGroup.addTo(map);}
   umapSave();umapRender();
 }
 document.getElementById('umapSel').onchange=function(){
