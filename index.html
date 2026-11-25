@@ -1205,6 +1205,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-btns{display:flex;gap:8px}.umap-btns .umap-import{flex:2;width:auto;margin:0}
 .umap-del{flex:1;margin:0;padding:10px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);font:600 14px system-ui,sans-serif;cursor:pointer}
 .umap-del:disabled{opacity:.35;cursor:default}
+.umap-dlrow .umap-clear{flex:1;width:auto;min-width:0}
 .umap-clear{width:100%;margin-top:8px;padding:7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mute);font:600 12px system-ui,sans-serif;cursor:pointer}
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
@@ -2078,13 +2079,16 @@ body.panel-hidden #panelResizer{display:none}
     <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
   </div>
   <label class="umap-keep" id="umapBgRow" hidden><input type="checkbox" id="umapBg"> พื้นหลังโปร่งใส (ในกรอบแผนที่ / legend คงพื้นขาว)</label>
-  <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
+  <label class="umap-keep" hidden style="display:none"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ</label>
   <div class="umap-btns map-3btn">
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
     <button type="button" id="umapDelBtn" class="umap-del" title="Delete one imported map from this device">🗑 DELETE MAP</button>
     <button type="button" id="umapDelAllBtn" class="umap-del" title="Delete every imported map from this device">🗑 CLEAR MAPs</button>
   </div>
-  <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
+  <div class="umap-btns umap-dlrow">
+    <button type="button" id="umapEnrBtn" class="umap-clear" title="Download the ENROUTE charts built into the app so they work offline">⬇ Download Enroute</button>
+    <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
+  </div>
   <input id="importMapFile" type="file" hidden>
   <div class="umap-status" id="umapStatus"></div>
 </section>
@@ -10506,7 +10510,7 @@ function loadUserMaps(){
     }));
   }).then(function(){umapSave();umapRender();}).catch(function(){});
 }
-function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')==='1';}catch(e){return false;}} /* default: no copy, read the file in place */
+function umapKeepOn(){return false;} /* default: no copy, read the file in place */
 function umapRender(status){
   var sel=document.getElementById('umapSel');if(!sel)return;
   var cur=userMaps.filter(function(m){return m.on;})[0];
@@ -10527,6 +10531,9 @@ function umapRender(status){
   if(cur)document.getElementById('umapOp').value=cur.opacity;
   if(typeof cbMapRender==='function')cbMapRender();
   document.getElementById('umapKeep').checked=umapKeepOn();
+  var bis=userMaps.filter(function(m){return m.builtin;}),bok=bis.length&&bis.every(function(m){return m.stored;}),bcp=bis.some(function(m){return m._copying;});
+  var eb=document.getElementById('umapEnrBtn');eb.disabled=!bis.length||bcp||!('caches' in window);
+  eb.textContent=bcp?'⬇ กำลังโหลด Enroute…':bok?'✓ Enroute ออฟไลน์ได้ · โหลดใหม่':'⬇ Download Enroute';
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
   else st.textContent=cur&&cur.builtin?'แผนที่ในแอพ (AIP) · z'+cur.minZ+'-'+cur.maxZ+(cur.stored?' · ก็อปไว้ในเครื่อง ใช้ออฟไลน์ได้ '+mb(cur.bytes):' · โหลดจากเน็ต (ติ๊กก็อปไฟล์ = ใช้ออฟไลน์ได้)')
@@ -10589,6 +10596,14 @@ document.getElementById('umapDelAllBtn').onclick=function(){
   ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
 /* clear map cache: drop every map file copied into the app; the list keeps the names (tap to re-open from the file) */
+document.getElementById('umapEnrBtn').onclick=function(){
+  if(!navigator.onLine){alert('ต้องต่ออินเทอร์เน็ตเพื่อโหลด Enroute');return;}
+  var bis=userMaps.filter(function(m){return m.builtin;});
+  Promise.all(bis.map(function(m){var p=umapBuiltinCopy(m,true);umapRender();return p;})).then(function(){
+    var ok=bis.every(function(m){return m.stored;});
+    umapSave();umapRender(ok?'✓ โหลด Enroute แล้ว ใช้ออฟไลน์ได้':undefined);
+  });
+};
 document.getElementById('umapClearBtn').onclick=function(){
   var n=userMaps.filter(function(m){return m.stored;}).length;
   if(!n||!confirm('ล้าง cache แผนที่? (ลบไฟล์แผนที่ที่ก็อปไว้ในแอพ '+n+' ไฟล์ — ชื่อยังอยู่ใน list แตะเพื่อเปิดจากไฟล์เดิม)'))return;
