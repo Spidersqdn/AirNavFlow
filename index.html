@@ -1221,6 +1221,17 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #chartPgBox button:disabled{opacity:.35;cursor:default}
 #chartPgTxt{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
 .chart-panel .umap-head{color:var(--orange)}
+.chart-sec{border:1px solid rgba(255,138,42,.45);border-radius:8px;padding:6px 8px 8px;margin-bottom:8px}
+.chart-sub{font:700 11px var(--mono);color:var(--orange);margin-bottom:5px;letter-spacing:.5px}
+.ch-sel{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:2px solid var(--orange);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
+.ch-pg{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.ch-pg button{width:auto;margin:0;padding:6px 7px;border:1px solid var(--orange);border-radius:6px;background:transparent;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer}
+.ch-pg button:disabled{opacity:.35;cursor:default}
+.ch-pg span{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
+.chart-show{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--orange);border-radius:6px;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap;padding:0 4px}
+.chart-show input{width:18px;height:18px;margin:0}
+.chart-sec .chart-btn{white-space:nowrap;font-size:12px;padding:8px 4px}
+.chart-show:has(input:disabled){opacity:.4}
 #chartSel{border-color:var(--orange)!important}
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
@@ -2009,17 +2020,36 @@ body.panel-hidden #panelResizer{display:none}
 
 <section class="umap-panel chart-panel">
   <div class="umap-head">CHART</div>
-  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
+  <div class="chart-sec">
+    <div class="chart-sub">DEP CHART</div>
+    <div class="chart-selrow"><select id="chDepSel" class="ch-sel"></select><span class="ch-pg"><button type="button" id="chDepPrev" title="Previous page / chart">◀</button><span id="chDepPg"></span><button type="button" id="chDepNext" title="Next page / chart">▶</button></span></div>
+    <div class="umap-btns" style="margin-top:6px">
+      <button type="button" id="chDepView" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW</button>
+      <button type="button" id="chDepGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
+      <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chDepShow"> SHOW CHART</label>
+    </div>
+  </div>
+  <div class="chart-sec">
+    <div class="chart-sub">ARR CHART</div>
+    <div class="chart-selrow"><select id="chArrSel" class="ch-sel"></select><span class="ch-pg"><button type="button" id="chArrPrev" title="Previous page / chart">◀</button><span id="chArrPg"></span><button type="button" id="chArrNext" title="Next page / chart">▶</button></span></div>
+    <div class="umap-btns" style="margin-top:6px">
+      <button type="button" id="chArrView" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW</button>
+      <button type="button" id="chArrGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
+      <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chArrShow"> SHOW CHART</label>
+    </div>
+  </div>
+  <div hidden style="display:none">  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW CHARTs</button>
     <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHARTs</button>
   </div>
   <label hidden class="umap-keep hide-toggle chart-onmap" title="Tick to hide the chart from the map; untick to show it"><input type="checkbox" id="chartOnMap"> HIDE CHARTs</label>
-  <div class="umap-row" id="chartRow" hidden style="display:none">
+  <div class="umap-row" id="chartRow" hidden>
     <span>โปร่งใส</span><input type="range" id="chartOp" min="0.1" max="1" step="0.05" value="0.8">
     <button type="button" id="chartZoomBtn">Zoom</button>
     <button type="button" id="chartNtsMinus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart smaller on the map">−</button>
     <button type="button" id="chartNtsPlus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart bigger on the map">+</button>
+  </div>
   </div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT CHART</button>
@@ -10604,6 +10634,7 @@ function chartPageMeta(c,n){
 /* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
 function chartGoPage(c,n,geo,noView){
   if(!c.pages||n<1||n>c.pages||n===c.page)return;
+  if(typeof cbPageHook==='function')cbPageHook(c,n);
   chartPut(c);chartPageMeta(c,n);
   if(c.url){URL.revokeObjectURL(c.url);c.url=null;}
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
@@ -11229,6 +11260,18 @@ function cbRender(){
     document.getElementById('cb'+id+'Next').disabled=!x||(i>=charts.length-1&&sl.page>=np);
     var sh=document.getElementById('cb'+id+'Show');sh.disabled=!x;sh.checked=!!(x&&sl.show);
     var op=document.getElementById('cb'+id+'Op');op.value=sl.op;op.disabled=!sl.layer;
+    var cs=document.getElementById('ch'+id+'Sel');
+    if(cs&&document.activeElement!==cs){
+      cs.innerHTML='<option value="">— เลือกชาร์ต —</option>'+charts.map(function(y){var n=y.pages||1;
+        return '<option value="'+esc(y.key)+'"'+(y===x?' selected':'')+'>'+esc(y.name)+(n>1?' ('+n+' หน้า)':'')+(y.db||y.gcp&&y.gcp.length>=2?' 📍':'')+'</option>';}).join('');
+    }
+    if(cs){
+      document.getElementById('ch'+id+'Pg').textContent=x?'หน้า '+sl.page+'/'+np:'';
+      document.getElementById('ch'+id+'Prev').disabled=document.getElementById('cb'+id+'Prev').disabled;
+      document.getElementById('ch'+id+'Next').disabled=document.getElementById('cb'+id+'Next').disabled;
+      document.getElementById('ch'+id+'View').disabled=document.getElementById('ch'+id+'Geo').disabled=!x;
+      var cw=document.getElementById('ch'+id+'Show');cw.disabled=!x;cw.checked=!!(x&&sl.show);
+    }
     document.getElementById('cb'+id+'Minus').hidden=document.getElementById('cb'+id+'Plus').hidden=!(sl.c&&sl.c.nts&&sl.layer);
   });
 }
@@ -11273,9 +11316,23 @@ function cbStep(k,d){
   else if(p>np){var j=charts.indexOf(x)+1;if(j>=charts.length)return;x=charts[j];p=1;}
   sl.key=x.key;sl.page=p;cbApply(k,sl.show);
 }
-/* after SET CHARTs: show that page (the slot already holding that chart, else an empty slot, else DEP) */
+/* sidebar DEP / ARR CHART: VIEW / SET CHART open the slot's chart page in the viewer */
+var cbEditSlot=null;
+function cbEdit(k,geo){
+  var sl=cbSlots[k],x=cbChart(sl.key);if(!x)return;
+  cbEditSlot=k;
+  if((x.pages||1)>1&&x.page!==sl.page){chartPut(x);chartPageMeta(x,sl.page);if(x.url){URL.revokeObjectURL(x.url);x.url=null;}}
+  chartSetCur(x);
+  chartLoad(x).then(function(){chartRender();openChartViewer(x,geo);}).catch(function(e){chartRender('เปิดชาร์ตไม่ได้: '+((e&&e.message)||e));});
+}
+/* viewer ◀ ▶ on the slot's chart moves the slot to that page too */
+function cbPageHook(c,n){
+  var k=cbEditSlot,sl=k&&cbSlots[k];if(!sl||sl.key!==c.key)return;
+  sl.page=n;if(sl.show)cbApply(k,false);else{cbSave();cbRender();}
+}
+/* after SET CHART: show that page (the slot it was opened from, else the slot holding that chart, else an empty slot, else DEP) */
 function cbShowSaved(c){
-  var k=cbSlots.dep.key===c.key?'dep':cbSlots.arr.key===c.key?'arr':!cbSlots.dep.key?'dep':!cbSlots.arr.key?'arr':'dep';
+  var k=cbEditSlot&&cbSlots[cbEditSlot].key===c.key?cbEditSlot:cbSlots.dep.key===c.key?'dep':cbSlots.arr.key===c.key?'arr':!cbSlots.dep.key?'dep':!cbSlots.arr.key?'arr':'dep';
   var sl=cbSlots[k];sl.key=c.key;sl.page=c.pages>1?c.page:1;sl.show=true;cbApply(k,true);
 }
 ['dep','arr'].forEach(function(k){
@@ -11283,6 +11340,12 @@ function cbShowSaved(c){
   document.getElementById('cb'+id+'Sel').onchange=function(){var sl=cbSlots[k];this.blur();sl.key=this.value;sl.page=1;sl.show=!!this.value;cbApply(k,true);};
   document.getElementById('cb'+id+'Prev').onclick=function(){cbStep(k,-1);};
   document.getElementById('cb'+id+'Next').onclick=function(){cbStep(k,1);};
+  document.getElementById('ch'+id+'Sel').onchange=function(){var sl=cbSlots[k];this.blur();sl.key=this.value;sl.page=1;sl.show=!!this.value;cbApply(k,true);};
+  document.getElementById('ch'+id+'Prev').onclick=function(){cbStep(k,-1);};
+  document.getElementById('ch'+id+'Next').onclick=function(){cbStep(k,1);};
+  document.getElementById('ch'+id+'Show').onchange=function(){cbSlots[k].show=this.checked;cbApply(k,this.checked);};
+  document.getElementById('ch'+id+'View').onclick=function(){cbEdit(k,false);};
+  document.getElementById('ch'+id+'Geo').onclick=function(){cbEdit(k,true);};
   document.getElementById('cb'+id+'Show').onchange=function(){cbSlots[k].show=this.checked;cbApply(k,this.checked);};
   document.getElementById('cb'+id+'Op').oninput=function(){var sl=cbSlots[k];sl.op=+this.value;if(sl.c)sl.c.opacity=sl.op;if(sl.layer)sl.layer.setOpacity(sl.op);cbSave();};
   [['Minus',1/1.25],['Plus',1.25]].forEach(function(b){

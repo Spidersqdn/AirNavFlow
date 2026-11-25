@@ -105,7 +105,8 @@ KM/                   knowledge notes; start at KM/README.md
 - **MAP box** (yellow): IMPORT MAP (user .pmtiles/PDF/image overlay, opacity inside frame only),
   built-in "ENROUTE (AIP)", checkbox "HIDE ENROUTE Charts / MAPs".
 - **CHART box** (orange): 📄 IMPORT CHART, built-in "ชาร์ตในแอพ" from DataBase, georef 2-3 points,
-  auto georef from index.json, PDF pages, 🗑 RESET (manage only; no map display here).
+  auto georef from index.json, PDF pages, 🗑 RESET; split into DEP CHART / ARR CHART sections
+  (select, ◀ page ▶, VIEW, SET CHART, SHOW CHART), same state as the bar slots.
 - **Chart bar** above NAVIGATION TRACKING: DEP Charts | MAP+ENROUTE | ARR Charts (line 1 select,
   line 2 opacity). Two chart pages on the map at once (cbSlots dep/arr); MAP box mirrors umapSel.
 - **NAVIGATION TRACKING** panel (yellow) above profile: TRACK (Wake Lock) | PPOS | ROUTE | RESET |
