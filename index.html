@@ -842,6 +842,23 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 
 /* NAVIGATION TRACKING panel (above the elevation profile) */
 .nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
+.chart-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:6px 0 8px;grid-column:1/-1}
+.cb-box{position:relative;min-width:0;border:1px solid #ff8a2a;border-radius:6px;background:#2f3338;padding:7px 5px 4px;display:flex;flex-direction:column;gap:4px;--c:#ff8a2a}
+.cb-map{border-color:var(--amber);--c:var(--amber)}
+.cb-box::before{content:attr(data-t);position:absolute;top:-7px;left:6px;padding:0 3px;background:#383d43;font:600 9px var(--mono);color:var(--c);line-height:12px}
+.cb-l1,.cb-l2{display:flex;align-items:center;gap:3px;min-width:0}
+.cb-l1 select{flex:1;min-width:0;box-sizing:border-box;padding:3px 4px;border:1px solid var(--line);border-radius:4px;background:#15181c;color:var(--text);font:500 12px var(--mono);text-overflow:ellipsis}
+.cb-box button{flex:none;width:24px;height:22px;padding:0;border:1px solid var(--c);border-radius:4px;background:transparent;color:var(--c);font:600 12px system-ui;line-height:1}
+.cb-box button:disabled{opacity:.35}
+.cb-show{flex:none;display:flex;align-items:center;gap:2px;font:600 10px var(--mono);color:var(--c);cursor:pointer;white-space:nowrap}
+.cb-show input{margin:0;width:16px;height:16px;accent-color:var(--c)}
+.cb-show:has(input:disabled){opacity:.4}
+.cb-l2 small{font:600 10px var(--mono);color:var(--c);flex:none}
+.cb-l2 input{flex:1;min-width:0;margin:0;accent-color:var(--c)}
+.cb-l2 input:disabled{opacity:.35}
+@media (orientation:portrait){.cb-l2 small{display:none}.cb-box{padding:6px 4px 2px;gap:2px}.cb-l2 input{height:18px}}
+@media (orientation:portrait) and (max-width:640px){.cb-box{padding:6px 4px 1px;gap:1px}.cb-l1,.cb-l2{gap:2px}.cb-l1 select{padding:1px 3px}.cb-box button{height:18px;width:22px;font-size:11px}.cb-show input{width:14px;height:14px}.cb-l2 input{height:14px}}
+@media (max-width:640px){.cb-box{padding:7px 4px 4px}.cb-l1 select{font-size:11px;padding:3px 2px}.cb-l1{flex-wrap:wrap}.cb-l1 select{order:-1;flex:1 0 100%}.cb-chart .cb-l1 .cb-show,.cb-map .cb-l1 select+.cb-show{margin-left:auto}.cb-l2 small{font-size:9px}}
 .nav-track-head{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
 .nav-track .actions{padding:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
 .nav-track .actions button{width:100%;padding-left:2px;padding-right:2px}
@@ -1188,6 +1205,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .umap-btns{display:flex;gap:8px}.umap-btns .umap-import{flex:2;width:auto;margin:0}
 .umap-del{flex:1;margin:0;padding:10px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);font:600 14px system-ui,sans-serif;cursor:pointer}
 .umap-del:disabled{opacity:.35;cursor:default}
+.umap-dlrow .umap-clear{flex:1;width:auto;min-width:0}
 .umap-clear{width:100%;margin-top:8px;padding:7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mute);font:600 12px system-ui,sans-serif;cursor:pointer}
 .umap-clear:disabled{opacity:.35;cursor:default}
 .umap-status{font-size:11px;color:var(--mute);margin-top:4px;min-height:0}
@@ -1204,6 +1222,20 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #chartPgBox button:disabled{opacity:.35;cursor:default}
 #chartPgTxt{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
 .chart-panel .umap-head{color:var(--orange)}
+.chart-sec{border:1px solid rgba(255,138,42,.45);border-radius:8px;padding:6px 8px 8px;margin-bottom:8px}
+.chart-sub{font:700 11px var(--mono);color:var(--orange);margin-bottom:5px;letter-spacing:.5px}
+.ch-sel{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:2px solid var(--orange);border-radius:6px;background:#15181c;color:var(--text);font:500 14px var(--mono)}
+.ch-pg{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.ch-pg button{width:auto;margin:0;padding:6px 7px;border:1px solid var(--orange);border-radius:6px;background:transparent;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer}
+.ch-pg button:disabled{opacity:.35;cursor:default}
+.ch-pg span{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
+.chart-show{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--orange);border-radius:6px;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap;padding:0 4px}
+.chart-show input{width:18px;height:18px;margin:0}
+.chart-sec .chart-btn,.map-sec-btns .chart-btn{white-space:nowrap;font-size:12px;padding:8px 4px}
+.ch-oprow{margin-top:6px}.ch-oprow input:disabled,#umapOp:disabled{opacity:.35}
+.map-show{border-color:var(--amber);color:var(--amber)}.map-show input{accent-color:var(--amber)}
+.map-sec-btns .chart-btn:disabled{opacity:.4}
+.chart-show:has(input:disabled){opacity:.4}
 #chartSel{border-color:var(--orange)!important}
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
 .chart-btn{flex:1;margin:0;padding:8px;border-radius:6px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px system-ui,sans-serif;cursor:pointer}
@@ -1963,6 +1995,17 @@ body.panel-hidden #panelResizer{display:none}
 </section>
 
 <section class="nav-track">
+  <div class="chart-bar" id="chartBar">
+    <div class="cb-box cb-chart" data-t="DEP Charts">
+      <div class="cb-l1"><button type="button" id="cbDepPrev" title="Previous page / chart">◀</button><select id="cbDepSel" title="DEPARTURE chart"></select><button type="button" id="cbDepNext" title="Next page / chart">▶</button><label class="cb-show"><input type="checkbox" id="cbDepShow"> SHOW</label></div>
+      <div class="cb-l2"><small>Transparent</small><input type="range" id="cbDepOp" min="0.1" max="1" step="0.05" value="0.8" title="Chart opacity"><button type="button" id="cbDepMinus" hidden title="NOT TO SCALE: smaller">−</button><button type="button" id="cbDepPlus" hidden title="NOT TO SCALE: bigger">+</button></div></div>
+    <div class="cb-box cb-map" data-t="MAP+ENROUTE">
+      <div class="cb-l1"><select id="cbMapSel" title="MAP / ENROUTE chart"></select><label class="cb-show" title="Transparent background (inside the map frame)"><input type="checkbox" id="cbMapBg"> พื้นหลังใส</label><label class="cb-show"><input type="checkbox" id="cbMapShow"> SHOW</label></div>
+      <div class="cb-l2"><small>Transparent</small><input type="range" id="cbMapOp" min="0.1" max="1" step="0.05" value="1" title="MAP opacity"></div></div>
+    <div class="cb-box cb-chart" data-t="ARR Charts">
+      <div class="cb-l1"><button type="button" id="cbArrPrev" title="Previous page / chart">◀</button><select id="cbArrSel" title="ARRIVAL chart"></select><button type="button" id="cbArrNext" title="Next page / chart">▶</button><label class="cb-show"><input type="checkbox" id="cbArrShow"> SHOW</label></div>
+      <div class="cb-l2"><small>Transparent</small><input type="range" id="cbArrOp" min="0.1" max="1" step="0.05" value="0.8" title="Chart opacity"><button type="button" id="cbArrMinus" hidden title="NOT TO SCALE: smaller">−</button><button type="button" id="cbArrPlus" hidden title="NOT TO SCALE: bigger">+</button></div></div>
+  </div>
   <div class="nav-track-head">NAVIGATION TRACKING</div>
   <div class="actions">
     <button id="navTrackBtn" type="button" title="Toggle GPS tracking (position updates every 1 s; screen kept awake)">TRACK</button>
@@ -1981,17 +2024,38 @@ body.panel-hidden #panelResizer{display:none}
 
 <section class="umap-panel chart-panel">
   <div class="umap-head">CHART</div>
-  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
+  <div class="chart-sec">
+    <div class="chart-sub">DEP CHART</div>
+    <div class="chart-selrow"><select id="chDepSel" class="ch-sel"></select><span class="ch-pg"><button type="button" id="chDepPrev" title="Previous page / chart">◀</button><span id="chDepPg"></span><button type="button" id="chDepNext" title="Next page / chart">▶</button></span></div>
+    <div class="umap-btns" style="margin-top:6px">
+      <button type="button" id="chDepView" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW</button>
+      <button type="button" id="chDepGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
+      <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chDepShow"> SHOW CHART</label>
+    </div>
+    <div class="umap-row ch-oprow"><span>โปร่งใส</span><input type="range" id="chDepOp" min="0.1" max="1" step="0.05" value="0.8"></div>
+  </div>
+  <div class="chart-sec">
+    <div class="chart-sub">ARR CHART</div>
+    <div class="chart-selrow"><select id="chArrSel" class="ch-sel"></select><span class="ch-pg"><button type="button" id="chArrPrev" title="Previous page / chart">◀</button><span id="chArrPg"></span><button type="button" id="chArrNext" title="Next page / chart">▶</button></span></div>
+    <div class="umap-btns" style="margin-top:6px">
+      <button type="button" id="chArrView" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW</button>
+      <button type="button" id="chArrGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
+      <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chArrShow"> SHOW CHART</label>
+    </div>
+    <div class="umap-row ch-oprow"><span>โปร่งใส</span><input type="range" id="chArrOp" min="0.1" max="1" step="0.05" value="0.8"></div>
+  </div>
+  <div hidden style="display:none">  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="chartViewBtn" class="chart-btn" title="Open the chart full screen (zoom / pan)">👁 VIEW CHARTs</button>
     <button type="button" id="chartGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHARTs</button>
   </div>
-  <label class="umap-keep hide-toggle chart-onmap" title="Tick to hide the chart from the map; untick to show it"><input type="checkbox" id="chartOnMap"> HIDE CHARTs</label>
+  <label hidden class="umap-keep hide-toggle chart-onmap" title="Tick to hide the chart from the map; untick to show it"><input type="checkbox" id="chartOnMap"> HIDE CHARTs</label>
   <div class="umap-row" id="chartRow" hidden>
     <span>โปร่งใส</span><input type="range" id="chartOp" min="0.1" max="1" step="0.05" value="0.8">
     <button type="button" id="chartZoomBtn">Zoom</button>
     <button type="button" id="chartNtsMinus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart smaller on the map">−</button>
     <button type="button" id="chartNtsPlus" class="chart-ntsbtn" hidden title="NOT TO SCALE: make the chart bigger on the map">+</button>
+  </div>
   </div>
   <div class="umap-btns" style="margin-top:6px">
     <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT CHART</button>
@@ -2005,23 +2069,26 @@ body.panel-hidden #panelResizer{display:none}
 <section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
-  <label class="umap-keep hide-toggle" title="Hide every ENROUTE chart / MAP overlay (selection kept)"><input type="checkbox" id="umapHide"> HIDE ENROUTE Charts / MAPs</label>
-  <div class="umap-row" id="umapRow" hidden>
-    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
-    <button type="button" id="umapZoomBtn">Zoom</button>
+  <div hidden style="display:none"><input type="checkbox" id="umapHide"><button type="button" id="umapZoomBtn">Zoom</button></div>
+  <div class="umap-btns map-sec-btns" id="umapImgRow" style="margin-top:6px">
+    <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen (PDF / image maps)">👁 VIEW</button>
+    <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map (PDF / image maps)">📍 SET MAP</button>
+    <label class="chart-show map-show" title="Show the selected ENROUTE chart / MAP on the map"><input type="checkbox" id="umapShow"> SHOW MAP</label>
   </div>
-  <div class="umap-btns" id="umapImgRow" style="margin-top:6px" hidden>
-    <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen">👁 VIEW</button>
-    <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
+  <div class="umap-row ch-oprow" id="umapRow" hidden>
+    <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
   </div>
   <label class="umap-keep" id="umapBgRow" hidden><input type="checkbox" id="umapBg"> พื้นหลังโปร่งใส (ในกรอบแผนที่ / legend คงพื้นขาว)</label>
-  <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
+  <label class="umap-keep" hidden style="display:none"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ</label>
   <div class="umap-btns map-3btn">
     <button type="button" id="importMapBtn" class="umap-import" title="Import your own map: .pmtiles, or an enroute chart PDF / PNG / JPG (georeference with 2 grid points). Separate from CHART so both can be on the map">📁 IMPORT MAP</button>
     <button type="button" id="umapDelBtn" class="umap-del" title="Delete one imported map from this device">🗑 DELETE MAP</button>
     <button type="button" id="umapDelAllBtn" class="umap-del" title="Delete every imported map from this device">🗑 CLEAR MAPs</button>
   </div>
-  <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
+  <div class="umap-btns umap-dlrow">
+    <button type="button" id="umapEnrBtn" class="umap-clear" title="Download the ENROUTE charts built into the app so they work offline">⬇ Download Enroute</button>
+    <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
+  </div>
   <input id="importMapFile" type="file" hidden>
   <div class="umap-status" id="umapStatus"></div>
 </section>
@@ -10093,7 +10160,7 @@ var umapGroup=L.layerGroup();
 umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}umapHideSync();});
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}umapHideSync();});
 /* HIDE ENROUTE Charts / MAPs = MAP overlay group off the map */
-function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);}
+function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);var us=document.getElementById('umapShow');if(us&&typeof userMaps!=='undefined'){var uc=userMaps.filter(function(m){return m.on;})[0];us.disabled=!uc;us.checked=!!uc&&map.hasLayer(umapGroup);}if(typeof cbMapRender==='function')cbMapRender();}
 document.getElementById('umapHide').onchange=function(){if(this.checked)map.removeLayer(umapGroup);else umapGroup.addTo(map);};
 umapHideSync();
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
@@ -10106,7 +10173,7 @@ function umapBuiltinInit(){
   UMAP_BUILTIN.slice().reverse().forEach(function(d){
     var s=st[d.id]||{},m={id:d.id,name:d.name,file:d.file,type:d.type,minZ:d.minZ,maxZ:d.maxZ,opacity:s.opacity||d.opacity,bgClear:s.bgClear,on:false,builtin:true,stored:!!s.stored,bounds:null,layer:null};
     userMaps.unshift(m);
-    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m);}).catch(function(){});
+    if(s.on)umapBuiltinOpen(m).then(function(){umapShow(m,true);}).catch(function(){}); /* selected, not shown: SHOW MAP off when the app opens */
   });
 }
 function umapBuiltinOpen(m){
@@ -10443,7 +10510,7 @@ function loadUserMaps(){
     }));
   }).then(function(){umapSave();umapRender();}).catch(function(){});
 }
-function umapKeepOn(){try{return localStorage.getItem('fp-user-maps-keep')==='1';}catch(e){return false;}} /* default: no copy, read the file in place */
+function umapKeepOn(){return false;} /* default: no copy, read the file in place */
 function umapRender(status){
   var sel=document.getElementById('umapSel');if(!sel)return;
   var cur=userMaps.filter(function(m){return m.on;})[0];
@@ -10451,8 +10518,9 @@ function umapRender(status){
   sel.innerHTML='<option value="">— ไม่แสดง —</option>'+userMaps.map(function(m){
     return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+(umapPending(m)?' (แตะเพื่อเปิดไฟล์)':'')+'</option>';
   }).join('');
-  document.getElementById('umapRow').hidden=!cur;
-  document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapRow').hidden=false;document.getElementById('umapOp').disabled=!cur;
+  document.getElementById('umapViewBtn').disabled=document.getElementById('umapGeoBtn').disabled=!(cur&&umapIsImg(cur));
+  var ush=document.getElementById('umapShow');ush.disabled=!cur;ush.checked=!!cur&&map.hasLayer(umapGroup);
   document.getElementById('umapBgRow').hidden=!(cur&&(umapIsImg(cur)||cur.builtin));
   document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
   document.getElementById('umapDelBtn').disabled=!userMaps.length;
@@ -10461,16 +10529,30 @@ function umapRender(status){
   var clr=document.getElementById('umapClearBtn');
   clr.disabled=!cn;clr.textContent='🧹 ล้าง cache แผนที่'+(cn?' ('+cn+' ไฟล์, '+mb(cb)+')':'');
   if(cur)document.getElementById('umapOp').value=cur.opacity;
+  if(typeof cbMapRender==='function')cbMapRender();
   document.getElementById('umapKeep').checked=umapKeepOn();
+  var bis=userMaps.filter(function(m){return m.builtin;}),bok=bis.length&&bis.every(function(m){return m.stored;}),bcp=bis.some(function(m){return m._copying;});
+  var eb=document.getElementById('umapEnrBtn');eb.disabled=!bis.length||bcp||!('caches' in window);
+  eb.textContent=bcp?'⬇ กำลังโหลด Enroute…':bok?'✓ Enroute ออฟไลน์ได้ · โหลดใหม่':'⬇ Download Enroute';
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
   else st.textContent=cur&&cur.builtin?'แผนที่ในแอพ (AIP) · z'+cur.minZ+'-'+cur.maxZ+(cur.stored?' · ก็อปไว้ในเครื่อง ใช้ออฟไลน์ได้ '+mb(cur.bytes):' · โหลดจากเน็ต (ติ๊กก็อปไฟล์ = ใช้ออฟไลน์ได้)')
     :cur?(umapIsImg(cur)?'PDF/ภาพ'+(cur.page?' หน้า '+cur.page:'')+(cur.gcp&&cur.gcp.length>=2?' · ตั้งพิกัดแล้ว ('+cur.gcp.length+' จุด)':' · ยังไม่ตั้งพิกัด → กด 📍'):UMAP_TYPES[cur.type]+' · z'+cur.minZ+'-'+cur.maxZ)+' · '+mb(cur.bytes)+(cur.stored?' · ก็อปไว้ในแอพ':cur.linked?' · อ่านจากไฟล์ต้นทาง ✓':' · อ่านจากไฟล์ต้นทาง (เปิดแอพใหม่ต้องเลือกไฟล์อีกครั้ง)'):(userMaps.length?'':'ไฟล์ .pmtiles (PNG/JPG/WEBP หรือ vector)');
 }
 function umapCur(){return userMaps.filter(function(m){return m.on;})[0];}
-function umapShow(m){
+/* bottom bar MAP+ENROUTE box = same list / opacity as the MAP box */
+function cbMapRender(){
+  var s=document.getElementById('cbMapSel'),u=document.getElementById('umapSel');if(!s||!u||typeof userMaps==='undefined'||!userMaps)return;
+  var cur=umapCur(),on=!!cur&&map.hasLayer(umapGroup);
+  if(document.activeElement!==s){s.innerHTML=u.innerHTML;if(s.options[0])s.options[0].textContent=window.innerWidth<640?'เลือก':'— เลือก MAP —';}
+  s.value=cur?cur.id:'';
+  var sh=document.getElementById('cbMapShow');sh.disabled=!cur;sh.checked=on;
+  var bg=document.getElementById('cbMapBg');bg.disabled=!(cur&&(umapIsImg(cur)||cur.builtin));bg.checked=!!(cur&&umapBgOn(cur));
+  var op=document.getElementById('cbMapOp');op.disabled=!on;if(cur)op.value=cur.opacity;
+}
+function umapShow(m,quiet){
   userMaps.forEach(function(x){x.on=(x===m);if(x.layer&&x!==m)umapGroup.removeLayer(x.layer);});
-  if(m&&m.layer){umapGroup.addLayer(m.layer);if(!map.hasLayer(umapGroup))umapGroup.addTo(map);}
+  if(m&&m.layer){umapGroup.addLayer(m.layer);if(!quiet&&!map.hasLayer(umapGroup))umapGroup.addTo(map);}
   umapSave();umapRender();
 }
 document.getElementById('umapSel').onchange=function(){
@@ -10480,18 +10562,19 @@ document.getElementById('umapSel').onchange=function(){
   umapShow(m);if(m)umapZoom(m);
 };
 document.getElementById('umapOp').oninput=function(){
-  var m=umapCur();if(!m)return;m.opacity=+this.value;
+  var m=umapCur();if(!m)return;m.opacity=+this.value;var bo=document.getElementById('cbMapOp');if(bo&&bo!==document.activeElement)bo.value=m.opacity;
   if(m.builtin&&m.frame&&m.layer&&m.layer.redraw){clearTimeout(m._opT);m._opT=setTimeout(function(){m.layer.redraw();},150);}
   else if(m.layer)m.layer.setOpacity(m.opacity);
   umapSave();
 };
 document.getElementById('umapBg').onchange=function(){
-  var m=umapCur();if(!m)return;
+  var m=umapCur();if(!m)return;setTimeout(cbMapRender,0);
   if(m.builtin){m.bgClear=this.checked;umapSave();if(m.layer&&m.layer.redraw)m.layer.redraw();return;}
   if(!umapIsImg(m))return;m.bgClear=this.checked;umapSave();umapImgRefresh(m);
 };
 document.getElementById('umapViewBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,false);});};
 document.getElementById('umapGeoBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,true);});};
+document.getElementById('umapShow').onchange=function(){if(this.checked)umapGroup.addTo(map);else map.removeLayer(umapGroup);};
 document.getElementById('umapZoomBtn').onclick=function(){var m=umapCur();if(m)umapZoom(m);};
 document.getElementById('umapDelBtn').onclick=function(){
   var m=umapCur();
@@ -10513,6 +10596,14 @@ document.getElementById('umapDelAllBtn').onclick=function(){
   ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
 /* clear map cache: drop every map file copied into the app; the list keeps the names (tap to re-open from the file) */
+document.getElementById('umapEnrBtn').onclick=function(){
+  if(!navigator.onLine){alert('ต้องต่ออินเทอร์เน็ตเพื่อโหลด Enroute');return;}
+  var bis=userMaps.filter(function(m){return m.builtin;});
+  Promise.all(bis.map(function(m){var p=umapBuiltinCopy(m,true);umapRender();return p;})).then(function(){
+    var ok=bis.every(function(m){return m.stored;});
+    umapSave();umapRender(ok?'✓ โหลด Enroute แล้ว ใช้ออฟไลน์ได้':undefined);
+  });
+};
 document.getElementById('umapClearBtn').onclick=function(){
   var n=userMaps.filter(function(m){return m.stored;}).length;
   if(!n||!confirm('ล้าง cache แผนที่? (ลบไฟล์แผนที่ที่ก็อปไว้ในแอพ '+n+' ไฟล์ — ชื่อยังอยู่ใน list แตะเพื่อเปิดจากไฟล์เดิม)'))return;
@@ -10565,6 +10656,7 @@ function chartPageMeta(c,n){
 /* viewer ◀ ▶: show another page of the PDF (keeps the viewer mode) */
 function chartGoPage(c,n,geo,noView){
   if(!c.pages||n<1||n>c.pages||n===c.page)return;
+  if(typeof cbPageHook==='function')cbPageHook(c,n);
   chartPut(c);chartPageMeta(c,n);
   if(c.url){URL.revokeObjectURL(c.url);c.url=null;}
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
@@ -10778,12 +10870,11 @@ function chartBounds(c){
 }
 function chartShowOverlay(){
   if(chartLayer){map.removeLayer(chartLayer);chartLayer=null;}
-  var c=chartCur();
-  if(c&&c.url&&c.onMap&&c.gcp&&c.gcp.length>=2){chartLayer=new ChartOverlay(c);chartLayer.addTo(map);}
 }
 function chartZoom(c){var b=c&&c.gcp&&c.gcp.length>=2&&chartBounds(c);if(b&&b.isValid())map.fitBounds(b,{padding:[20,20]});}
 function chartRender(status){
   var sel=document.getElementById('chartSel');if(!sel)return;
+  if(status===undefined)cbRender();
   var c=chartCur(),geo=!!(c&&c.gcp&&c.gcp.length>=2),pend=!!chartFhPend;
   var opt=function(x){return '<option value="'+esc(x.key)+'"'+(x===c?' selected':'')+'>'+esc(x.name)+(x.pages>1?' ('+x.pages+' หน้า)':'')+(x.gcp&&x.gcp.length>=2?' 📍':'')+'</option>';};
   var fol=charts.filter(function(x){return !x.db;}),dbs=charts.filter(function(x){return x.db;});
@@ -10971,9 +11062,9 @@ function openChartViewer(c,geo){
     else if(a==='undo'){pts.pop();geoMsg();apply();}
     else if(a==='save'&&pts.length>=2){
       if(c.onGeoSave){c.gcp=pts.slice();close();c.onGeoSave();return;}
-      c.gcp=pts.slice();c.gcpAuto=false;c.onMap=true;chartSetCur(c);
+      c.gcp=pts.slice();c.gcpAuto=false;chartSetCur(c);
       chartPut(c).catch(function(){});
-      chartShowOverlay();chartRender();close();chartZoom(c);
+      chartRender();close();cbShowSaved(c);
     }
   });
   /* pan / pinch / tap */
@@ -11167,6 +11258,139 @@ function chartDbOffline(){
   .then(function(){btn.disabled=false;chartDbOfflineState();});
 }
 document.getElementById('chartDbBtn').onclick=chartDbOffline;
+/* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
+   Two charts on the map at once. Each slot holds its own copy of the chart page (independent of the sidebar
+   CHART box, which stays for IMPORT / VIEW / SET). Slots start empty each time the app opens (HIDE default);
+   opacity per slot kept in localStorage 'fp-chart-slots-v1'. */
+var CB_KEY='fp-chart-slots-v1',cbSlots={dep:{key:'',page:1,show:false,op:0.8,c:null,layer:null,job:0},arr:{key:'',page:1,show:false,op:0.8,c:null,layer:null,job:0}};
+try{var cbs=JSON.parse(localStorage.getItem(CB_KEY)||'null');if(cbs)['dep','arr'].forEach(function(k){var v=cbs[k];if(v&&typeof v==='object'){cbSlots[k].key=v.key||'';cbSlots[k].page=v.page||1;cbSlots[k].op=+v.op||0.8;}});}catch(e){}
+function cbSave(){var o={};['dep','arr'].forEach(function(k){var sl=cbSlots[k];o[k]={key:sl.key,page:sl.page,op:sl.op};});try{localStorage.setItem(CB_KEY,JSON.stringify(o));}catch(e){}}
+function cbId(k){return k==='dep'?'Dep':'Arr';}
+function cbChart(key){return charts.filter(function(y){return y.key===key;})[0]||null;}
+function cbRender(){
+  if(!cbSlots)return;
+  ['dep','arr'].forEach(function(k){
+    var id=cbId(k),s=document.getElementById('cb'+id+'Sel');if(!s)return;
+    var sl=cbSlots[k],x=cbChart(sl.key),np=x?(x.pages||1):0,i=charts.indexOf(x);
+    var sm=window.innerWidth<640;
+    if(document.activeElement!==s){
+      s.innerHTML='<option value="">'+(sm?'เลือก':'— เลือกชาร์ต —')+'</option>'+charts.map(function(y){
+        var n=y.pages||1,txt=y===x?y.name+(n>1?(sm?' '+sl.page+'/'+n:' (หน้า '+sl.page+'/'+n+')'):''):y.name+(n>1?' ('+n+' หน้า)':'');
+        return '<option value="'+esc(y.key)+'"'+(y===x?' selected':'')+'>'+esc(txt)+'</option>';}).join('');
+    }
+    document.getElementById('cb'+id+'Prev').disabled=!x||(i<=0&&sl.page<=1);
+    document.getElementById('cb'+id+'Next').disabled=!x||(i>=charts.length-1&&sl.page>=np);
+    var sh=document.getElementById('cb'+id+'Show');sh.disabled=!x;sh.checked=!!(x&&sl.show);
+    var op=document.getElementById('cb'+id+'Op');op.value=sl.op;op.disabled=!sl.layer;
+    var cs=document.getElementById('ch'+id+'Sel');
+    if(cs&&document.activeElement!==cs){
+      cs.innerHTML='<option value="">— เลือกชาร์ต —</option>'+charts.map(function(y){var n=y.pages||1;
+        return '<option value="'+esc(y.key)+'"'+(y===x?' selected':'')+'>'+esc(y.name)+(n>1?' ('+n+' หน้า)':'')+(y.db||y.gcp&&y.gcp.length>=2?' 📍':'')+'</option>';}).join('');
+    }
+    if(cs){
+      document.getElementById('ch'+id+'Pg').textContent=x?'หน้า '+sl.page+'/'+np:'';
+      document.getElementById('ch'+id+'Prev').disabled=document.getElementById('cb'+id+'Prev').disabled;
+      document.getElementById('ch'+id+'Next').disabled=document.getElementById('cb'+id+'Next').disabled;
+      document.getElementById('ch'+id+'View').disabled=document.getElementById('ch'+id+'Geo').disabled=!x;
+      var cw=document.getElementById('ch'+id+'Show');cw.disabled=!x;cw.checked=!!(x&&sl.show);
+      var co=document.getElementById('ch'+id+'Op');co.value=sl.op;co.disabled=!sl.layer;
+    }
+    document.getElementById('cb'+id+'Minus').hidden=document.getElementById('cb'+id+'Plus').hidden=!(sl.c&&sl.c.nts&&sl.layer);
+  });
+}
+function cbClear(k){
+  var sl=cbSlots[k];sl.job++;
+  if(sl.layer){map.removeLayer(sl.layer);sl.layer=null;}
+  if(sl.c&&sl.c.url)URL.revokeObjectURL(sl.c.url);
+  sl.c=null;
+}
+/* own copy of chart page n (does not touch the sidebar chart or its saved meta) */
+function cbItem(x,n){
+  var c=chartMakeItem({key:x.key,file:x.file,fh:x.fh});
+  if(x.db){c.db=x.db;c.name=x.name;c.labels=x.labels;c.geo=x.geo;c.ntsIdx=x.ntsIdx;c.pages=x.pages;}
+  else c.pages=x.pages||c.pages;
+  c.onPage=null;c.url=null;
+  if(c.pages>1)chartPageMeta(c,n);else{c.page=1;if(c.db)chartDbPreset(c,true);}
+  c.page=n;c.opacity=0.8;return c;
+}
+function cbLoad(c){
+  var fp=c.db?chartDbFile(c):c.file?Promise.resolve(c.file):c.fh?c.fh.getFile():Promise.reject(new Error('IMPORT CHART อีกครั้ง'));
+  return fp.then(function(file){return /\.pdf$/i.test(c.key)?chartPdfToPng(file,c).then(function(r){return r.blob;}):file;})
+    .then(function(blob){return chartImgSize(blob).then(function(sz){c.url=URL.createObjectURL(blob);c.w=sz[0];c.h=sz[1];if(c.nts)chartNtsSet(c);return c;});});
+}
+/* draw slot k from its key / page / SHOW */
+function cbApply(k,zoom){
+  cbClear(k);var sl=cbSlots[k],x=cbChart(sl.key);cbSave();
+  if(!x||!sl.show){cbRender();return Promise.resolve();}
+  var c=cbItem(x,sl.page),job=sl.job;
+  if(!(c.gcp&&c.gcp.length>=2)){cbRender();chartRender(x.name+' หน้า '+sl.page+' ยังไม่ตั้งพิกัด กด 📍 SET CHARTs');return Promise.resolve();}
+  cbRender();
+  return cbLoad(c).then(function(){
+    if(job!==sl.job){URL.revokeObjectURL(c.url);return;}
+    c.opacity=sl.op;sl.c=c;sl.layer=new ChartOverlay(c);sl.layer.addTo(map);
+    chartRender();if(zoom)chartZoom(c);
+  }).catch(function(e){if(job===sl.job)cbRender();chartRender('เปิดชาร์ตไม่ได้: '+((e&&e.message)||e));});
+}
+/* ◀ ▶: previous / next page; past the first / last page moves to the previous / next chart */
+function cbStep(k,d){
+  var sl=cbSlots[k],x=cbChart(sl.key);if(!x)return;
+  var np=x.pages||1,p=sl.page+d;
+  if(p<1){var i=charts.indexOf(x)-1;if(i<0)return;x=charts[i];p=x.pages||1;}
+  else if(p>np){var j=charts.indexOf(x)+1;if(j>=charts.length)return;x=charts[j];p=1;}
+  sl.key=x.key;sl.page=p;cbApply(k,sl.show);
+}
+/* sidebar DEP / ARR CHART: VIEW / SET CHART open the slot's chart page in the viewer */
+var cbEditSlot=null;
+function cbEdit(k,geo){
+  var sl=cbSlots[k],x=cbChart(sl.key);if(!x)return;
+  cbEditSlot=k;
+  if((x.pages||1)>1&&x.page!==sl.page){chartPut(x);chartPageMeta(x,sl.page);if(x.url){URL.revokeObjectURL(x.url);x.url=null;}}
+  chartSetCur(x);
+  chartLoad(x).then(function(){chartRender();openChartViewer(x,geo);}).catch(function(e){chartRender('เปิดชาร์ตไม่ได้: '+((e&&e.message)||e));});
+}
+/* viewer ◀ ▶ on the slot's chart moves the slot to that page too */
+function cbPageHook(c,n){
+  var k=cbEditSlot,sl=k&&cbSlots[k];if(!sl||sl.key!==c.key)return;
+  sl.page=n;if(sl.show)cbApply(k,false);else{cbSave();cbRender();}
+}
+/* after SET CHART: show that page (the slot it was opened from, else the slot holding that chart, else an empty slot, else DEP) */
+function cbShowSaved(c){
+  var k=cbEditSlot&&cbSlots[cbEditSlot].key===c.key?cbEditSlot:cbSlots.dep.key===c.key?'dep':cbSlots.arr.key===c.key?'arr':!cbSlots.dep.key?'dep':!cbSlots.arr.key?'arr':'dep';
+  var sl=cbSlots[k];sl.key=c.key;sl.page=c.pages>1?c.page:1;sl.show=true;cbApply(k,true);
+}
+['dep','arr'].forEach(function(k){
+  var id=cbId(k);
+  document.getElementById('cb'+id+'Sel').onchange=function(){var sl=cbSlots[k];this.blur();sl.key=this.value;sl.page=1;sl.show=!!this.value;cbApply(k,true);};
+  document.getElementById('cb'+id+'Prev').onclick=function(){cbStep(k,-1);};
+  document.getElementById('cb'+id+'Next').onclick=function(){cbStep(k,1);};
+  document.getElementById('ch'+id+'Sel').onchange=function(){var sl=cbSlots[k];this.blur();sl.key=this.value;sl.page=1;sl.show=!!this.value;cbApply(k,true);};
+  document.getElementById('ch'+id+'Prev').onclick=function(){cbStep(k,-1);};
+  document.getElementById('ch'+id+'Next').onclick=function(){cbStep(k,1);};
+  document.getElementById('ch'+id+'Show').onchange=function(){cbSlots[k].show=this.checked;cbApply(k,this.checked);};
+  document.getElementById('ch'+id+'View').onclick=function(){cbEdit(k,false);};
+  document.getElementById('ch'+id+'Geo').onclick=function(){cbEdit(k,true);};
+  document.getElementById('cb'+id+'Show').onchange=function(){cbSlots[k].show=this.checked;cbApply(k,this.checked);};
+  var opIn=function(){var sl=cbSlots[k];sl.op=+this.value;if(sl.c)sl.c.opacity=sl.op;if(sl.layer)sl.layer.setOpacity(sl.op);
+    document.getElementById('cb'+id+'Op').value=document.getElementById('ch'+id+'Op').value=sl.op;cbSave();};
+  document.getElementById('cb'+id+'Op').oninput=opIn;document.getElementById('ch'+id+'Op').oninput=opIn;
+  [['Minus',1/1.25],['Plus',1.25]].forEach(function(b){
+    document.getElementById('cb'+id+b[0]).onclick=function(){
+      var sl=cbSlots[k],c=sl.c;if(!c||!c.nts)return;
+      c.ntsK*=b[1];chartNtsSet(c);if(sl.layer)sl.layer._reset();
+      var mk=c.pages>1?c.key+'#p'+c.page:c.key,m=chartMeta.items[mk]||(chartMeta.items[mk]={gcp:[],opacity:0.8,onMap:false,page:c.page,pages:c.pages||0,w:c.w,h:c.h});
+      m.ntsK=c.ntsK;chartMetaSave();
+    };
+  });
+});
+document.getElementById('cbMapSel').onchange=function(){
+  var u=document.getElementById('umapSel');this.blur();
+  if(this.value&&!map.hasLayer(umapGroup))umapGroup.addTo(map);
+  u.value=this.value;u.onchange.call(u);
+};
+document.getElementById('cbMapBg').onchange=function(){var u=document.getElementById('umapBg');u.checked=this.checked;u.onchange.call(u);cbMapRender();};
+document.getElementById('cbMapShow').onchange=function(){if(this.checked)umapGroup.addTo(map);else map.removeLayer(umapGroup);};
+document.getElementById('cbMapOp').oninput=function(){var u=document.getElementById('umapOp');u.value=this.value;u.oninput.call(u);};
+cbMapRender();
 chartDbMerge();chartRender();chartLoadSaved();chartDbLoadIndex();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
