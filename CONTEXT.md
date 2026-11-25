@@ -105,7 +105,9 @@ KM/                   knowledge notes; start at KM/README.md
 - **MAP box** (yellow): IMPORT MAP (user .pmtiles/PDF/image overlay, opacity inside frame only),
   built-in "ENROUTE (AIP)", checkbox "HIDE ENROUTE Charts / MAPs".
 - **CHART box** (orange): 📄 IMPORT CHART, built-in "ชาร์ตในแอพ" from DataBase, georef 2-3 points,
-  auto georef from index.json, PDF pages, "HIDE CHARTs", 🗑 RESET.
+  auto georef from index.json, PDF pages, 🗑 RESET (manage only; no map display here).
+- **Chart bar** above NAVIGATION TRACKING: DEP Charts | MAP+ENROUTE | ARR Charts (line 1 select,
+  line 2 opacity). Two chart pages on the map at once (cbSlots dep/arr); MAP box mirrors umapSel.
 - **NAVIGATION TRACKING** panel (yellow) above profile: TRACK (Wake Lock) | PPOS | ROUTE | RESET |
   EXPORT; DISTANCE NM, GROUND SPEED KT, FLIGHT TIME, ALTITUDE. PWA stops when backgrounded.
   Phone portrait (≤820px): panel moves to bottom strip #navDock (always visible).
@@ -114,7 +116,7 @@ KM/                   knowledge notes; start at KM/README.md
 - **Desktop menu width:** drag #panelResizer (menu/map edge), saved fp-panel-w-v1; double-click = 390px.
 - **Layers:** มทบ., VFR BKK A/C & Helicopter Wpt, RTAF POC (CSAR + ผบ.ฝูง), สนามบิน ทบ., airspace,
   reporting points, Imported NOTAM, rain radar. NOTAM list in side panel hidden by default.
-- **Startup defaults:** HIDE CHARTs + HIDE ENROUTE ticked, OFF-ROUTE Wpt layer off.
+- **Startup defaults:** DEP/ARR charts empty + HIDE ENROUTE ticked, OFF-ROUTE Wpt layer off.
 - **Hide-menu bar:** ◀/▶ left edge (landscape) or ▼/▲ bottom (portrait), remembered.
 
 ## 7. Parked / future
