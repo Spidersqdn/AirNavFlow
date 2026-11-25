@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>AirNavFLOW</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
 <style>/* Leaflet 1.9.4 */
@@ -798,7 +798,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 }
 /* Touch menu: allow scrolling, but no page pinch/double-tap zoom or iOS input zoom. */
 @media (any-pointer:coarse){
-  #panel{touch-action:pan-x pan-y}
+  #panel,#navDock,.nav-track{touch-action:pan-x pan-y}
+  html,body{touch-action:manipulation}
   #panel input,#panel select,#panel textarea{font-size:16px}
 }
 
@@ -10639,6 +10640,9 @@ var charts=[], chartLayer=null, chartFhPend=null, chartMeta={sel:'',items:{}};
 try{var cm=JSON.parse(localStorage.getItem(CHART_META)||'null');if(cm&&cm.items)chartMeta=cm;}catch(e){}
 /* SPD 14 NOV: HIDE CHARTs ticked whenever the app opens (georeference kept; untick to show) */
 Object.keys(chartMeta.items).forEach(function(k){chartMeta.items[k].onMap=false;});
+/* SPD 25 NOV: iPhone / iPad: the app's menus never zoom (pinch / double tap); the map and the chart viewer keep their own zoom */
+['gesturestart','gesturechange','gestureend'].forEach(function(t){document.addEventListener(t,function(e){
+  if(!(e.target&&e.target.closest&&e.target.closest('#map,.cv-stage')))e.preventDefault();},{passive:false});});
 var chartPane=map.createPane('charts');chartPane.style.zIndex=255;chartPane.style.pointerEvents='none';
 function chartMetaSave(){try{localStorage.setItem(CHART_META,JSON.stringify(chartMeta));}catch(e){}}
 /* PDF with several pages: each page has its own georeference, saved under 'path#pN'; 'path' keeps the page shown */
