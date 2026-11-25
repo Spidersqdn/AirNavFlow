@@ -1386,7 +1386,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 /* offline map panel */
 .offline-panel{padding:8px 18px;border-top:1px solid var(--line)}
 .off-row{display:flex;align-items:center;gap:5px;margin-top:4px;min-width:0}
-.off-name{flex:none;width:58px;font:600 11px var(--mono);color:var(--text)}
+.off-name{flex:none;width:62px;font:600 11px var(--mono);color:var(--text)}
 .off-row .offline-info{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
 .off-row button{flex:none;width:auto;min-height:0;margin:0;padding:4px 8px;font-size:11px;line-height:1.2}
 .off-row button:disabled{opacity:.5;cursor:not-allowed}
@@ -2070,7 +2070,6 @@ body.panel-hidden #panelResizer{display:none}
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
   <div class="umap-status" id="chartStatus"></div>
-  <button type="button" id="chartDbBtn" class="chart-btn chart-dbbtn" hidden title="Copy the charts built into the app (DataBase) onto this device for offline use">⬇ เก็บชาร์ตในแอพไว้ใช้ออฟไลน์</button>
 </section>
 
 <section class="umap-panel map-panel">
@@ -2093,7 +2092,6 @@ body.panel-hidden #panelResizer{display:none}
     <button type="button" id="umapDelAllBtn" class="umap-del" title="Delete every imported map from this device">🗑 CLEAR MAPs</button>
   </div>
   <div class="umap-btns umap-dlrow">
-    <button type="button" id="umapEnrBtn" class="umap-clear" title="Download the ENROUTE charts built into the app so they work offline">⬇ Download Enroute</button>
     <button type="button" id="umapClearBtn" class="umap-clear" title="Delete map files copied into the app (Cache Storage); maps read from their own file are not touched">🧹 ล้าง cache แผนที่</button>
   </div>
   <input id="importMapFile" type="file" hidden>
@@ -2102,10 +2100,12 @@ body.panel-hidden #panelResizer{display:none}
 
 <section class="offline-panel">
   <div class="offline-head"><b>OFFLINE DATA</b><small id="netStatus">…</small></div>
-  <div class="off-row"><span class="off-name">MAP</span><span class="offline-info" id="offlineInfo">…</span><button type="button" id="offlineDl">Download</button><button type="button" id="offlineDel">ลบ</button></div>
+  <div class="off-row"><span class="off-name">OSM MAP</span><span class="offline-info" id="offlineInfo">…</span><button type="button" id="offlineDl">Download</button><button type="button" id="offlineDel">ลบ</button></div>
   <div class="offline-bar" id="offlineBar"><div></div></div>
   <div class="off-row"><span class="off-name">TERRAIN</span><span class="offline-info" id="elevInfo">…</span><button type="button" id="elevDl">Download</button><button type="button" id="elevDel">ลบ</button></div>
   <div class="offline-bar" id="elevBar"><div></div></div>
+  <div class="off-row"><span class="off-name">ENROUTE</span><span class="offline-info" id="enrInfo">…</span><button type="button" id="umapEnrBtn" title="Download the ENROUTE (AIP) chart for offline use">Download</button><button type="button" id="umapEnrDel">ลบ</button></div>
+  <div class="off-row"><span class="off-name">CHART</span><span class="offline-info" id="chartDbInfo">…</span><button type="button" id="chartDbBtn" title="Download the charts built into the app for offline use">Download</button><button type="button" id="chartDbDel">ลบ</button></div>
 </section>
 
 
@@ -10530,8 +10530,11 @@ function umapRender(status){
   if(typeof cbMapRender==='function')cbMapRender();
   document.getElementById('umapKeep').checked=umapKeepOn();
   var bis=userMaps.filter(function(m){return m.builtin;}),bok=bis.length&&bis.every(function(m){return m.stored;}),bcp=bis.some(function(m){return m._copying;});
-  var eb=document.getElementById('umapEnrBtn');eb.disabled=!bis.length||bcp||!('caches' in window);
-  eb.textContent=bcp?'⬇ กำลังโหลด Enroute…':bok?'✓ Enroute ออฟไลน์ได้ · โหลดใหม่':'⬇ Download Enroute';
+  var eb=document.getElementById('umapEnrBtn');eb.disabled=!bis.length||bcp||!('caches' in window)||!navigator.onLine;
+  eb.textContent=bok?'Update':'Download';
+  document.getElementById('umapEnrDel').disabled=bcp||!bis.some(function(m){return m.stored;});
+  var ebb=bis.reduce(function(t,m){return t+(m.stored?(m.bytes||0):0);},0);
+  document.getElementById('enrInfo').textContent=bcp?'กำลังโหลด…':bok?'✓'+(ebb?' '+mb(ebb):'')+' ใช้ออฟไลน์ได้':'ยังไม่โหลด';
   var st=document.getElementById('umapStatus');
   if(status!==undefined)st.textContent=status||'';
   else st.textContent=cur&&cur.builtin?'แผนที่ในแอพ (AIP) · z'+cur.minZ+'-'+cur.maxZ+(cur.stored?' · ก็อปไว้ในเครื่อง ใช้ออฟไลน์ได้ '+mb(cur.bytes):' · โหลดจากเน็ต (ติ๊กก็อปไฟล์ = ใช้ออฟไลน์ได้)')
@@ -10601,6 +10604,11 @@ document.getElementById('umapEnrBtn').onclick=function(){
     var ok=bis.every(function(m){return m.stored;});
     umapSave();umapRender(ok?'✓ โหลด Enroute แล้ว ใช้ออฟไลน์ได้':undefined);
   });
+};
+document.getElementById('umapEnrDel').onclick=function(){
+  var bis=userMaps.filter(function(m){return m.builtin&&m.stored;});if(!bis.length||!confirm('ลบ ENROUTE ที่โหลดไว้ในเครื่อง? (ยังเปิดออนไลน์ได้)'))return;
+  caches.open(UMAP_CACHE).then(function(c){return Promise.all(bis.map(function(m){return c.delete(umapKey(m.id));}));}).catch(function(){})
+    .then(function(){bis.forEach(function(m){m.stored=false;});umapSave();umapRender('ลบ ENROUTE ในเครื่องแล้ว');});
 };
 document.getElementById('umapClearBtn').onclick=function(){
   var n=userMaps.filter(function(m){return m.stored;}).length;
@@ -11226,30 +11234,29 @@ function chartDbFile(c){
 var chartDbStored=0;
 function chartDbOfflineState(){
   var btn=document.getElementById('chartDbBtn');if(!btn)return;
-  var list=(chartDbIdx&&chartDbIdx.charts)||[];
-  btn.hidden=!list.length;if(!list.length)return;
+  var list=(chartDbIdx&&chartDbIdx.charts)||[],inf=document.getElementById('chartDbInfo'),del=document.getElementById('chartDbDel');
+  btn.disabled=del.disabled=!list.length;if(!list.length){inf.textContent=navigator.onLine?'กำลังตรวจสอบ…':'ไม่มีรายการชาร์ต';return;}
   var tot=list.reduce(function(s,e){return s+(e.bytes||0);},0),mb=function(b){return (b/1048576).toFixed(0)+' MB';};
   if(!('caches' in window)){btn.disabled=true;return;}
   caches.open(CHART_DB_CACHE).then(function(k){return k.keys();}).then(function(ks){
     chartDbStored=ks.length;
-    btn.textContent=ks.length>=list.length?'✓ ชาร์ตในแอพใช้ออฟไลน์ได้ ('+mb(tot)+') · แตะเพื่อลบ':'⬇ เก็บชาร์ตในแอพไว้ใช้ออฟไลน์ ('+list.length+' ไฟล์, '+mb(tot)+')';
+    var all=ks.length>=list.length;
+    inf.textContent=all?'✓ '+list.length+' ไฟล์ · '+mb(tot):ks.length?'✓ '+ks.length+'/'+list.length+' ไฟล์':'ยังไม่โหลด ('+list.length+' ไฟล์, '+mb(tot)+')';
+    btn.textContent=all?'Update':'Download';btn.disabled=!navigator.onLine;del.disabled=!ks.length;
   }).catch(function(){});
 }
 function chartDbOffline(){
   var list=(chartDbIdx&&chartDbIdx.charts)||[],btn=document.getElementById('chartDbBtn');
   if(!list.length||!('caches' in window))return;
-  if(chartDbStored>=list.length){
-    if(!confirm('ลบชาร์ตในแอพที่เก็บไว้ออฟไลน์? (ยังเปิดดูออนไลน์ได้ พิกัดที่ตั้งไว้ยังอยู่)'))return;
-    caches.delete(CHART_DB_CACHE).then(chartDbOfflineState);return;
-  }
+  var upd=chartDbStored>=list.length;
   btn.disabled=true;var i=0;
   caches.open(CHART_DB_CACHE).then(function(k){
     function next(){
       if(i>=list.length)return;
       var url=CHART_DB_URL+list[i].f.split('/').map(encodeURIComponent).join('/');
-      btn.textContent='⬇ กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
+      document.getElementById('chartDbInfo').textContent='กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
       return k.match(url).then(function(hit){
-        if(hit)return;
+        if(hit&&!upd)return;
         return fetch(url).then(function(r){if(!r.ok)throw new Error(list[i].f+' '+r.status);return k.put(url,r);});
       }).then(function(){i++;return next();});
     }
@@ -11259,6 +11266,10 @@ function chartDbOffline(){
   .then(function(){btn.disabled=false;chartDbOfflineState();});
 }
 document.getElementById('chartDbBtn').onclick=chartDbOffline;
+document.getElementById('chartDbDel').onclick=function(){
+  if(!('caches' in window)||!confirm('ลบชาร์ตในแอพที่เก็บไว้ออฟไลน์? (ยังเปิดดูออนไลน์ได้ พิกัดที่ตั้งไว้ยังอยู่)'))return;
+  caches.delete(CHART_DB_CACHE).then(chartDbOfflineState);
+};
 /* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
    Two charts on the map at once. Each slot holds its own copy of the chart page (independent of the sidebar
    CHART box, which stays for IMPORT / VIEW / SET). Slots start empty each time the app opens (HIDE default);
