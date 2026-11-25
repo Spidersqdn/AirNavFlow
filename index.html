@@ -1231,6 +1231,7 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .chart-show{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--orange);border-radius:6px;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap;padding:0 4px}
 .chart-show input{width:18px;height:18px;margin:0}
 .chart-sec .chart-btn,.map-sec-btns .chart-btn{white-space:nowrap;font-size:12px;padding:8px 4px}
+.ch-oprow{margin-top:6px}.ch-oprow input:disabled{opacity:.35}
 .map-show{border-color:var(--amber);color:var(--amber)}.map-show input{accent-color:var(--amber)}
 .map-sec-btns .chart-btn:disabled{opacity:.4}
 .chart-show:has(input:disabled){opacity:.4}
@@ -2030,6 +2031,7 @@ body.panel-hidden #panelResizer{display:none}
       <button type="button" id="chDepGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
       <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chDepShow"> SHOW CHART</label>
     </div>
+    <div class="umap-row ch-oprow"><span>โปร่งใส</span><input type="range" id="chDepOp" min="0.1" max="1" step="0.05" value="0.8"></div>
   </div>
   <div class="chart-sec">
     <div class="chart-sub">ARR CHART</div>
@@ -2039,6 +2041,7 @@ body.panel-hidden #panelResizer{display:none}
       <button type="button" id="chArrGeo" class="chart-btn" title="Tap 2-3 grid crossings on the chart and type their Lat/Long so it can sit on the map">📍 SET CHART</button>
       <label class="chart-show" title="Show this chart on the map"><input type="checkbox" id="chArrShow"> SHOW CHART</label>
     </div>
+    <div class="umap-row ch-oprow"><span>โปร่งใส</span><input type="range" id="chArrOp" min="0.1" max="1" step="0.05" value="0.8"></div>
   </div>
   <div hidden style="display:none">  <div class="chart-selrow"><select id="chartSel"><option value="">— ไม่มีชาร์ต —</option></select><span id="chartPgBox" hidden><button type="button" id="chartPgPrev" title="Previous PDF page">◀</button><span id="chartPgTxt"></span><button type="button" id="chartPgNext" title="Next PDF page">▶</button></span></div>
   <div class="umap-btns" style="margin-top:6px">
@@ -11275,6 +11278,7 @@ function cbRender(){
       document.getElementById('ch'+id+'Next').disabled=document.getElementById('cb'+id+'Next').disabled;
       document.getElementById('ch'+id+'View').disabled=document.getElementById('ch'+id+'Geo').disabled=!x;
       var cw=document.getElementById('ch'+id+'Show');cw.disabled=!x;cw.checked=!!(x&&sl.show);
+      var co=document.getElementById('ch'+id+'Op');co.value=sl.op;co.disabled=!sl.layer;
     }
     document.getElementById('cb'+id+'Minus').hidden=document.getElementById('cb'+id+'Plus').hidden=!(sl.c&&sl.c.nts&&sl.layer);
   });
@@ -11351,7 +11355,9 @@ function cbShowSaved(c){
   document.getElementById('ch'+id+'View').onclick=function(){cbEdit(k,false);};
   document.getElementById('ch'+id+'Geo').onclick=function(){cbEdit(k,true);};
   document.getElementById('cb'+id+'Show').onchange=function(){cbSlots[k].show=this.checked;cbApply(k,this.checked);};
-  document.getElementById('cb'+id+'Op').oninput=function(){var sl=cbSlots[k];sl.op=+this.value;if(sl.c)sl.c.opacity=sl.op;if(sl.layer)sl.layer.setOpacity(sl.op);cbSave();};
+  var opIn=function(){var sl=cbSlots[k];sl.op=+this.value;if(sl.c)sl.c.opacity=sl.op;if(sl.layer)sl.layer.setOpacity(sl.op);
+    document.getElementById('cb'+id+'Op').value=document.getElementById('ch'+id+'Op').value=sl.op;cbSave();};
+  document.getElementById('cb'+id+'Op').oninput=opIn;document.getElementById('ch'+id+'Op').oninput=opIn;
   [['Minus',1/1.25],['Plus',1.25]].forEach(function(b){
     document.getElementById('cb'+id+b[0]).onclick=function(){
       var sl=cbSlots[k],c=sl.c;if(!c||!c.nts)return;
