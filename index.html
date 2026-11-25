@@ -1230,7 +1230,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .ch-pg span{font:600 12px system-ui,sans-serif;color:var(--orange);padding:0 2px}
 .chart-show{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--orange);border-radius:6px;color:var(--orange);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap;padding:0 4px}
 .chart-show input{width:18px;height:18px;margin:0}
-.chart-sec .chart-btn{white-space:nowrap;font-size:12px;padding:8px 4px}
+.chart-sec .chart-btn,.map-sec-btns .chart-btn{white-space:nowrap;font-size:12px;padding:8px 4px}
+.map-show{border-color:var(--amber);color:var(--amber)}.map-show input{accent-color:var(--amber)}
+.map-sec-btns .chart-btn:disabled{opacity:.4}
 .chart-show:has(input:disabled){opacity:.4}
 #chartSel{border-color:var(--orange)!important}
 .chart-panel input[type=checkbox],.chart-panel input[type=range]{accent-color:var(--orange)}
@@ -2063,14 +2065,14 @@ body.panel-hidden #panelResizer{display:none}
 <section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
-  <label class="umap-keep hide-toggle" title="Hide every ENROUTE chart / MAP overlay (selection kept)"><input type="checkbox" id="umapHide"> HIDE ENROUTE Charts / MAPs</label>
+  <div hidden style="display:none"><input type="checkbox" id="umapHide"><button type="button" id="umapZoomBtn">Zoom</button></div>
   <div class="umap-row" id="umapRow" hidden>
     <span>โปร่งใส</span><input type="range" id="umapOp" min="0.1" max="1" step="0.05" value="1">
-    <button type="button" id="umapZoomBtn">Zoom</button>
   </div>
-  <div class="umap-btns" id="umapImgRow" style="margin-top:6px" hidden>
-    <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen">👁 VIEW</button>
-    <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map">📍 SET MAP</button>
+  <div class="umap-btns map-sec-btns" id="umapImgRow" style="margin-top:6px">
+    <button type="button" id="umapViewBtn" class="chart-btn" title="Open the map image full screen (PDF / image maps)">👁 VIEW</button>
+    <button type="button" id="umapGeoBtn" class="chart-btn" title="Tap 2-3 grid crossings and type their Lat/Long so the map sits on the map (PDF / image maps)">📍 SET MAP</button>
+    <label class="chart-show map-show" title="Show the selected ENROUTE chart / MAP on the map"><input type="checkbox" id="umapShow"> SHOW MAP</label>
   </div>
   <label class="umap-keep" id="umapBgRow" hidden><input type="checkbox" id="umapBg"> พื้นหลังโปร่งใส (ในกรอบแผนที่ / legend คงพื้นขาว)</label>
   <label class="umap-keep"><input type="checkbox" id="umapKeep"> ก็อปไฟล์เก็บไว้ในแอพ (ไม่ติ๊ก = อ่านจากที่อยู่ไฟล์โดยตรง)</label>
@@ -10151,7 +10153,7 @@ var umapGroup=L.layerGroup();
 umapGroup.on('add',function(){try{localStorage.setItem('fp-user-maps-grp','1');}catch(e){}umapHideSync();});
 umapGroup.on('remove',function(){try{localStorage.setItem('fp-user-maps-grp','0');}catch(e){}umapHideSync();});
 /* HIDE ENROUTE Charts / MAPs = MAP overlay group off the map */
-function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);if(typeof cbMapRender==='function')cbMapRender();}
+function umapHideSync(){var cb=document.getElementById('umapHide');if(cb)cb.checked=!map.hasLayer(umapGroup);var us=document.getElementById('umapShow');if(us&&typeof userMaps!=='undefined'){var uc=userMaps.filter(function(m){return m.on;})[0];us.disabled=!uc;us.checked=!!uc&&map.hasLayer(umapGroup);}if(typeof cbMapRender==='function')cbMapRender();}
 document.getElementById('umapHide').onchange=function(){if(this.checked)map.removeLayer(umapGroup);else umapGroup.addTo(map);};
 umapHideSync();
 var umapPane=map.createPane('userMaps');umapPane.style.zIndex=250; /* above base map, below airspace/route */
@@ -10510,7 +10512,8 @@ function umapRender(status){
     return '<option value="'+esc(m.id)+'"'+(m===cur?' selected':'')+'>'+esc(m.name)+(umapPending(m)?' (แตะเพื่อเปิดไฟล์)':'')+'</option>';
   }).join('');
   document.getElementById('umapRow').hidden=!cur;
-  document.getElementById('umapImgRow').hidden=!(cur&&umapIsImg(cur));
+  document.getElementById('umapViewBtn').disabled=document.getElementById('umapGeoBtn').disabled=!(cur&&umapIsImg(cur));
+  var ush=document.getElementById('umapShow');ush.disabled=!cur;ush.checked=!!cur&&map.hasLayer(umapGroup);
   document.getElementById('umapBgRow').hidden=!(cur&&(umapIsImg(cur)||cur.builtin));
   document.getElementById('umapBg').checked=!!(cur&&umapBgOn(cur));
   document.getElementById('umapDelBtn').disabled=!userMaps.length;
@@ -10549,7 +10552,7 @@ document.getElementById('umapSel').onchange=function(){
   umapShow(m);if(m)umapZoom(m);
 };
 document.getElementById('umapOp').oninput=function(){
-  var m=umapCur();if(!m)return;m.opacity=+this.value;
+  var m=umapCur();if(!m)return;m.opacity=+this.value;var bo=document.getElementById('cbMapOp');if(bo&&bo!==document.activeElement)bo.value=m.opacity;
   if(m.builtin&&m.frame&&m.layer&&m.layer.redraw){clearTimeout(m._opT);m._opT=setTimeout(function(){m.layer.redraw();},150);}
   else if(m.layer)m.layer.setOpacity(m.opacity);
   umapSave();
@@ -10561,6 +10564,7 @@ document.getElementById('umapBg').onchange=function(){
 };
 document.getElementById('umapViewBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,false);});};
 document.getElementById('umapGeoBtn').onclick=function(){var m=umapCur();if(m&&m.ready)m.ready.then(function(){umapImgGeo(m,true);});};
+document.getElementById('umapShow').onchange=function(){if(this.checked)umapGroup.addTo(map);else map.removeLayer(umapGroup);};
 document.getElementById('umapZoomBtn').onclick=function(){var m=umapCur();if(m)umapZoom(m);};
 document.getElementById('umapDelBtn').onclick=function(){
   var m=umapCur();
