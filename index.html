@@ -5662,7 +5662,14 @@ layerCtl.getContainer().addEventListener('mouseenter',fitLayerCtl);
 layerCtl.getContainer().addEventListener('touchstart',fitLayerCtl,{passive:true});
 fitLayerCtl();
 
-L.control.scale({position:'bottomleft',imperial:false,metric:true,maxWidth:180}).addTo(map);
+/* scale bar in nautical miles (Leaflet has only metric/imperial) */
+var NmScale=L.Control.Scale.extend({
+  _updateMetric:function(maxMeters){
+    var nm=maxMeters/1852,n=this._getRoundNum(nm);
+    this._updateScale(this._mScale,(n<1?+n.toFixed(2):n)+' NM',n/nm);
+  }
+});
+new NmScale({position:'bottomleft',imperial:false,metric:true,maxWidth:180}).addTo(map);
 (function(){ /* keep scale bar above the #status coordinate box */
   var stEl=document.getElementById('status'),mw=document.getElementById('mapwrap');
   function upd(){if(stEl&&mw)mw.style.setProperty('--status-h',(stEl.offsetParent?stEl.offsetHeight:0)+'px');}
@@ -10108,7 +10115,9 @@ function umapBuiltinOpen(m){
   var url=MAP_SITE+m.file;
   var cp=('caches' in window)?caches.open(UMAP_CACHE).then(function(c){return c.match(umapKey(m.id));}).then(function(r){return r?r.blob():null;}).catch(function(){return null;}):Promise.resolve(null);
   return cp.then(function(blob){
+    if(!blob&&!navigator.onLine)throw new Error('ยังไม่มีไฟล์ในเครื่อง: เปิด '+m.name+' ตอนออนไลน์ 1 ครั้ง หรือกด Download Map');
     m.stored=!!blob;
+    if(blob)umapBuiltinCheck(m,blob.size);
     var pm=new pmtiles.PMTiles(blob?new pmtiles.FileSource(new File([blob],m.file)):url);
     return pm.getHeader().then(function(h){
       m.minZ=h.minZoom;m.maxZ=h.maxZoom;m.bytes=blob?blob.size:0;
@@ -10116,20 +10125,32 @@ function umapBuiltinOpen(m){
       return pm.getMetadata().catch(function(){return null;}).then(function(md){
       m.frame=md&&Array.isArray(md.frame)&&md.frame.length>2?md.frame:null; /* map frame [lon,lat]: only inside it is made transparent */
       m.layer=umapLayer(m,pm);
-      if(!blob&&umapKeepOn())umapBuiltinCopy(m);
+      if(!blob)umapBuiltinCopy(m); /* built-in maps are small: always keep an offline copy */
       return m;
       });
     });
   });
 }
 /* copy the built-in map into the app (offline): whole file into Cache Storage */
-function umapBuiltinCopy(m){
-  if(m.stored||m._copying||!('caches' in window))return;
+function umapBuiltinCopy(m,force){
+  if((m.stored&&!force)||m._copying||!('caches' in window)||!navigator.onLine)return Promise.resolve();
   m._copying=true;umapRender('กำลังก็อป '+m.name+' ลงเครื่อง…');
-  fetch(MAP_SITE+m.file,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();})
+  return fetch(MAP_SITE+m.file,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();})
     .then(function(b){m.file0=m.file;m.file=new File([b],m.file0);m.bytes=b.size;return umapStore(m).then(function(){m.file=m.file0;});})
     .catch(function(e){umapRender('ก็อปไม่สำเร็จ: '+((e&&e.message)||e));})
     .then(function(){m._copying=false;});
+}
+/* offline copy already in the app: if the site has a different file (new AIRAC), copy it again (used from next open) */
+function umapBuiltinCheck(m,size){
+  if(!navigator.onLine)return;
+  fetch(MAP_SITE+m.file,{method:'HEAD',cache:'no-store'}).then(function(r){
+    var n=Number(r.headers.get('content-length'))||0;
+    if(r.ok&&n&&n!==size){m.stored=false;umapBuiltinCopy(m,true);}
+  }).catch(function(){});
+}
+/* Download Map: also copy every built-in MAP (ENROUTE (AIP)) for offline */
+function umapBuiltinSaveAll(){
+  return Promise.all(userMaps.filter(function(m){return m.builtin&&!m.stored;}).map(function(m){return umapBuiltinCopy(m);}));
 }
 function umapSave(){
   try{var bi={};userMaps.forEach(function(m){if(m.builtin)bi[m.id]={on:m.on,opacity:m.opacity,stored:m.stored,bgClear:m.bgClear};});localStorage.setItem('fp-user-maps-bi',JSON.stringify(bi));}catch(e){}
@@ -10488,7 +10509,7 @@ document.getElementById('umapDelAllBtn').onclick=function(){
   mine.forEach(function(m){if(m.layer)umapGroup.removeLayer(m.layer);});
   var ids=mine.map(function(m){return m.id;});
   userMaps=userMaps.filter(function(m){return m.builtin;});umapSave();umapRender('✓ ลบ MAP ที่ import ทั้งหมดแล้ว');
-  if('caches' in window)caches.delete(UMAP_CACHE).catch(function(){});
+  if('caches' in window)caches.open(UMAP_CACHE).then(function(c){return Promise.all(ids.map(function(id){return c.delete(umapKey(id));}));}).catch(function(){});
   ids.forEach(function(id){umapIdb('readwrite',function(o){return o.delete(id);}).catch(function(){});});
 };
 /* clear map cache: drop every map file copied into the app; the list keeps the names (tap to re-open from the file) */
@@ -11653,6 +11674,9 @@ function downloadOfflineMap(){
     renderOfflineInfo('กำลังโหลดดัชนีค้นหาสถานที่…');
     return savePlaces();
   }).then(function(){
+    renderOfflineInfo('กำลังโหลด ENROUTE (AIP)…');
+    return umapBuiltinSaveAll();
+  }).then(function(){
     offlineState.busy=false;bar.classList.remove('on');
     if(!map.hasLayer(offlineBase)){map.eachLayer(function(l){if(l===sat||l===osm||l===topo)map.removeLayer(l);});offlineBase.addTo(map);}
     renderOfflineInfo();
@@ -11680,6 +11704,7 @@ function initOfflineMap(){
         if(r)return loadPlaces().then(function(){renderOfflineInfo();});
         return savePlaces();
       }).catch(function(){});
+      if(navigator.onLine)setTimeout(umapBuiltinSaveAll,3000); /* map downloaded before ENROUTE was saved with it */
       return;
     }
     return mapSrc('thailand.pmtiles').then(setOfflineSource).then(function(){offlineState.onServer=true;})
