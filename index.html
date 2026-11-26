@@ -11268,21 +11268,20 @@ function chartDbOfflineState(){
   }).catch(function(){});
 }
 function chartDbOffline(){
-  var list=(chartDbIdx&&chartDbIdx.charts)||[],btn=document.getElementById('chartDbBtn');
+  var list=(!chartLocked()&&chartDbIdx&&chartDbIdx.charts)||[],btn=document.getElementById('chartDbBtn');
   if(!list.length||!('caches' in window))return;
-  var upd=chartDbStored>=list.length;
-  btn.disabled=true;var i=0;
-  caches.open(CHART_DB_CACHE).then(function(k){
-    function next(){
-      if(i>=list.length)return;
-      var url=CHART_DB_URL+(list[i].u||list[i].f).split('/').map(encodeURIComponent).join('/');
-      document.getElementById('chartDbInfo').textContent='กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
-      return k.match(url).then(function(hit){
-        if(hit&&!upd)return;
-        return fetch(url).then(function(r){if(!r.ok)throw new Error(list[i].f+' '+r.status);return k.put(url,r);});
-      }).then(function(){i++;return next();});
-    }
-    return next();
+  /* Download / Update (SPD 26 NOV): fetch every chart fresh (past the HTTP cache); only when all arrived,
+     delete the old offline copy (stale or old-format files too) and store the new set */
+  btn.disabled=true;var got=[],i=0,inf=document.getElementById('chartDbInfo');
+  (function next(){
+    if(i>=list.length)return Promise.resolve();
+    var url=CHART_DB_URL+(list[i].u||list[i].f).split('/').map(encodeURIComponent).join('/');
+    inf.textContent='กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
+    return fetch(url,{cache:'reload'}).then(function(r){if(!r.ok)throw new Error(list[i].f+' '+r.status);got.push([url,r]);i++;return next();});
+  })().then(function(){
+    inf.textContent='กำลังบันทึก…';
+    return caches.delete(CHART_DB_CACHE).then(function(){return caches.open(CHART_DB_CACHE);})
+      .then(function(k){return Promise.all(got.map(function(x){return k.put(x[0],x[1]);}));});
   }).then(function(){if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();})
   .catch(function(e){alert('เก็บออฟไลน์ไม่สำเร็จ: '+((e&&e.message)||e));})
   .then(function(){btn.disabled=false;chartDbOfflineState();});
