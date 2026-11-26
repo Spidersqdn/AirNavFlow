@@ -843,9 +843,13 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 
 /* NAVIGATION TRACKING panel (above the elevation profile) */
 .nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
-#chartLoginDlg{border:1px solid var(--line,#888);border-radius:10px;padding:14px;max-width:320px;width:90vw;background:var(--panel,#fff);color:inherit}
-#chartLoginDlg input[type=password],#chartLoginDlg input[type=text]{width:100%;box-sizing:border-box;font-size:16px;padding:8px;margin:8px 0}
-#chartLoginDlg .dlg-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}#chartLoginErr{color:#d33;min-height:1.2em;font-size:13px}
+#chartLoginDlg{border:0;border-radius:12px;padding:24px 22px;width:min(300px,86vw);box-sizing:border-box;background:#2d3036;color:#eee;box-shadow:0 6px 24px #0009;text-align:center;font:16px sans-serif}
+#chartLoginDlg::backdrop{background:#000a}
+#chartLoginDlg .lg-ico{width:48px;height:48px;border-radius:10px}#chartLoginDlg .lg-t{font-weight:bold;font-size:18px;margin-top:6px}#chartLoginDlg .lg-s{font-size:12px;color:#aaa;margin-top:2px}
+#chartLoginDlg input[type=password]{width:100%;box-sizing:border-box;font:16px sans-serif;padding:10px;margin:14px 0 10px;border-radius:8px;border:1px solid #555;background:#1b1d21;color:#fff}
+#chartLoginDlg .dlg-btns{display:flex;gap:8px}#chartLoginDlg .dlg-btns button{flex:1;font:bold 16px sans-serif;padding:10px;border:0;border-radius:8px;cursor:pointer;height:auto}
+#chartLoginOk{background:#F2B43C;color:#111}.chart-loginbtn{flex:0 0 auto;background:#F2B43C!important;color:#111!important;font-weight:700}.chart-loginbtn[hidden]{display:none!important}#chartLoginCancel{background:#44484f;color:#eee}#chartLoginOk:disabled{opacity:.6}
+#chartLoginErr{color:#ff7b7b;font-size:14px;min-height:18px;margin-top:8px}
 .chart-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:6px 0 8px;grid-column:1/-1}
 .cb-box{position:relative;min-width:0;border:1px solid #ff8a2a;border-radius:6px;background:#2f3338;padding:7px 5px 4px;display:flex;flex-direction:column;gap:4px;--c:#ff8a2a}
 .cb-map{border-color:var(--amber);--c:var(--amber)}
@@ -2068,6 +2072,7 @@ body.panel-hidden #panelResizer{display:none}
   </div>
   </div>
   <div class="umap-btns" style="margin-top:6px">
+    <button type="button" id="chartLoginBtn" class="chart-btn chart-loginbtn" hidden title="Log in to use the charts">🔓 LOGIN</button>
     <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT CHART</button>
     <button type="button" id="chartResetBtn" class="chart-btn" style="flex:0 0 auto" title="Remove the imported chart files its georeference from the app (files on your device are not touched)">🗑 RESET</button>
   </div>
@@ -2076,12 +2081,11 @@ body.panel-hidden #panelResizer{display:none}
 </section>
 
 <dialog id="chartLoginDlg"><form method="post" action="#" autocomplete="on" id="chartLoginForm">
-  <b>🔓 LOGIN CHART</b>
+  <img class="lg-ico" src="icons/icon-192.png" alt=""><div class="lg-t">AirNavFlow</div><div class="lg-s">CHART</div>
   <input id="chartLoginUser" name="username" type="text" value="AirNavFlow" autocomplete="username" tabindex="-1" aria-hidden="true" readonly style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0;padding:0;border:0"><!-- hidden: password managers / Keychain (Face ID) save + fill under one name, like FalCon2CP -->
   <input type="password" id="chartLoginPw" name="password" autocomplete="current-password" placeholder="รหัสผ่าน">
-  <label style="font-size:13px"><input type="checkbox" id="chartLoginShow"> แสดงรหัส</label>
+  <div class="dlg-btns"><button type="button" id="chartLoginCancel">ยกเลิก</button><button type="submit" id="chartLoginOk">เข้าสู่ระบบ</button></div>
   <div id="chartLoginErr"></div>
-  <div class="dlg-btns"><button type="button" id="chartLoginCancel">CANCEL</button><button type="submit" id="chartLoginOk">LOGIN</button></div>
 </form></dialog>
 <section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
@@ -11301,7 +11305,7 @@ function chartEnc(){return chartDbIdx&&chartDbIdx.enc||null;}
 function chartLocked(){return !chartKey&&!(chartDbIdx&&!chartDbIdx.enc);}
 /* lock state changed: fill (or keep empty) every chart list */
 function chartLockChanged(){
-  var lk=chartLocked();
+  var lk=chartLocked(),lb=document.getElementById('chartLoginBtn');if(lb)lb.hidden=!(lk&&chartEnc());
   if(chartWasLocked&&!lk){chartWasLocked=false;chartDbMerge();chartRender();chartLoadSaved();chartDbOfflineState();if(typeof cbRender==='function')cbRender();}
   else if(lk&&chartEnc()&&!chartAsked){chartAsked=true;chartLoginOpen();if(chartPk())chartBio();}
 }
@@ -11400,7 +11404,6 @@ function chartBio(){
 (function(){
   var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw');
   document.getElementById('chartLoginCancel').onclick=chartLoginClose;
-  document.getElementById('chartLoginShow').onchange=function(){pw.type=this.checked?'text':'password';};
   document.getElementById('chartLoginForm').onsubmit=function(ev){
     ev.preventDefault();
     if(!pw.value){if(chartPk())chartBio();return;}
@@ -11408,6 +11411,8 @@ function chartBio(){
   };
   pw.addEventListener('input',function(){var e=chartEnc();if(e&&e.ph&&chartSha(pw.value)===e.ph)chartLoginPw(pw.value,true);});
   d.addEventListener('click',function(ev){if(!ev.target.closest('input,button,label'))chartBio();});
+  /* LOGIN button beside IMPORT CHART: log in again after CANCEL (SPD); shown only while CHART is locked */
+  document.getElementById('chartLoginBtn').onclick=function(){chartLoginOpen();if(chartPk())chartBio();};
   chartWasLocked=chartLocked();chartKeyRestore();
 })();
 /* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
