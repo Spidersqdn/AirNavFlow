@@ -843,6 +843,9 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 
 /* NAVIGATION TRACKING panel (above the elevation profile) */
 .nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
+#chartLoginDlg{border:1px solid var(--line,#888);border-radius:10px;padding:14px;max-width:320px;width:90vw;background:var(--panel,#fff);color:inherit}
+#chartLoginDlg input[type=password],#chartLoginDlg input[type=text]{width:100%;box-sizing:border-box;font-size:16px;padding:8px;margin:8px 0}
+#chartLoginDlg .dlg-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}#chartLoginErr{color:#d33;min-height:1.2em;font-size:13px}
 .chart-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:6px 0 8px;grid-column:1/-1}
 .cb-box{position:relative;min-width:0;border:1px solid #ff8a2a;border-radius:6px;background:#2f3338;padding:7px 5px 4px;display:flex;flex-direction:column;gap:4px;--c:#ff8a2a}
 .cb-map{border-color:var(--amber);--c:var(--amber)}
@@ -2072,6 +2075,14 @@ body.panel-hidden #panelResizer{display:none}
   <div class="umap-status" id="chartStatus"></div>
 </section>
 
+<dialog id="chartLoginDlg"><form method="post" action="#" autocomplete="on" id="chartLoginForm">
+  <b>🔓 LOGIN CHART</b>
+  <input id="chartLoginUser" name="username" type="text" value="AirNavFlow" autocomplete="username" tabindex="-1" aria-hidden="true" readonly style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0;padding:0;border:0"><!-- hidden: password managers / Keychain (Face ID) save + fill under one name, like FalCon2CP -->
+  <input type="password" id="chartLoginPw" name="password" autocomplete="current-password" placeholder="รหัสผ่าน">
+  <label style="font-size:13px"><input type="checkbox" id="chartLoginShow"> แสดงรหัส</label>
+  <div id="chartLoginErr"></div>
+  <div class="dlg-btns"><button type="button" id="chartLoginCancel">CANCEL</button><button type="submit" id="chartLoginOk">LOGIN</button></div>
+</form></dialog>
 <section class="umap-panel map-panel">
   <div class="umap-head">MAP</div>
   <select id="umapSel"><option value="">— ไม่แสดง —</option></select>
@@ -11145,6 +11156,7 @@ document.getElementById('chartResetBtn').onclick=function(){
   chartSetList([]);chartRender('ลบชาร์ตที่ import แล้ว');
 };
 document.getElementById('importChartBtn').onclick=function(){
+  if(chartLocked()){chartLoginOpen();return;}
   if(chartFhPend){ /* remembered files: one tap to grant read access again */
     var hs=chartFhPend,ok=[];
     hs.reduce(function(p,h){return p.then(function(){return h.requestPermission({mode:'read'}).then(function(s){if(s==='granted')ok.push(h);},function(){});});},Promise.resolve())
@@ -11167,9 +11179,10 @@ document.getElementById('importChartBtn').onclick=function(){
 var CHART_DB_URL=MAP_SITE+'charts/', CHART_DB_CACHE='fp-charts-db-v1', chartDbIdx=null;
 try{chartDbIdx=JSON.parse(localStorage.getItem('fp-charts-db-idx')||'null');}catch(e){}
 function chartDbItems(){
+  if(chartLocked())return [];
   return ((chartDbIdx&&chartDbIdx.charts)||[]).map(function(e){
     var c=chartMakeItem({key:'db:'+e.f});
-    c.db=e.f;c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
+    c.db=e.f;c.dbU=e.u||'';c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
     if(e.pages)c.pages=e.pages;
     c.geo=e.geo||null;c.ntsIdx=e.nts||null;chartDbPreset(c,chartMeta.items[c.key]?c.onMap:chartDbShow);
     return c;
@@ -11216,13 +11229,15 @@ function chartDbLoadIndex(){
     .then(function(j){
       if(!j||!Array.isArray(j.charts))return;
       chartDbIdx=j;try{localStorage.setItem('fp-charts-db-idx',JSON.stringify(j));}catch(e){}
+      chartKeyRestore();
       var had=!!chartCur();chartDbMerge();chartRender();
       if(!had)chartSelect(chartCur(),false);
       chartDbOfflineState();
     }).catch(function(){chartDbOfflineState();}); /* offline: keep the last list */
 }
 function chartDbFile(c){
-  var url=CHART_DB_URL+c.db.split('/').map(encodeURIComponent).join('/');
+  if(c.dbU&&!chartKey)return Promise.reject(new Error('🔒 LOGIN CHART ก่อน'));
+  var url=CHART_DB_URL+(c.dbU||c.db).split('/').map(encodeURIComponent).join('/');
   var cp=('caches' in window)?caches.open(CHART_DB_CACHE).then(function(k){return k.match(url);}).catch(function(){return null;}):Promise.resolve(null);
   /* a stale copy (offline cache or browser cache from before a DataBase update) has a different size than
      index.json says: fetch it again past the caches, and refresh the offline copy if there was one */
@@ -11235,13 +11250,13 @@ function chartDbFile(c){
         return r.blob();
       }).catch(function(){return b;});
     });
-  }).then(function(b){return new File([b],c.db.split('/').pop(),{lastModified:0});});
+  }).then(function(b){return c.dbU?chartDecrypt(b):b;}).then(function(b){return new File([b],c.db.split('/').pop(),{lastModified:0});});
 }
 /* offline copy of every chart in the app (only on request) */
 var chartDbStored=0;
 function chartDbOfflineState(){
   var btn=document.getElementById('chartDbBtn');if(!btn)return;
-  var list=(chartDbIdx&&chartDbIdx.charts)||[],inf=document.getElementById('chartDbInfo'),del=document.getElementById('chartDbDel');
+  var list=(!chartLocked()&&chartDbIdx&&chartDbIdx.charts)||[],inf=document.getElementById('chartDbInfo'),del=document.getElementById('chartDbDel');
   btn.disabled=del.disabled=!list.length;if(!list.length){inf.textContent=navigator.onLine?'กำลังตรวจสอบ…':'ไม่มีรายการชาร์ต';return;}
   var tot=list.reduce(function(s,e){return s+(e.bytes||0);},0),mb=function(b){return (b/1048576).toFixed(0)+' MB';};
   if(!('caches' in window)){btn.disabled=true;return;}
@@ -11260,7 +11275,7 @@ function chartDbOffline(){
   caches.open(CHART_DB_CACHE).then(function(k){
     function next(){
       if(i>=list.length)return;
-      var url=CHART_DB_URL+list[i].f.split('/').map(encodeURIComponent).join('/');
+      var url=CHART_DB_URL+(list[i].u||list[i].f).split('/').map(encodeURIComponent).join('/');
       document.getElementById('chartDbInfo').textContent='กำลังโหลด '+(i+1)+'/'+list.length+' · '+list[i].f;
       return k.match(url).then(function(hit){
         if(hit&&!upd)return;
@@ -11277,6 +11292,69 @@ document.getElementById('chartDbDel').onclick=function(){
   if(!('caches' in window)||!confirm('ลบชาร์ตในแอพที่เก็บไว้ออฟไลน์? (ยังเปิดดูออนไลน์ได้ พิกัดที่ตั้งไว้ยังอยู่)'))return;
   caches.delete(CHART_DB_CACHE).then(chartDbOfflineState);
 };
+/* ---- CHART login (SPD 26 NOV, thread "Login"): built-in charts are stored/served only as AES-256-GCM files
+   ('u' in index.json, format 'ANF1'+IV12+ciphertext). Key = PBKDF2-SHA256(password, enc.salt, enc.iter); the
+   password is checked by decrypting enc.check. Like FalCon2CP: asked on every app open, key kept in memory only
+   (nothing saved; hidden username "AirNavFlow" lets Keychain / Face ID / password manager fill it). Not logged in: no chart data at all (built-in list,
+   imported charts, offline row empty; IMPORT CHART asks for the password). No other UI change (SPD). */
+var chartKey=null,CHART_KEY_LS='fp-chart-key',chartAsked=false,chartWasLocked=true;
+function chartEnc(){return chartDbIdx&&chartDbIdx.enc||null;}
+function chartLocked(){return !chartKey&&!(chartDbIdx&&!chartDbIdx.enc);}
+/* lock state changed: fill (or keep empty) every chart list */
+function chartLockChanged(){
+  var lk=chartLocked();
+  if(chartWasLocked&&!lk){chartWasLocked=false;chartDbMerge();chartRender();chartLoadSaved();chartDbOfflineState();if(typeof cbRender==='function')cbRender();}
+  else if(lk&&chartEnc()&&!chartAsked){chartAsked=true;chartLoginOpen();}
+}
+function chartB64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+function chartOpen(key,buf){
+  var u=new Uint8Array(buf);
+  if(u.length<32||String.fromCharCode(u[0],u[1],u[2],u[3])!=='ANF1')return Promise.reject(new Error('ไฟล์ชาร์ตไม่ถูกต้อง'));
+  return crypto.subtle.decrypt({name:'AES-GCM',iv:u.slice(4,16)},key,u.slice(16));
+}
+function chartDecrypt(b){
+  return b.arrayBuffer().then(function(buf){return chartOpen(chartKey,buf);})
+    .then(function(d){return new Blob([d],{type:'application/pdf'});},function(e){throw new Error('ถอดรหัสชาร์ตไม่ได้ ('+((e&&e.message)||'รหัสผ่านเปลี่ยน?')+')');});
+}
+function chartKeyCheck(key){var e=chartEnc();return e?chartOpen(key,chartB64(e.check).buffer).then(function(){return key;}):Promise.reject(new Error('no enc'));}
+/* nothing is remembered: drop a key saved by an earlier build, then ask (index.json known) */
+function chartKeyRestore(){
+  try{localStorage.removeItem(CHART_KEY_LS);}catch(e){}
+  if(chartKey&&chartEnc())return chartKeyCheck(chartKey).catch(function(){chartKey=null;}).then(chartLockChanged);
+  chartLockChanged();return Promise.resolve();
+}
+function chartLogin(pw){
+  var e=chartEnc();
+  if(!e)return Promise.reject(new Error(navigator.onLine?'ยังโหลดรายการชาร์ตไม่ได้ ลองใหม่':'ต้องต่ออินเทอร์เน็ตครั้งแรกเพื่อ LOGIN'));
+  if(!(window.crypto&&crypto.subtle))return Promise.reject(new Error('เบราว์เซอร์นี้ไม่รองรับ'));
+  return crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey'])
+    .then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:chartB64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);})
+    .then(function(k){return chartKeyCheck(k).catch(function(){throw new Error('รหัสผ่านไม่ถูกต้อง');});})
+    .then(function(k){
+      try{if(window.PasswordCredential)navigator.credentials.store(new PasswordCredential({id:'AirNavFlow',password:pw,name:'AirNavFlow'})).catch(function(){});}catch(x){} /* Chrome/Edge save prompt */
+      chartKey=k;chartLockChanged();
+    });
+}
+function chartLoginOpen(){
+  var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw');
+  if(d.open)return;
+  pw.value='';document.getElementById('chartLoginErr').textContent='';
+  if(d.showModal)d.showModal();else d.setAttribute('open','');
+  setTimeout(function(){pw.focus();},50);
+}
+(function(){
+  var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw'),err=document.getElementById('chartLoginErr'),ok=document.getElementById('chartLoginOk');
+  var close=function(){if(d.close)d.close();else d.removeAttribute('open');};
+  document.getElementById('chartLoginCancel').onclick=close;
+  document.getElementById('chartLoginShow').onchange=function(){pw.type=this.checked?'text':'password';};
+  document.getElementById('chartLoginForm').onsubmit=function(ev){
+    ev.preventDefault();if(!pw.value)return;
+    ok.disabled=true;err.textContent='กำลังตรวจสอบ…';
+    chartLogin(pw.value).then(close,function(x){err.textContent=(x&&x.message)||String(x);})
+      .then(function(){ok.disabled=false;});
+  };
+  chartWasLocked=chartLocked();chartKeyRestore();
+})();
 /* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
    Two charts on the map at once. Each slot holds its own copy of the chart page (independent of the sidebar
    CHART box, which stays for IMPORT / VIEW / SET). Slots start empty each time the app opens (HIDE default);
@@ -11326,7 +11404,7 @@ function cbClear(k){
 /* own copy of chart page n (does not touch the sidebar chart or its saved meta) */
 function cbItem(x,n){
   var c=chartMakeItem({key:x.key,file:x.file,fh:x.fh});
-  if(x.db){c.db=x.db;c.bytesDb=x.bytesDb;c.name=x.name;c.labels=x.labels;c.geo=x.geo;c.ntsIdx=x.ntsIdx;c.pages=x.pages;}
+  if(x.db){c.db=x.db;c.dbU=x.dbU;c.bytesDb=x.bytesDb;c.name=x.name;c.labels=x.labels;c.geo=x.geo;c.ntsIdx=x.ntsIdx;c.pages=x.pages;}
   else c.pages=x.pages||c.pages;
   c.onPage=null;c.url=null;
   if(c.pages>1)chartPageMeta(c,n);else{c.page=1;if(c.db)chartDbPreset(c,true);}
@@ -11410,7 +11488,7 @@ document.getElementById('cbMapBg').onchange=function(){var u=document.getElement
 document.getElementById('cbMapShow').onchange=function(){if(this.checked)umapGroup.addTo(map);else map.removeLayer(umapGroup);};
 document.getElementById('cbMapOp').oninput=function(){var u=document.getElementById('umapOp');u.value=this.value;u.oninput.call(u);};
 cbMapRender();
-chartDbMerge();chartRender();chartLoadSaved();chartDbLoadIndex();
+chartDbMerge();chartRender();if(!chartLocked())chartLoadSaved();chartDbLoadIndex();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
