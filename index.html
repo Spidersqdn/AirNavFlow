@@ -2075,9 +2075,10 @@ body.panel-hidden #panelResizer{display:none}
   <div class="umap-status" id="chartStatus"></div>
 </section>
 
-<dialog id="chartLoginDlg"><form method="dialog" id="chartLoginForm">
+<dialog id="chartLoginDlg"><form method="post" action="#" autocomplete="on" id="chartLoginForm">
   <b>🔓 LOGIN CHART</b>
-  <input type="password" id="chartLoginPw" autocomplete="current-password" placeholder="รหัสผ่าน">
+  <input id="chartLoginUser" name="username" type="text" value="AirNavFlow" autocomplete="username" tabindex="-1" aria-hidden="true" readonly style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0;padding:0;border:0"><!-- hidden: password managers / Keychain (Face ID) save + fill under one name, like FalCon2CP -->
+  <input type="password" id="chartLoginPw" name="password" autocomplete="current-password" placeholder="รหัสผ่าน">
   <label style="font-size:13px"><input type="checkbox" id="chartLoginShow"> แสดงรหัส</label>
   <div id="chartLoginErr"></div>
   <div class="dlg-btns"><button type="button" id="chartLoginCancel">CANCEL</button><button type="submit" id="chartLoginOk">LOGIN</button></div>
@@ -11293,8 +11294,8 @@ document.getElementById('chartDbDel').onclick=function(){
 };
 /* ---- CHART login (SPD 26 NOV, thread "Login"): built-in charts are stored/served only as AES-256-GCM files
    ('u' in index.json, format 'ANF1'+IV12+ciphertext). Key = PBKDF2-SHA256(password, enc.salt, enc.iter); the
-   password is checked by decrypting enc.check. The password is asked when the app opens; logged in = key kept on
-   this device (localStorage 'fp-chart-key', works offline). Not logged in: no chart data at all (built-in list,
+   password is checked by decrypting enc.check. Like FalCon2CP: asked on every app open, key kept in memory only
+   (nothing saved; hidden username "AirNavFlow" lets Keychain / Face ID / password manager fill it). Not logged in: no chart data at all (built-in list,
    imported charts, offline row empty; IMPORT CHART asks for the password). No other UI change (SPD). */
 var chartKey=null,CHART_KEY_LS='fp-chart-key',chartAsked=false,chartWasLocked=true;
 function chartEnc(){return chartDbIdx&&chartDbIdx.enc||null;}
@@ -11316,26 +11317,23 @@ function chartDecrypt(b){
     .then(function(d){return new Blob([d],{type:'application/pdf'});},function(e){throw new Error('ถอดรหัสชาร์ตไม่ได้ ('+((e&&e.message)||'รหัสผ่านเปลี่ยน?')+')');});
 }
 function chartKeyCheck(key){var e=chartEnc();return e?chartOpen(key,chartB64(e.check).buffer).then(function(){return key;}):Promise.reject(new Error('no enc'));}
-/* saved key: still valid for the current index.json? (password changed -> asked again) */
+/* nothing is remembered: drop a key saved by an earlier build, then ask (index.json known) */
 function chartKeyRestore(){
-  var raw=null;try{raw=localStorage.getItem(CHART_KEY_LS);}catch(e){}
-  if(!raw||!chartEnc()||!(window.crypto&&crypto.subtle)){chartKey=null;chartLockChanged();return Promise.resolve();}
-  return crypto.subtle.importKey('raw',chartB64(raw),{name:'AES-GCM'},false,['decrypt']).then(chartKeyCheck)
-    .then(function(k){chartKey=k;},function(){chartKey=null;})
-    .then(chartLockChanged);
+  try{localStorage.removeItem(CHART_KEY_LS);}catch(e){}
+  if(chartKey&&chartEnc())return chartKeyCheck(chartKey).catch(function(){chartKey=null;}).then(chartLockChanged);
+  chartLockChanged();return Promise.resolve();
 }
 function chartLogin(pw){
   var e=chartEnc();
   if(!e)return Promise.reject(new Error(navigator.onLine?'ยังโหลดรายการชาร์ตไม่ได้ ลองใหม่':'ต้องต่ออินเทอร์เน็ตครั้งแรกเพื่อ LOGIN'));
   if(!(window.crypto&&crypto.subtle))return Promise.reject(new Error('เบราว์เซอร์นี้ไม่รองรับ'));
   return crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey'])
-    .then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:chartB64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['decrypt']);})
+    .then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:chartB64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);})
     .then(function(k){return chartKeyCheck(k).catch(function(){throw new Error('รหัสผ่านไม่ถูกต้อง');});})
-    .then(function(k){return crypto.subtle.exportKey('raw',k).then(function(raw){
-      var s='',u=new Uint8Array(raw);for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);
-      try{localStorage.setItem(CHART_KEY_LS,btoa(s));}catch(x){}
+    .then(function(k){
+      try{if(window.PasswordCredential)navigator.credentials.store(new PasswordCredential({id:'AirNavFlow',password:pw,name:'AirNavFlow'})).catch(function(){});}catch(x){} /* Chrome/Edge save prompt */
       chartKey=k;chartLockChanged();
-    });});
+    });
 }
 function chartLoginOpen(){
   var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw');
