@@ -53,6 +53,9 @@ KM/                   knowledge notes; start at KM/README.md
 - Offline place search: index used only when offline AND map downloaded. Online search =
   ICAO -> Nominatim; index only as backup.
 - Copyright caution: repos are public (charts, AIP).
+- CHART login (v178): built-in charts are stored + served only encrypted (`<file>.enc`, AES-256-GCM,
+  key = PBKDF2(password, index.json `enc`)). Password = DataBase secret CHART_KEY. Logged out = all CHART
+  controls hidden; key kept per device (`fp-chart-key`) until 🔒 LOGOUT.
 
 ## 4. Deploy and automation (all GitHub Actions, no AI needed)
 | Workflow | Repo | When | Does |
