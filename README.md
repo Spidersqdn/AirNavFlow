@@ -44,7 +44,7 @@
 - **MINI MAP**: ภาพ PNG ขนาด A4 มีเส้นชั้นความสูง, ตราฝูง 201, กล่องข้อมูลแต่ละจุด, สนามบินใกล้เคียง, กราฟ profile และกล่อง DIST/FT
 - **MSN CARD**: ภาพ PNG Pilot Mission Data Card (มีคอลัมน์ ELEV, FUEL เริ่มต้น 2200)
 - **SLIDE**: ภาพ PNG 16:9 "MISSION OVERVIEW" บนภาพดาวเทียม ฟอนต์ TH SarabunPSK แก้ข้อความได้ก่อนบันทึก
-- **WINDY**: เปิด Windy ที่จุด DEPARTURE | MidWay | DESTINATION
+- **NOTAM**: สไลด์ NOTAM 16:9 ตามเส้นทางหลัก + สำรอง (ระยะค้นหาตั้งได้ ค่าเริ่มต้น 10 NM) ส่งออก PDF / PPT / แชร์
 - **EXPORT / IMPORT**: KMZ / KML / GPX / CSV (เปิดกับ Google Earth ได้)
   - Export มี 3 แบบ: 1 ทั้งหมด / 2 เฉพาะในรัศมี 20 NM / 3 FalCon2CP
 - **GPS TRACK**: แสดงตำแหน่งและบันทึกเส้นทางที่บินจริง
