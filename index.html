@@ -11303,7 +11303,7 @@ function chartLocked(){return !chartKey&&!(chartDbIdx&&!chartDbIdx.enc);}
 function chartLockChanged(){
   var lk=chartLocked();
   if(chartWasLocked&&!lk){chartWasLocked=false;chartDbMerge();chartRender();chartLoadSaved();chartDbOfflineState();if(typeof cbRender==='function')cbRender();}
-  else if(lk&&chartEnc()&&!chartAsked){chartAsked=true;chartLoginOpen();}
+  else if(lk&&chartEnc()&&!chartAsked){chartAsked=true;chartLoginOpen();if(chartPk())chartBio();}
 }
 function chartB64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
 function chartOpen(key,buf){
@@ -11327,11 +11327,11 @@ function chartLogin(pw){
   if(!e)return Promise.reject(new Error(navigator.onLine?'ยังโหลดรายการชาร์ตไม่ได้ ลองใหม่':'ต้องต่ออินเทอร์เน็ตครั้งแรกเพื่อ LOGIN'));
   if(!(window.crypto&&crypto.subtle))return Promise.reject(new Error('เบราว์เซอร์นี้ไม่รองรับ'));
   return crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey'])
-    .then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:chartB64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);})
+    .then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:chartB64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['decrypt']);})
     .then(function(k){return chartKeyCheck(k).catch(function(){throw new Error('รหัสผ่านไม่ถูกต้อง');});})
     .then(function(k){
       try{if(window.PasswordCredential)navigator.credentials.store(new PasswordCredential({id:'AirNavFlow',password:pw,name:'AirNavFlow'})).catch(function(){});}catch(x){} /* Chrome/Edge save prompt */
-      chartKey=k;chartLockChanged();
+      chartKey=k;chartLockChanged();return k;
     });
 }
 function chartLoginOpen(){
@@ -11341,17 +11341,73 @@ function chartLoginOpen(){
   if(d.showModal)d.showModal();else d.setAttribute('open','');
   setTimeout(function(){pw.focus();},50);
 }
+/* FalCon2CP-style fast paths (SPD 26 NOV, LOGIN_HANDOFF): typing the right password logs in at once (SHA-256 vs
+   index.json enc.ph, also when Keychain fills it); after the first password login the device registers a local passkey
+   (WebAuthn, Face ID / fingerprint) and later opens ask for it right away. The chart key is kept on the device only
+   together with that passkey ('fp-chart-pk': id + key + enc.check; password change = register again). */
+function chartSha(m){ /* SHA-256 hex, pure JS (sync, so a passkey can be created inside the tap) */
+  var K=[],H=[],n=2,c=0,fr=function(x){return (x-Math.floor(x))*4294967296|0;};
+  while(c<64){var p=1;for(var i=2;i*i<=n;i++)if(n%i==0){p=0;break;}if(p){if(c<8)H[c]=fr(Math.pow(n,1/2));K[c++]=fr(Math.pow(n,1/3));}n++;}
+  var b=Array.prototype.slice.call(new TextEncoder().encode(m)),l=b.length*8;b.push(128);while(b.length%64!=56)b.push(0);
+  for(i=7;i>=0;i--)b.push(i>3?0:(l>>>(i*8))&255);
+  var r=function(x,y){return x>>>y|x<<(32-y);};
+  for(var o=0;o<b.length;o+=64){var w=[];for(i=0;i<64;i++){if(i<16)w[i]=b[o+i*4]<<24|b[o+i*4+1]<<16|b[o+i*4+2]<<8|b[o+i*4+3];
+    else{var x1=w[i-15],x2=w[i-2];w[i]=(w[i-16]+(r(x1,7)^r(x1,18)^x1>>>3)+w[i-7]+(r(x2,17)^r(x2,19)^x2>>>10))|0;}}
+    var A=H[0],B=H[1],C=H[2],D=H[3],E=H[4],F=H[5],G=H[6],HH=H[7];
+    for(i=0;i<64;i++){var t1=HH+(r(E,6)^r(E,11)^r(E,25))+(E&F^~E&G)+K[i]+w[i]|0,t2=(r(A,2)^r(A,13)^r(A,22))+(A&B^A&C^B&C)|0;
+      HH=G;G=F;F=E;E=D+t1|0;D=C;C=B;B=A;A=t1+t2|0;}
+    [A,B,C,D,E,F,G,HH].forEach(function(v,j){H[j]=H[j]+v|0;});}
+  return H.map(function(v){return ('0000000'+(v>>>0).toString(16)).slice(-8);}).join('');
+}
+var CHART_PK='fp-chart-pk',chartBusy=false;
+function chartRnd(n){return crypto.getRandomValues(new Uint8Array(n));}
+function chartToB64(buf){var s2='',u=new Uint8Array(buf);for(var i=0;i<u.length;i++)s2+=String.fromCharCode(u[i]);return btoa(s2);}
+function chartPk(){var e=chartEnc();if(!e||!window.PublicKeyCredential)return null;try{var o=JSON.parse(localStorage.getItem(CHART_PK)||'null');return o&&o.h===e.check?o:null;}catch(x){return null;}}
+function chartLoginClose(){var d=document.getElementById('chartLoginDlg');if(d.close)d.close();else d.removeAttribute('open');}
+/* password path; started inside the user's tap / typing so the passkey prompt is allowed */
+function chartLoginPw(pw,quiet){
+  var e=chartEnc(),err=document.getElementById('chartLoginErr'),ok=document.getElementById('chartLoginOk');
+  if(chartBusy||!chartLocked())return;
+  if(e&&e.ph&&chartSha(pw)!==e.ph){if(!quiet){err.textContent='รหัสผ่านไม่ถูกต้อง';document.getElementById('chartLoginPw').select();}return;}
+  var mk=null;
+  if(e&&e.ph&&!chartPk()&&window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create&&window.isSecureContext)try{
+    mk=navigator.credentials.create({publicKey:{rp:{name:'AirNavFlow'},user:{id:chartRnd(16),name:'AirNavFlow CHART',displayName:'AirNavFlow CHART'},challenge:chartRnd(32),
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],timeout:60000,
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'}}}).catch(function(){return null;});
+  }catch(x){mk=null;}
+  chartBusy=true;ok.disabled=true;err.textContent='กำลังตรวจสอบ…';
+  chartLogin(pw).then(function(k){
+    err.textContent='';chartLoginClose();
+    if(mk)Promise.all([mk,crypto.subtle.exportKey('raw',k)]).then(function(v){
+      if(v[0])try{localStorage.setItem(CHART_PK,JSON.stringify({id:chartToB64(v[0].rawId),k:chartToB64(v[1]),h:chartEnc().check}));}catch(x){}
+    }).catch(function(){});
+  },function(x){if(!quiet)err.textContent=(x&&x.message)||String(x);})
+  .then(function(){chartBusy=false;ok.disabled=false;});
+}
+/* Face ID / fingerprint path */
+function chartBio(){
+  var pk=chartPk(),err=document.getElementById('chartLoginErr');
+  if(!pk||chartBusy||!chartLocked())return;chartBusy=true;err.textContent='';
+  navigator.credentials.get({publicKey:{challenge:chartRnd(32),allowCredentials:[{type:'public-key',id:chartB64(pk.id),transports:['internal','hybrid']}],userVerification:'required',timeout:60000}})
+    .then(function(c){
+      if(!c)throw new Error('cancel');
+      return crypto.subtle.importKey('raw',chartB64(pk.k),{name:'AES-GCM'},false,['decrypt']).then(chartKeyCheck)
+        .then(function(k){chartKey=k;chartLoginClose();chartLockChanged();});
+    })
+    .catch(function(){err.textContent='กด LOGIN (ช่องรหัสว่าง) เพื่อสแกนหน้า/นิ้ว หรือพิมพ์รหัส';})
+    .then(function(){chartBusy=false;});
+}
 (function(){
-  var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw'),err=document.getElementById('chartLoginErr'),ok=document.getElementById('chartLoginOk');
-  var close=function(){if(d.close)d.close();else d.removeAttribute('open');};
-  document.getElementById('chartLoginCancel').onclick=close;
+  var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw');
+  document.getElementById('chartLoginCancel').onclick=chartLoginClose;
   document.getElementById('chartLoginShow').onchange=function(){pw.type=this.checked?'text':'password';};
   document.getElementById('chartLoginForm').onsubmit=function(ev){
-    ev.preventDefault();if(!pw.value)return;
-    ok.disabled=true;err.textContent='กำลังตรวจสอบ…';
-    chartLogin(pw.value).then(close,function(x){err.textContent=(x&&x.message)||String(x);})
-      .then(function(){ok.disabled=false;});
+    ev.preventDefault();
+    if(!pw.value){if(chartPk())chartBio();return;}
+    chartLoginPw(pw.value,false);
   };
+  pw.addEventListener('input',function(){var e=chartEnc();if(e&&e.ph&&chartSha(pw.value)===e.ph)chartLoginPw(pw.value,true);});
+  d.addEventListener('click',function(ev){if(!ev.target.closest('input,button,label'))chartBio();});
   chartWasLocked=chartLocked();chartKeyRestore();
 })();
 /* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
