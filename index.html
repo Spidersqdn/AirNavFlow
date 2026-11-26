@@ -843,11 +843,6 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 
 /* NAVIGATION TRACKING panel (above the elevation profile) */
 .nav-track{padding:10px 18px 12px;border-bottom:1px solid var(--line);background:#383d43}
-.chart-login{display:none;margin:6px 0}.chart-login small{display:block;color:var(--mute);margin-top:4px}
-.chart-locked .chart-panel>:not(.umap-head):not(.chart-login){display:none!important}.chart-locked .chart-login{display:block}
-.chart-lockbtn{float:right;font-size:11px;padding:2px 8px;margin:-2px 0}.chart-locked .chart-lockbtn{display:none}
-.cb-box .cb-lock{display:none;width:100%!important;height:auto!important;flex:1 1 auto;min-height:30px;font-size:12px!important;font-weight:700;white-space:nowrap;padding:2px 4px}.chart-locked .cb-chart>:not(.cb-lock){display:none!important}.chart-locked .cb-box .cb-lock{display:block}
-.chart-locked .off-chart{display:none!important}
 #chartLoginDlg{border:1px solid var(--line,#888);border-radius:10px;padding:14px;max-width:320px;width:90vw;background:var(--panel,#fff);color:inherit}
 #chartLoginDlg input[type=password],#chartLoginDlg input[type=text]{width:100%;box-sizing:border-box;font-size:16px;padding:8px;margin:8px 0}
 #chartLoginDlg .dlg-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}#chartLoginErr{color:#d33;min-height:1.2em;font-size:13px}
@@ -2038,8 +2033,7 @@ body.panel-hidden #panelResizer{display:none}
 </section>
 
 <section class="umap-panel chart-panel">
-  <div class="umap-head">CHART<button type="button" id="chartLogoutBtn" class="chart-lockbtn" title="Log out of CHART on this device">🔒 LOGOUT</button></div>
-  <div class="chart-login"><button type="button" id="chartLoginBtn" class="umap-import chart-import" title="Enter the CHART password">🔓 LOGIN CHART</button><small>ต้องใส่รหัสผ่านก่อนใช้ CHART</small></div>
+  <div class="umap-head">CHART</div>
   <div class="chart-sec">
     <div class="chart-sub">DEP CHART</div>
     <div class="chart-selrow"><select id="chDepSel" class="ch-sel"></select><span class="ch-pg"><button type="button" id="chDepPrev" title="Previous page / chart">◀</button><span id="chDepPg"></span><button type="button" id="chDepNext" title="Next page / chart">▶</button></span></div>
@@ -2119,7 +2113,7 @@ body.panel-hidden #panelResizer{display:none}
   <div class="off-row"><span class="off-name">TERRAIN</span><span class="offline-info" id="elevInfo">…</span><button type="button" id="elevDl">Download</button><button type="button" id="elevDel">ลบ</button></div>
   <div class="offline-bar" id="elevBar"><div></div></div>
   <div class="off-row"><span class="off-name">ENROUTE</span><span class="offline-info" id="enrInfo">…</span><button type="button" id="umapEnrBtn" title="Download the ENROUTE (AIP) chart for offline use">Download</button><button type="button" id="umapEnrDel">ลบ</button></div>
-  <div class="off-row off-chart"><span class="off-name">CHART</span><span class="offline-info" id="chartDbInfo">…</span><button type="button" id="chartDbBtn" title="Download the charts built into the app for offline use">Download</button><button type="button" id="chartDbDel">ลบ</button></div>
+  <div class="off-row"><span class="off-name">CHART</span><span class="offline-info" id="chartDbInfo">…</span><button type="button" id="chartDbBtn" title="Download the charts built into the app for offline use">Download</button><button type="button" id="chartDbDel">ลบ</button></div>
 </section>
 
 
@@ -11161,6 +11155,7 @@ document.getElementById('chartResetBtn').onclick=function(){
   chartSetList([]);chartRender('ลบชาร์ตที่ import แล้ว');
 };
 document.getElementById('importChartBtn').onclick=function(){
+  if(chartLocked()){chartLoginOpen();return;}
   if(chartFhPend){ /* remembered files: one tap to grant read access again */
     var hs=chartFhPend,ok=[];
     hs.reduce(function(p,h){return p.then(function(){return h.requestPermission({mode:'read'}).then(function(s){if(s==='granted')ok.push(h);},function(){});});},Promise.resolve())
@@ -11183,6 +11178,7 @@ document.getElementById('importChartBtn').onclick=function(){
 var CHART_DB_URL=MAP_SITE+'charts/', CHART_DB_CACHE='fp-charts-db-v1', chartDbIdx=null;
 try{chartDbIdx=JSON.parse(localStorage.getItem('fp-charts-db-idx')||'null');}catch(e){}
 function chartDbItems(){
+  if(chartLocked())return [];
   return ((chartDbIdx&&chartDbIdx.charts)||[]).map(function(e){
     var c=chartMakeItem({key:'db:'+e.f});
     c.db=e.f;c.dbU=e.u||'';c.name=e.f.replace(CHART_RE,'');c.bytesDb=e.bytes||0;c.labels=e.labels||null;
@@ -11259,7 +11255,7 @@ function chartDbFile(c){
 var chartDbStored=0;
 function chartDbOfflineState(){
   var btn=document.getElementById('chartDbBtn');if(!btn)return;
-  var list=(chartDbIdx&&chartDbIdx.charts)||[],inf=document.getElementById('chartDbInfo'),del=document.getElementById('chartDbDel');
+  var list=(!chartLocked()&&chartDbIdx&&chartDbIdx.charts)||[],inf=document.getElementById('chartDbInfo'),del=document.getElementById('chartDbDel');
   btn.disabled=del.disabled=!list.length;if(!list.length){inf.textContent=navigator.onLine?'กำลังตรวจสอบ…':'ไม่มีรายการชาร์ต';return;}
   var tot=list.reduce(function(s,e){return s+(e.bytes||0);},0),mb=function(b){return (b/1048576).toFixed(0)+' MB';};
   if(!('caches' in window)){btn.disabled=true;return;}
@@ -11297,11 +11293,18 @@ document.getElementById('chartDbDel').onclick=function(){
 };
 /* ---- CHART login (SPD 26 NOV, thread "Login"): built-in charts are stored/served only as AES-256-GCM files
    ('u' in index.json, format 'ANF1'+IV12+ciphertext). Key = PBKDF2-SHA256(password, enc.salt, enc.iter); the
-   password is checked by decrypting enc.check. Logged in = key kept on this device (localStorage 'fp-chart-key',
-   works offline) until 🔒 LOGOUT. While logged out every CHART control (sidebar, DEP/ARR bar, offline row) is hidden. */
-var chartKey=null,CHART_KEY_LS='fp-chart-key';
+   password is checked by decrypting enc.check. The password is asked when the app opens; logged in = key kept on
+   this device (localStorage 'fp-chart-key', works offline). Not logged in: no chart data at all (built-in list,
+   imported charts, offline row empty; IMPORT CHART asks for the password). No other UI change (SPD). */
+var chartKey=null,CHART_KEY_LS='fp-chart-key',chartAsked=false,chartWasLocked=true;
 function chartEnc(){return chartDbIdx&&chartDbIdx.enc||null;}
-function chartLockUi(){document.body.classList.toggle('chart-locked',!chartKey&&!(chartDbIdx&&!chartDbIdx.enc));}
+function chartLocked(){return !chartKey&&!(chartDbIdx&&!chartDbIdx.enc);}
+/* lock state changed: fill (or keep empty) every chart list */
+function chartLockChanged(){
+  var lk=chartLocked();
+  if(chartWasLocked&&!lk){chartWasLocked=false;chartDbMerge();chartRender();chartLoadSaved();chartDbOfflineState();if(typeof cbRender==='function')cbRender();}
+  else if(lk&&chartEnc()&&!chartAsked){chartAsked=true;chartLoginOpen();}
+}
 function chartB64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
 function chartOpen(key,buf){
   var u=new Uint8Array(buf);
@@ -11313,13 +11316,13 @@ function chartDecrypt(b){
     .then(function(d){return new Blob([d],{type:'application/pdf'});},function(e){throw new Error('ถอดรหัสชาร์ตไม่ได้ ('+((e&&e.message)||'รหัสผ่านเปลี่ยน?')+')');});
 }
 function chartKeyCheck(key){var e=chartEnc();return e?chartOpen(key,chartB64(e.check).buffer).then(function(){return key;}):Promise.reject(new Error('no enc'));}
-/* saved key: still valid for the current index.json? (password changed -> logged out) */
+/* saved key: still valid for the current index.json? (password changed -> asked again) */
 function chartKeyRestore(){
   var raw=null;try{raw=localStorage.getItem(CHART_KEY_LS);}catch(e){}
-  if(!raw||!chartEnc()||!(window.crypto&&crypto.subtle)){chartKey=null;chartLockUi();return Promise.resolve();}
+  if(!raw||!chartEnc()||!(window.crypto&&crypto.subtle)){chartKey=null;chartLockChanged();return Promise.resolve();}
   return crypto.subtle.importKey('raw',chartB64(raw),{name:'AES-GCM'},false,['decrypt']).then(chartKeyCheck)
     .then(function(k){chartKey=k;},function(){chartKey=null;})
-    .then(chartLockUi);
+    .then(chartLockChanged);
 }
 function chartLogin(pw){
   var e=chartEnc();
@@ -11331,11 +11334,12 @@ function chartLogin(pw){
     .then(function(k){return crypto.subtle.exportKey('raw',k).then(function(raw){
       var s='',u=new Uint8Array(raw);for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);
       try{localStorage.setItem(CHART_KEY_LS,btoa(s));}catch(x){}
-      chartKey=k;chartLockUi();
+      chartKey=k;chartLockChanged();
     });});
 }
 function chartLoginOpen(){
   var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw');
+  if(d.open)return;
   pw.value='';document.getElementById('chartLoginErr').textContent='';
   if(d.showModal)d.showModal();else d.setAttribute('open','');
   setTimeout(function(){pw.focus();},50);
@@ -11343,25 +11347,15 @@ function chartLoginOpen(){
 (function(){
   var d=document.getElementById('chartLoginDlg'),pw=document.getElementById('chartLoginPw'),err=document.getElementById('chartLoginErr'),ok=document.getElementById('chartLoginOk');
   var close=function(){if(d.close)d.close();else d.removeAttribute('open');};
-  document.getElementById('chartLoginBtn').onclick=chartLoginOpen;
   document.getElementById('chartLoginCancel').onclick=close;
   document.getElementById('chartLoginShow').onchange=function(){pw.type=this.checked?'text':'password';};
   document.getElementById('chartLoginForm').onsubmit=function(ev){
     ev.preventDefault();if(!pw.value)return;
     ok.disabled=true;err.textContent='กำลังตรวจสอบ…';
-    chartLogin(pw.value).then(function(){close();chartDbOfflineState();},function(x){err.textContent=(x&&x.message)||String(x);})
+    chartLogin(pw.value).then(close,function(x){err.textContent=(x&&x.message)||String(x);})
       .then(function(){ok.disabled=false;});
   };
-  document.getElementById('chartLogoutBtn').onclick=function(){
-    if(!confirm('LOGOUT CHART บนเครื่องนี้? (ต้องใส่รหัสผ่านใหม่เพื่อใช้ชาร์ต)'))return;
-    try{localStorage.removeItem(CHART_KEY_LS);}catch(x){}
-    location.reload();
-  };
-  document.querySelectorAll('#chartBar .cb-chart').forEach(function(b){
-    var x=document.createElement('button');x.type='button';x.className='cb-lock';x.textContent='🔒 LOGIN';
-    x.onclick=chartLoginOpen;b.appendChild(x);
-  });
-  chartLockUi();chartKeyRestore();
+  chartWasLocked=chartLocked();chartKeyRestore();
 })();
 /* ---- bottom bar (above NAVIGATION TRACKING): DEP Charts | MAP+ENROUTE | ARR Charts (SPD 25 NOV).
    Two charts on the map at once. Each slot holds its own copy of the chart page (independent of the sidebar
@@ -11496,7 +11490,7 @@ document.getElementById('cbMapBg').onchange=function(){var u=document.getElement
 document.getElementById('cbMapShow').onchange=function(){if(this.checked)umapGroup.addTo(map);else map.removeLayer(umapGroup);};
 document.getElementById('cbMapOp').oninput=function(){var u=document.getElementById('umapOp');u.value=this.value;u.oninput.call(u);};
 cbMapRender();
-chartDbMerge();chartRender();chartLoadSaved();chartDbLoadIndex();
+chartDbMerge();chartRender();if(!chartLocked())chartLoadSaved();chartDbLoadIndex();
 
 document.getElementById('exportKmz').onclick=exportRouteKmz;
 document.getElementById('importKmz').onclick=function(){document.getElementById('importKmzFile').click();};
