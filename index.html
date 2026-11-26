@@ -9797,7 +9797,7 @@ function nsBuild(f,prog){
     slides.forEach(function(s,i){p=p.then(function(){
       if(prog)prog(i+1,slides.length);
       var v=s.view;
-      return (v.ov?nsMapAt(R.main.concat(R.alt),[],''):nsMapAt(nsFit(v.x),[v.x],v.x.n.listOnly?'ครอบคลุมทั้ง FIR':'')).then(function(m){
+      return (v.ov?nsMapAt(R.main.concat(R.alt),list,''):nsMapAt(nsFit(v.x),[v.x],v.x.n.listOnly?'ครอบคลุมทั้ง FIR':'')).then(function(m){
         s.mapCv=m;
         var c=nsDraw(s,i,slides.length,f,list,bg,m,false,FS,FONT);out.full.push(c.toDataURL('image/jpeg',0.88));
         c=nsDraw(s,i,slides.length,f,list,bg,m,true,FS,FONT);out.bare.push(c.toDataURL('image/jpeg',0.88));
