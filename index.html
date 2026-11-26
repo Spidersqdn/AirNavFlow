@@ -2072,8 +2072,8 @@ body.panel-hidden #panelResizer{display:none}
   </div>
   </div>
   <div class="umap-btns" style="margin-top:6px">
-    <button type="button" id="chartLoginBtn" class="chart-btn chart-loginbtn" hidden title="Password: open the charts built into the app (ชาร์ตในแอพ)">🔓 OPEN CHART</button>
-    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT CHART</button>
+    <button type="button" id="chartLoginBtn" class="chart-btn chart-loginbtn" hidden title="Password: open the charts built into the app (ชาร์ตในแอพ)">🔓 LOGIN</button>
+    <button type="button" id="importChartBtn" class="umap-import chart-import" title="Choose chart files (PNG/JPG/PDF). Files are read in place, nothing is copied into the app">📄 IMPORT</button>
     <button type="button" id="chartResetBtn" class="chart-btn" style="flex:0 0 auto" title="Remove the imported chart files its georeference from the app (files on your device are not touched)">🗑 RESET</button>
   </div>
   <input id="importChartFile" type="file" multiple accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp,.pdf,application/pdf" hidden>
@@ -10909,7 +10909,7 @@ function chartRender(status){
     document.getElementById('chartPgPrev').disabled=c.page<=1;document.getElementById('chartPgNext').disabled=c.page>=c.pages;}
   document.getElementById('chartGeoBtn').disabled=!c;
   document.getElementById('chartResetBtn').disabled=!(pend||fol.length);
-  document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN CHARTs ('+chartFhPend.length+')':'📄 IMPORT CHART';
+  document.getElementById('importChartBtn').textContent=pend?'🔓 OPEN CHARTs ('+chartFhPend.length+')':'📄 IMPORT';
   var cb=document.getElementById('chartOnMap');cb.disabled=!geo;cb.checked=geo&&!c.onMap; /* HIDE CHARTs: ticked = not on the map */
   document.getElementById('chartRow').hidden=!(geo&&c.onMap);
   if(c)document.getElementById('chartOp').value=c.opacity;
