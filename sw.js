@@ -4,7 +4,7 @@
    - Province borders / fonts: stale-while-revalidate
    - lib/ (pdf.js, 1.4 MB): fetched once into its own cache, kept across app versions
    - map/*.pmtiles is NOT handled here: the app stores it in its own cache ('fp-offline-map-v1') */
-var APP_CACHE='fp-app-v176';
+var APP_CACHE='fp-app-v177';
 var RUNTIME_CACHE='fp-runtime-v1';
 var LIB_CACHE='fp-lib-v1';   /* rename when a file in lib/ is replaced */
 var LIB=['lib/pdf.min.js','lib/pdf.worker.min.js'];
@@ -42,6 +42,7 @@ self.addEventListener('fetch',function(e){
     if(/\/notam\//.test(url.pathname))return;   // daily NOTAM file: always from network (app keeps its own offline copy)
     if(/\/data\//.test(url.pathname))return;    // data/*.txt (มทบ., CSAR, ผบ.ฝูง): same, app keeps its own offline copy
     if(/\/DataBase\/CoWork\//.test(url.pathname))return;   // shared AD/RWY/สนามบิน ทบ. + places.json (DataBase repo): app keeps its own offline copy
+    if(/\/DataBase\/AirNavFlow\/charts\//.test(url.pathname))return;   // built-in charts: app checks size vs index.json, keeps its own offline copy (fp-charts-db-v1)
     if(req.mode==='navigate'){
       e.respondWith(fetch(req).then(function(res){
         if(res.ok&&/(\/|index\.html)$/.test(url.pathname)){   /* never store an error page (404 / 5xx) as the offline app shell */
