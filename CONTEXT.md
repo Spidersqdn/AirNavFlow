@@ -103,7 +103,7 @@ KM/                   knowledge notes; start at KM/README.md
   ย้ายกล่อง mode moves + resizes boxes. Prefs in `fp-mm-*` keys.
 - **MSN CARD:** PNG Pilot Mission Data Card, ELEV column, FUEL default 2200, IAS/FUEL card-only.
 - **SLIDE:** 16:9 MISSION OVERVIEW on satellite, TH SarabunPSK, editable fields, PNG + PPT.
-- **NOTAM (replaced WINDY, v184):** 16:9 NOTAM slides for main + alternate route; NOTAM_DB active at chosen time (B)..C), default now, v185), area edge ≤ buf NM (default 10, form) of any leg; FIR-wide optional; untick list (fp-notam-slide-v1). Slide 1 map + list, then full-text cards. PDF 960x540 pt (mmPdfBlob pw/ph) / PPT (picture + editable text) / แชร์.
+- **NOTAM (replaced WINDY, v184):** 16:9 NOTAM slides for main + alternate route; NOTAM_DB active at chosen time (B)..C), default now, v185), area edge or A) aerodrome ≤ buf NM (default 20, v186) of any leg; FIR-wide optional; untick list (fp-notam-slide-v1). Slide 1 map + list, then full-text cards. PDF 960x540 pt (mmPdfBlob pw/ph) / PPT (picture + editable text) / แชร์.
 - **EXPORT/IMPORT:** KMZ / KML / GPX / CSV; export 1 All / 2 within 20 NM / 3 FalCon2CP.
 - **MAP box** (yellow): IMPORT MAP (user .pmtiles/PDF/image overlay, opacity inside frame only),
   built-in "ENROUTE (AIP)", row VIEW | SET MAP | SHOW MAP (replaced HIDE ENROUTE), opacity slider,

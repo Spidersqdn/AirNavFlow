@@ -9568,7 +9568,7 @@ function slPptxBlob(f){
    NOTAM = Imported NOTAM (NOTAM_DB), not expired, area edge within "buf" NM of any leg (default 10, editable).
    FIR-wide NOTAMs (list-only) only when ticked. Export PDF (16:9 pages) / PPT (picture + editable text boxes, TH SarabunPSK). ---- */
 var NS_KEY='fp-notam-slide-v1';
-function nsLoad(){var o={};try{o=JSON.parse(localStorage.getItem(NS_KEY)||'{}')||{};}catch(e){}if(!o.buf)o.buf='10';if(!Array.isArray(o.off))o.off=[];return o;}
+function nsLoad(){var o={};try{o=JSON.parse(localStorage.getItem(NS_KEY)||'{}')||{};}catch(e){}if(!o.buf||o.v!==2){o.buf='20';o.v=2;}   /* SPD 26 NOV: default 20 NM */if(!Array.isArray(o.off))o.off=[];return o;}
 function nsSave(o){try{localStorage.setItem(NS_KEY,JSON.stringify(o));}catch(e){}}
 function nsRoutes(){
   var ok=function(p){return p&&isFinite(p.lat)&&isFinite(p.lng);};
@@ -9587,13 +9587,17 @@ function nsActive(n,t){   /* SPD: only NOTAMs active at that time: B) <= t <= C)
   return (!b||b<=t)&&(!n.endMs||t<=n.endMs);
 }
 function nsMatch(f){
-  var buf=Math.max(0,parseFloat(f.buf)),R=nsRoutes(),out=[],at=nsAt(f);if(!isFinite(buf))buf=10;
+  var buf=Math.max(0,parseFloat(f.buf)),R=nsRoutes(),out=[],at=nsAt(f);if(!isFinite(buf))buf=20;
   (typeof NOTAM_DB!=='undefined'?NOTAM_DB:[]).forEach(function(n){
     if(!nsActive(n,at)||!isFinite(n.lat)||!isFinite(n.lng))return;
-    if(n.listOnly){if(f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>0,dm:0,da:0,d:0});return;}
-    var r=n.radiusNM||0,dm=Math.max(0,nsDist(n,R.main)-r),da=Math.max(0,nsDist(n,R.alt)-r);
+    /* SPD: include aerodrome NOTAMs: A) airport within buf NM of a route */
+    var ads=(notamField(n.text||'','A','B|C|D|E|F|G|Q').toUpperCase().match(/\b[A-Z]{4}\b/g)||[]).filter(function(id){return APX[id];}),adm=Infinity,ada=Infinity,adId='';
+    ads.forEach(function(id){var q={lat:APX[id][4],lng:APX[id][5]},x=nsDist(q,R.main),y=nsDist(q,R.alt);if(Math.min(x,y)<Math.min(adm,ada))adId=id;adm=Math.min(adm,x);ada=Math.min(ada,y);});
+    var r=n.radiusNM||0,dm=n.listOnly?Infinity:Math.max(0,nsDist(n,R.main)-r),da=n.listOnly?Infinity:Math.max(0,nsDist(n,R.alt)-r);
+    dm=Math.min(dm,adm);da=Math.min(da,ada);
     var m=R.main.length>0&&dm<=buf,a=R.alt.length>0&&da<=buf;
-    if(m||a)out.push({n:n,m:m,a:a,dm:dm,da:da,d:Math.min(m?dm:Infinity,a?da:Infinity)});
+    if(m||a){out.push({n:n,m:m,a:a,dm:dm,da:da,ad:(adm<=buf||ada<=buf)?adId:'',d:Math.min(m?dm:Infinity,a?da:Infinity)});return;}
+    if(n.listOnly&&f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>0,dm:0,da:0,d:0});
   });
   out.sort(function(x,y){return (x.fir||0)-(y.fir||0)||x.d-y.d;});
   return out;
@@ -9602,7 +9606,7 @@ function nsRouteTxt(r){return r.map(function(p){return p.name||'?';}).join(' - '
 function nsDistTxt(x){
   if(x.fir)return 'FIR';
   function t(on,d){return on?(d<0.05?'ตัดผ่าน':d.toFixed(1)+' NM'):'-';}
-  return 'หลัก '+t(x.m,x.dm)+' · สำรอง '+t(x.a,x.da);
+  return (x.ad?x.ad+' · ':'')+'หลัก '+t(x.m,x.dm)+' · สำรอง '+t(x.a,x.da);
 }
 /* layout -> slides [{map:bool, shapes:[{x,y,w,h,fill,line,pad,va,lh,lines:[{t,sz,b,col,al,cont}]}]}] in design units 1600 x 900 */
 function nsLayout(f,list,FS,FONT){
@@ -9848,12 +9852,12 @@ function openNotamSlide(){
     '</div></details>'+
     '<details class="fl-form" id="nsSel"><summary>NOTAM</summary><div class="fl-grid" id="nsSelList"></div></details>'+
     '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
-    '<p class="mm-note">16:9 · NOTAM จาก Imported NOTAM ที่ active ณ เวลาที่เลือก (B) ถึง C), ไม่ดูช่วงเวลาใน D)) · ขอบพื้นที่ห่างจากเส้นทางหลักหรือสำรองไม่เกินระยะที่ตั้ง · สไลด์แรก = แผนที่ + รายการ ถัดไป = ข้อความเต็ม</p></div>';
+    '<p class="mm-note">16:9 · NOTAM จาก Imported NOTAM ที่ active ณ เวลาที่เลือก (B) ถึง C), ไม่ดูช่วงเวลาใน D)) · รวม NOTAM สนามบิน (A)) ในระยะที่ตั้ง · ขอบพื้นที่ห่างจากเส้นทางหลักหรือสำรองไม่เกินระยะที่ตั้ง · สไลด์แรก = แผนที่ + รายการ ถัดไป = ข้อความเต็ม</p></div>';
   document.body.appendChild(d);
   var imgBox=d.querySelector('.mm-img');
   function read(){
     d.querySelectorAll('[data-ns]').forEach(function(i){f[i.getAttribute('data-ns')]=i.value.trim();});
-    if(!(parseFloat(f.buf)>=0))f.buf='10';f.fir=d.querySelector('#nsFir').checked;var s=Object.assign({},f);delete s.at;nsSave(s);
+    if(!(parseFloat(f.buf)>=0))f.buf='20';f.fir=d.querySelector('#nsFir').checked;var s=Object.assign({},f);delete s.at;nsSave(s);
   }
   function selList(){   /* untick a NOTAM to leave it out (remembered on this device) */
     var all=nsMatch(f),box=d.querySelector('#nsSelList'),sum=d.querySelector('#nsSel summary');
