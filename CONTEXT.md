@@ -95,7 +95,7 @@ KM/                   knowledge notes; start at KM/README.md
 - **Lat/Long input:** digits only, LAT 6 = DDMMmm, LONG 7 = DDDMMmm, no N/E; old format accepted.
 - **Main/alternate route:** row เส้นทางหลัก | ⇄ | เส้นทางสำรอง | ✕. Globals `pts` (active), `otherPts`,
   `routeActive`; storage `fp-route-v1` {alt, active}. Waypoint `remark` field (Landmark column).
-- **Button grid 3x3:** BACK | CLEAR ROUTE | RULER / MINI MAP | MSN CARD | WINDY / SLIDE | EXPORT | IMPORT.
+- **Button grid 3x3:** BACK | CLEAR ROUTE | RULER / MINI MAP | MSN CARD | NOTAM / SLIDE | EXPORT | IMPORT.
 - **MINI MAP:** A4 map (contour, 201 Sqn emblem, waypoint boxes, nearby ADs, profile, DIST/FT),
   editable title, table view + editor (undo, align), PDF / PPT (pptx, TH SarabunPSK) / แชร์.
   Style: main route black line, alt blue dashed; route Wpts green triangles; off-route light blue
@@ -103,7 +103,7 @@ KM/                   knowledge notes; start at KM/README.md
   ย้ายกล่อง mode moves + resizes boxes. Prefs in `fp-mm-*` keys.
 - **MSN CARD:** PNG Pilot Mission Data Card, ELEV column, FUEL default 2200, IAS/FUEL card-only.
 - **SLIDE:** 16:9 MISSION OVERVIEW on satellite, TH SarabunPSK, editable fields, PNG + PPT.
-- **WINDY:** DEPARTURE | MidWay | DESTINATION.
+- **NOTAM (replaced WINDY, v184):** 16:9 NOTAM slides for main + alternate route; NOTAM_DB active at chosen time (B)..C), default now, v185), area edge or A) aerodrome ≤ buf NM (default 20, v186) of any leg; FIR-wide optional; untick list (fp-notam-slide-v1). Slide 1 map + list, then full-text cards. PDF 960x540 pt (mmPdfBlob pw/ph) / PPT (picture + editable text) / แชร์.
 - **EXPORT/IMPORT:** KMZ / KML / GPX / CSV; export 1 All / 2 within 20 NM / 3 FalCon2CP.
 - **MAP box** (yellow): IMPORT MAP (user .pmtiles/PDF/image overlay, opacity inside frame only),
   built-in "ENROUTE (AIP)", row VIEW | SET MAP | SHOW MAP (replaced HIDE ENROUTE), opacity slider,

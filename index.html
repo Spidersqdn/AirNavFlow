@@ -776,12 +776,6 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 .wp-coord{font-size:11px;color:var(--mute);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.35;white-space:nowrap}
 .wp-editor .wp-coord,.offroute-tooltip .wp-coord,.mapinfo-popup .wp-coord{color:inherit;opacity:.85;margin:2px 0 4px}
 .ap h4{margin:0 0 4px;font-size:14px}.ap div{font-size:12px;line-height:1.5}.ap button{margin-top:6px;background:#f5b335;color:#1a1200;border:none;font-weight:600;padding:5px 10px}
-#windy{position:absolute;right:10px;bottom:44px;width:min(440px,calc(100% - 20px));height:min(360px,58%);z-index:950;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:none;flex-direction:column;overflow:hidden}
-#windy.on{display:flex}
-#windy header{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px}
-#windy header button{padding:2px 8px}
-#windy header button.wPos.on{background:var(--accent,#2b7);color:#fff}
-#windy iframe{flex:1;border:0;width:100%}
 .airspace-popup h4{margin:0 0 5px;font-size:13px;font-family:var(--mono)}
 .airspace-popup pre{background:#30343a;color:#f1f3f5;padding:6px;border-radius:4px;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;font-family:var(--mono);border:1px solid #666d76}
 .notam-pin{width:22px;height:22px;border-radius:50%;background:#ff4d4d;color:#fff;border:2px solid #fff;text-align:center;font:bold 14px/18px sans-serif;box-shadow:0 1px 5px rgba(0,0,0,.5)}
@@ -1309,8 +1303,8 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal .mm-rwy{white-space:nowrap;font-size:13px}
 #miniMapModal .mm-rwy input{width:3.2em;padding:4px;font:600 14px system-ui,sans-serif;text-align:center;border-radius:5px;border:1px solid #666d76;background:#15181c;color:#fff}
 #miniMapModal .mm-rwy input.mm-ref{width:5.5em;font-size:13px}
-#miniMapModal .mm-sharebox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 10px 8px;color:var(--text,#fff);font-size:13px}
-#miniMapModal .mm-sharebox button{min-height:36px;padding:5px 12px}
+#miniMapModal .mm-sharebox,#nsModal .mm-sharebox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 10px 8px;color:var(--text,#fff);font-size:13px}
+#miniMapModal .mm-sharebox button,#nsModal .mm-sharebox button{min-height:36px;padding:5px 12px}
 #miniMapModal .mm-sharego{background:#2e86de;color:#fff;font-weight:700}
 #miniMapModal #mmTblPrev{background:#8a9099;padding:8px;display:flex;flex-direction:column;gap:10px;align-items:center}
 #miniMapModal #mmTblPrev img{max-width:100%;box-shadow:0 1px 6px rgba(0,0,0,.4)}
@@ -1323,17 +1317,17 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #miniMapModal .mm-tbl td{font:inherit;letter-spacing:0;border:1px solid #fff;padding:3px 6px;text-align:center;white-space:nowrap;user-select:text;-webkit-user-select:text}
 #miniMapModal .mm-thint{margin:0;padding:0 10px 8px;font-size:11px;color:#555}
 #miniMapModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
-#flightLogModal,#slideModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
-#flightLogModal .mm-card,#slideModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
-#flightLogModal .mm-bar,#slideModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
-#flightLogModal .mm-img,#slideModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
-#flightLogModal img,#slideModal img{display:block;width:100%;height:auto}
-#flightLogModal .mm-note,#slideModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
-#flightLogModal .fl-form,#slideModal .fl-form{padding:0 10px 8px;color:var(--text,#fff);font-size:12px}
-#flightLogModal .fl-form summary,#slideModal .fl-form summary{cursor:pointer;padding:4px 0}
-#flightLogModal .fl-grid,#slideModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
-#flightLogModal .fl-grid label,#slideModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
-#flightLogModal .fl-grid input,#slideModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
+#flightLogModal,#slideModal,#nsModal{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+#flightLogModal .mm-card,#slideModal .mm-card,#nsModal .mm-card{background:var(--panel,#1b1f24);border:1px solid var(--line,#333);border-radius:8px;max-width:min(96vw,760px);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+#flightLogModal .mm-bar,#slideModal .mm-bar,#nsModal .mm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;color:var(--text,#fff)}
+#flightLogModal .mm-img,#slideModal .mm-img,#nsModal .mm-img{overflow:auto;flex:1;background:#fff;min-height:120px}
+#flightLogModal img,#slideModal img,#nsModal img{display:block;width:100%;height:auto}
+#flightLogModal .mm-note,#slideModal .mm-note,#nsModal .mm-note{margin:0;padding:6px 10px;font-size:11px;color:var(--mute,#999)}
+#flightLogModal .fl-form,#slideModal .fl-form,#nsModal .fl-form{padding:0 10px 8px;color:var(--text,#fff);font-size:12px}
+#flightLogModal .fl-form summary,#slideModal .fl-form summary,#nsModal .fl-form summary{cursor:pointer;padding:4px 0}
+#flightLogModal .fl-grid,#slideModal .fl-grid,#nsModal .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+#flightLogModal .fl-grid label,#slideModal .fl-grid label,#nsModal .fl-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mute,#aaa)}
+#flightLogModal .fl-grid input,#slideModal .fl-grid input,#nsModal .fl-grid input{width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px}
 #flightLogModal .fl-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
 #flightLogModal .fl-grid label{font-size:10px;white-space:nowrap;overflow:hidden}
 #flightLogModal .fl-grid input{padding:3px 4px;font-size:12px}
@@ -1346,11 +1340,11 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
 #flightLogModal .fl-adadd button{padding:2px 8px;font-size:12px;white-space:nowrap}
 /* phone / tablet: popup menu buttons + close ✕ stay on ONE row (SPD); scrolls sideways if still too wide */
 @media (max-width:820px){
-  #flightLogModal,#slideModal{padding-left:6px;padding-right:6px}
-  #flightLogModal .mm-bar,#slideModal .mm-bar{gap:6px;padding:6px 8px}
-  #miniMapModal .mm-btns,#flightLogModal .mm-bar>span,#slideModal .mm-bar>span,#miniMapModal .mm-bar>span,#windy header>span{
+  #flightLogModal,#slideModal,#nsModal{padding-left:6px;padding-right:6px}
+  #flightLogModal .mm-bar,#slideModal .mm-bar,#nsModal .mm-bar{gap:6px;padding:6px 8px}
+  #miniMapModal .mm-btns,#flightLogModal .mm-bar>span,#slideModal .mm-bar>span,#nsModal .mm-bar>span,#miniMapModal .mm-bar>span{
     display:flex;flex-wrap:nowrap;align-items:center;gap:4px;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  #miniMapModal .mm-btns::-webkit-scrollbar,#flightLogModal .mm-bar>span::-webkit-scrollbar,#slideModal .mm-bar>span::-webkit-scrollbar,#windy header>span::-webkit-scrollbar{display:none}
+  #miniMapModal .mm-btns::-webkit-scrollbar,#flightLogModal .mm-bar>span::-webkit-scrollbar,#slideModal .mm-bar>span::-webkit-scrollbar,#nsModal .mm-bar>span::-webkit-scrollbar{display:none}
   #miniMapModal .mm-bar>span.mm-btns{overflow:visible}  /* WPt list drops down below; buttons are sized to fit */
   /* MINI MAP button row fills the width, same height as the ✋ row below (SPD) */
   #miniMapModal .mm-bar .mm-btns{width:100%;flex:1 1 100%}
@@ -1359,18 +1353,16 @@ td button{padding:0 7px;line-height:22px;color:var(--red);background:none;border
   #miniMapModal .mm-bar .mm-btns .mm-view button{flex:1 1 50% !important}
   #miniMapModal .mm-bar .mm-btns button,#miniMapModal .mm-bar .mm-wpt summary{min-height:37px;box-sizing:border-box;text-align:center;font-size:14px !important}
   #miniMapModal .mm-wpt summary{display:flex;align-items:center;justify-content:center}
-  #miniMapModal .mm-bar>span button,#flightLogModal .mm-bar>span button,#slideModal .mm-bar>span button,#miniMapModal .mm-wpt summary{
+  #miniMapModal .mm-bar>span button,#flightLogModal .mm-bar>span button,#slideModal .mm-bar>span button,#nsModal .mm-bar>span button,#miniMapModal .mm-wpt summary{
     flex:0 0 auto;white-space:nowrap;padding:5px 7px !important;font-size:13px !important;min-height:34px;margin:0}
   #miniMapModal .mm-wpt{margin-right:0}
   #miniMapModal .mm-view{flex:0 0 auto}
-  #flightLogModal #flClose,#slideModal #slClose{margin-left:auto;min-width:34px}
+  #flightLogModal #flClose,#slideModal #slClose,#nsModal #nsClose{margin-left:auto;min-width:34px}
   #miniMapModal #mmClose{min-width:40px;min-height:38px;padding:5px 10px !important;font-size:15px !important}
-  #flightLogModal .mm-bar>b,#slideModal .mm-bar>b{font-size:13px;white-space:nowrap}
-  #windy header{gap:6px}
-  #windy header>span button{flex:0 0 auto;white-space:nowrap;padding:4px 6px;font-size:12px}
+  #flightLogModal .mm-bar>b,#slideModal .mm-bar>b,#nsModal .mm-bar>b{font-size:13px;white-space:nowrap}
 }
 @media (max-width:380px){
-  #miniMapModal .mm-bar>span button,#flightLogModal .mm-bar>span button,#slideModal .mm-bar>span button,#miniMapModal .mm-wpt summary{padding:5px 5px !important;font-size:12px !important}
+  #miniMapModal .mm-bar>span button,#flightLogModal .mm-bar>span button,#slideModal .mm-bar>span button,#nsModal .mm-bar>span button,#miniMapModal .mm-wpt summary{padding:5px 5px !important;font-size:12px !important}
 }
 .actions button{
   flex:1 1 calc(33.333% - 8px);
@@ -1970,7 +1962,7 @@ body.panel-hidden #panelResizer{display:none}
   <button id="measureBtn" type="button">RULER</button>
   <button id="exportMiniMap" type="button" title="Export a mini map (PNG) of the route">MINI MAP</button>
   <button id="flightLogBtn" type="button" title="Pilot mission data card (PNG)">MSN CARD</button>
-  <button id="wBtn" type="button">WINDY</button>
+  <button id="notamSlideBtn" type="button" title="NOTAM slides along the main + alternate route (PDF / PPT)">NOTAM</button>
   <button id="slideBtn" type="button" title="Mission overview slide 16:9 (PNG)">SLIDE</button>
   <button id="exportKmz" type="button" title="Export route as KMZ / KML / GPX / CSV">EXPORT</button>
   <button id="importKmz" type="button" title="Import route / waypoints from KMZ, KML, GPX or CSV (e.g. Google Earth)">IMPORT</button>
@@ -2131,10 +2123,6 @@ body.panel-hidden #panelResizer{display:none}
   <div id="map"></div>
   <button id="panelToggle" type="button" title="ซ่อน/แสดงเมนู" aria-label="ซ่อน/แสดงเมนู" aria-expanded="true"></button>
   <div id="status">กด On MAP เพื่อเพิ่ม waypoint • กดค้างที่แผนที่เพื่อดูข้อมูลจุด</div>
-  <div id="windy">
-    <header><span>Windy</span><span><button id="wDep" class="wPos" type="button">DEPARTURE</button> <button id="wSync" class="wPos" type="button">MidWay</button> <button id="wDest" class="wPos" type="button">DESTINATION</button> <button id="wClose" type="button">✕</button></span></header>
-    <iframe id="wFrame" title="Windy" loading="lazy"></iframe>
-  </div>
 </div>
 
 <script>/* Leaflet 1.9.4 */
@@ -8810,9 +8798,9 @@ function mmTblEditor(host,title,onChange){
   draw();
   return {setTitle:setTitle};
 }
-/* minimal PDF: A4 landscape pages (842 x 595 pt), each filled with one JPEG; pages = [{url,w,h}] */
-function mmPdfBlob(pages){
-  var PW=842,PH=595,parts=[],off=[],len=0,n=pages.length,N=3+n*3;
+/* minimal PDF: A4 landscape pages (842 x 595 pt; NOTAM slides pass 960 x 540), each filled with one JPEG; pages = [{url,w,h}] */
+function mmPdfBlob(pages,pw,ph){   /* pw/ph: page size in pt (default A4 landscape) */
+  var PW=pw||842,PH=ph||595,parts=[],off=[],len=0,n=pages.length,N=3+n*3;
   function add(x){var b=typeof x==='string'?new TextEncoder().encode(x):x;parts.push(b);len+=b.length;}
   function obj(k,body){off[k]=len;add(k+' 0 obj\n');body();add('\nendobj\n');}
   add('%PDF-1.4\n%\xE2\xE3\n');
@@ -9575,6 +9563,354 @@ function slPptxBlob(f){
   });
 }
 
+/* ---- NOTAM SLIDE (SPD 26 NOV): replaces WINDY. 16:9 slides of the NOTAMs along the main AND alternate route.
+   Slide 1: map (both routes + numbered NOTAM areas) + summary/list; next slides: full NOTAM text cards (2 columns).
+   NOTAM = Imported NOTAM (NOTAM_DB), not expired, area edge within "buf" NM of any leg (default 10, editable).
+   FIR-wide NOTAMs (list-only) only when ticked. Export PDF (16:9 pages) / PPT (picture + editable text boxes, TH SarabunPSK). ---- */
+var NS_KEY='fp-notam-slide-v1';
+function nsLoad(){var o={};try{o=JSON.parse(localStorage.getItem(NS_KEY)||'{}')||{};}catch(e){}if(!o.buf||o.v!==2){o.buf='20';o.v=2;}   /* SPD 26 NOV: default 20 NM */if(!Array.isArray(o.off))o.off=[];return o;}
+function nsSave(o){try{localStorage.setItem(NS_KEY,JSON.stringify(o));}catch(e){}}
+function nsRoutes(){
+  var ok=function(p){return p&&isFinite(p.lat)&&isFinite(p.lng);};
+  var m=(routeActive==='main'?pts:otherPts)||[],a=(routeActive==='main'?otherPts:pts)||[];
+  return {main:m.filter(ok),alt:a.filter(ok)};
+}
+function nsDist(n,r){   /* NM from the NOTAM centre to the nearest leg of route r */
+  if(!r.length)return Infinity;
+  if(r.length===1)return dist(n,r[0]);
+  var m=Infinity;for(var i=1;i<r.length;i++)m=Math.min(m,pDistToSegment(n,r[i-1],r[i]));return m;
+}
+function nsAt(f){var t=f.at?new Date(f.at).getTime():NaN;return isFinite(t)?t:Date.now();}   /* chosen time (device local), blank = now */
+function nsLocalIso(ms){var d=new Date(ms),p=function(v){return String(v).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
+function nsActive(n,t){   /* SPD: only NOTAMs active at that time: B) <= t <= C) (PERM / missing = open end); D) schedule not checked */
+  var b=n.startMs;if(b===undefined)b=n.startMs=notamEndMs(notamField(n.text||'','B','C|D|E|F|G|Q|A'));
+  return (!b||b<=t)&&(!n.endMs||t<=n.endMs);
+}
+function nsMatch(f){
+  var buf=Math.max(0,parseFloat(f.buf)),R=nsRoutes(),out=[],at=nsAt(f);if(!isFinite(buf))buf=20;
+  (typeof NOTAM_DB!=='undefined'?NOTAM_DB:[]).forEach(function(n){
+    if(!nsActive(n,at)||!isFinite(n.lat)||!isFinite(n.lng))return;
+    /* SPD: include aerodrome NOTAMs: A) airport within buf NM of a route */
+    var ads=(notamField(n.text||'','A','B|C|D|E|F|G|Q').toUpperCase().match(/\b[A-Z]{4}\b/g)||[]).filter(function(id){return APX[id];}),adm=Infinity,ada=Infinity,adId='';
+    ads.forEach(function(id){var q={lat:APX[id][4],lng:APX[id][5]},x=nsDist(q,R.main),y=nsDist(q,R.alt);if(Math.min(x,y)<Math.min(adm,ada))adId=id;adm=Math.min(adm,x);ada=Math.min(ada,y);});
+    var r=n.radiusNM||0,dm=n.listOnly?Infinity:Math.max(0,nsDist(n,R.main)-r),da=n.listOnly?Infinity:Math.max(0,nsDist(n,R.alt)-r);
+    dm=Math.min(dm,adm);da=Math.min(da,ada);
+    var m=R.main.length>0&&dm<=buf,a=R.alt.length>0&&da<=buf;
+    if(m||a){out.push({n:n,m:m,a:a,dm:dm,da:da,ad:(adm<=buf||ada<=buf)?adId:'',d:Math.min(m?dm:Infinity,a?da:Infinity)});return;}
+    if(n.listOnly&&f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>0,dm:0,da:0,d:0});
+  });
+  out.sort(function(x,y){return (x.fir||0)-(y.fir||0)||x.d-y.d;});
+  return out;
+}
+function nsRouteTxt(r){return r.map(function(p){return p.name||'?';}).join(' - ');}
+function nsDistTxt(x){
+  if(x.fir)return 'FIR';
+  function t(on,d){return on?(d<0.05?'ตัดผ่าน':d.toFixed(1)+' NM'):'-';}
+  return (x.ad?x.ad+' · ':'')+'หลัก '+t(x.m,x.dm)+' · สำรอง '+t(x.a,x.da);
+}
+/* layout -> slides [{map:bool, shapes:[{x,y,w,h,fill,line,pad,va,lh,lines:[{t,sz,b,col,al,cont}]}]}] in design units 1600 x 900 */
+function nsLayout(f,list,FS,FONT){
+  var mc=document.createElement('canvas').getContext('2d');
+  function wrap(t,sz,b,w){   /* text -> lines that fit w; cont = continues the previous line's paragraph */
+    mc.font=(b?'700':'400')+' '+Math.round(sz*FS)+'px '+FONT;
+    var out=[];String(t||'').replace(/\r/g,'').split('\n').forEach(function(par){
+      var words=par.replace(/\s+$/,'').split(/(\s+)/),cur='',first=true;
+      function push(){out.push({t:cur,cont:!first});first=false;cur='';}
+      words.forEach(function(wd){
+        if(!wd)return;
+        if(mc.measureText(cur+wd).width<=w){cur+=wd;return;}
+        if(/^\s+$/.test(wd)){push();return;}
+        if(cur.trim())push();
+        cur='';
+        if(mc.measureText(wd).width<=w){cur=wd;return;}
+        for(var i=0;i<wd.length;i++){if(cur&&mc.measureText(cur+wd[i]).width>w)push();cur+=wd[i];}   /* one long word: hard break */
+      });
+      push();
+    });
+    return out;
+  }
+  var NAVY='1F3461',HD=128,BOT=846,R=nsRoutes(),now=new Date(),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var stamp=now.getDate()+' '+MON[now.getMonth()]+' '+String(now.getFullYear()).slice(2)+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  /* slide 1: map left, summary + list right */
+  var TX=950,TW=620,y=HD,s1=[];
+  s1.push({x:TX,y:y,w:TW,h:58,fill:NAVY,line:'0D1A33',pad:14,va:'ctr',lh:40,lines:[{t:f.title||'NOTAM ตามเส้นทางบิน',sz:30,col:'FFFFFF',al:'ctr'}]});
+  y+=64;
+  var info=[['เส้นทางหลัก',R.main.length?nsRouteTxt(R.main):'-'],['เส้นทางสำรอง',R.alt.length?nsRouteTxt(R.alt):'-'],
+    ['ระยะค้นหา','±'+(parseFloat(f.buf)||0)+' NM จากเส้นทาง'+(f.fir?' + NOTAM ทั้ง FIR':'')],['NOTAM active ณ',(function(){var a=new Date(nsAt(f));return a.getDate()+' '+MON[a.getMonth()]+' '+String(a.getFullYear()).slice(2)+' '+String(a.getHours()).padStart(2,'0')+':'+String(a.getMinutes()).padStart(2,'0');})()],['จัดทำ',stamp],['พบ NOTAM',list.length+' รายการ']];
+  var il=[];info.forEach(function(r){wrap(r[0]+' : '+r[1],21,0,TW-28).forEach(function(l){il.push({t:l.t,cont:l.cont,sz:21,col:'FFFFFF'});});});
+  var ih=Math.min(il.length,9)*30+18;il=il.slice(0,9);
+  s1.push({x:TX,y:y,w:TW,h:ih,fill:NAVY,line:'0D1A33',pad:14,va:'ctr',lh:30,lines:il});
+  y+=ih+6;
+  var lh=29,room=Math.floor((BOT-y-18)/lh),ll=[];
+  if(!list.length)ll.push({t:'ไม่พบ NOTAM ตามเส้นทาง',sz:21,col:'333333'});
+  list.forEach(function(x,i){
+    if(ll.length>=room)return;
+    if(ll.length===room-1&&i<list.length-1){ll.push({t:'+ อีก '+(list.length-i)+' รายการ (สไลด์ถัดไป)',sz:19,col:'555555'});return;}
+    ll.push({t:(i+1)+'.  '+x.n.id+'   '+nsDistTxt(x),sz:20,b:1,col:'B3261E'});
+  });
+  s1.push({x:TX,y:y,w:TW,h:Math.min(BOT-y,ll.length*lh+18),fill:'FFFFFF',line:'9AA0A8',pad:14,va:'top',lh:lh,lines:ll});
+  var slides=[{map:1,shapes:s1}];
+  /* NOTAM cards: 2 columns, split a card that is taller than a whole column */
+  var CW=760,COLX=[30,810],HH=36,BL=24,BS=18,cur=null,col=2,cy=0;
+  function newCol(){col++;if(col>1){cur={shapes:[]};slides.push(cur);col=0;}cy=HD;}
+  list.forEach(function(x,i){
+    var lines=wrap(x.n.text||'',BS,0,CW-24),head=(i+1)+'.  '+x.n.id+'   '+nsDistTxt(x),k=0,part=0;
+    while(k<lines.length||(!lines.length&&!part)){
+      if(!cur||cy+HH+10+BL*Math.min(3,Math.max(1,lines.length-k))+10>BOT)newCol();
+      var fit=Math.floor((BOT-cy-HH-20)/BL),take=Math.min(lines.length-k,fit);
+      if(take<lines.length-k&&cy>HD&&(take<3||lines.length-k<=Math.floor((BOT-HD-HH-20)/BL))){newCol();continue;}   /* split only cards taller than a whole column */
+      var ls=lines.slice(k,k+take).map(function(l,j){return {t:l.t,cont:j?l.cont:(part?false:l.cont),sz:BS,col:'111111'};});
+      cur.shapes.push({x:COLX[col],y:cy,w:CW,h:HH,fill:'B3261E',line:'7A1A14',pad:12,va:'ctr',lh:28,lines:[{t:head+(part?'  (ต่อ)':''),sz:21,b:1,col:'FFFFFF'}]});
+      var bh=Math.max(1,take)*BL+20;
+      cur.shapes.push({x:COLX[col],y:cy+HH,w:CW,h:bh,fill:'FFFFFF',line:'9AA0A8',pad:12,va:'top',lh:BL,lines:ls,mono:1});
+      cy+=HH+bh+12;k+=take;part++;
+      if(!lines.length)break;
+    }
+  });
+  return slides;
+}
+/* draw one slide: template background + NOTAM header (+ map) (+ text shapes unless noText) */
+function nsDraw(sl,idx,total,f,list,bg,mapCv,noText,FS,FONT){
+  var S=2,W=1600*S,H=900*S,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var ctx=cv.getContext('2d');
+  function F(w,n){return w+' '+Math.round(n*FS*S)+'px '+FONT;}
+  if(bg){
+    ctx.drawImage(bg,0,0,W,H);
+    /* cover "MISSION OVERVIEW" in the template header with the header's own shading, row by row */
+    var x0=540*S,x1=1060*S,y0=6*S,y1=104*S;
+    try{
+      var L0=ctx.getImageData(x0-4*S,y0,1,y1-y0).data,R0=ctx.getImageData(x1+4*S,y0,1,y1-y0).data;
+      for(var r=0;r<y1-y0;r++){
+        var g=ctx.createLinearGradient(x0,0,x1,0);
+        g.addColorStop(0,'rgb('+L0[r*4]+','+L0[r*4+1]+','+L0[r*4+2]+')');g.addColorStop(1,'rgb('+R0[r*4]+','+R0[r*4+1]+','+R0[r*4+2]+')');
+        ctx.fillStyle=g;ctx.fillRect(x0,y0+r,x1-x0,1);
+      }
+    }catch(e){ctx.fillStyle='#c9ccd0';ctx.fillRect(x0,y0,x1-x0,y1-y0);}
+  }else{
+    ctx.fillStyle='#eceef1';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d3d6da';ctx.fillRect(0,0,W,108*S);
+    ctx.fillStyle='#b88a1c';ctx.fillRect(0,H-46*S,W,46*S);
+  }
+  ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=F('500',46);
+  ctx.fillText('NOTAM'+(total>1?'  ('+(idx+1)+'/'+total+')':''),W/2,57*S);
+  if(sl.map&&mapCv){
+    var MX=30*S,MY=128*S;ctx.drawImage(mapCv,MX,MY);ctx.strokeStyle='#9aa0a8';ctx.lineWidth=1*S;ctx.strokeRect(MX,MY,mapCv.width,mapCv.height);
+  }
+  if(noText)return cv;
+  sl.shapes.forEach(function(s){
+    if(s.fill){ctx.fillStyle='#'+s.fill;ctx.fillRect(s.x*S,s.y*S,s.w*S,s.h*S);}
+    if(s.line){ctx.strokeStyle='#'+s.line;ctx.lineWidth=2*S;ctx.strokeRect(s.x*S,s.y*S,s.w*S,s.h*S);}
+    var top=s.va==='ctr'?s.y+(s.h-s.lines.length*s.lh)/2:s.y+10;
+    s.lines.forEach(function(l,k){
+      ctx.font=F(l.b?'700':'400',l.sz);ctx.fillStyle='#'+(l.col||'111111');ctx.textBaseline='alphabetic';ctx.textAlign='left';
+      var a=ctx.measureText('Hก').actualBoundingBoxAscent||l.sz*FS*S*0.7,w=Math.min(ctx.measureText(l.t).width,(s.w-2*s.pad)*S);
+      var x=l.al==='ctr'?(s.x+s.w/2)*S-w/2:(s.x+s.pad)*S;
+      ctx.fillText(l.t,x,(top+s.lh*(k+0.5))*S+a/2,(s.w-2*s.pad)*S);
+    });
+  });
+  return cv;
+}
+/* map picture for slide 1: both routes + NOTAM areas with their list numbers */
+function nsMap(list){
+  var S=2,MW=900*S,MH=712*S,R=nsRoutes(),all=R.main.concat(R.alt);
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  all.forEach(function(p){var q=mmWorld(p.lat,p.lng,0);minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
+  var z=Math.log2(Math.min(MW*0.8/Math.max(maxX-minX,1e-4),MH*0.8/Math.max(maxY-minY,1e-4)));z=Math.max(5,Math.min(z,13));
+  var sc=Math.pow(2,z),cxW=(minX+maxX)/2*sc,cyW=(minY+maxY)/2*sc;
+  var center=(function(){var s=256*sc,lng=cxW/s*360-180,n=Math.PI-2*Math.PI*cyW/s;return {lat:deg*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))),lng:lng};})();
+  function px(lat,lng){var q=mmWorld(lat,lng,z);return {x:q.x-cxW+MW/2,y:q.y-cyW+MH/2};}
+  var cv=document.createElement('canvas');cv.width=MW;cv.height=MH;var ctx=cv.getContext('2d');
+  ctx.fillStyle='#e9eef2';ctx.fillRect(0,0,MW,MH);
+  return mmDrawRaster(ctx,sat,MW,MH,cxW,cyW,z).then(function(ok){return ok||mmDrawBase(ctx,MW,MH,cxW,cyW,z,center);})
+  .then(function(){return mmDrawContours(ctx,MW,MH,cxW,cyW,z,S);})
+  .then(function(){
+    ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(0,0,MW,MH);
+    var FONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';
+    /* NOTAM areas */
+    var lbl=[];
+    list.forEach(function(x,i){
+      var n=x.n;if(x.fir)return;
+      ctx.beginPath();
+      if(n.poly&&n.poly.length>=3){n.poly.forEach(function(p,k){var q=px(p[0],p[1]);k?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});ctx.closePath();}
+      else{var c=px(n.lat,n.lng),mpp=156543.034*Math.cos(n.lat*rad)/Math.pow(2,z),r=Math.max(6*S,(n.radiusNM||0.3)*1852/mpp);ctx.arc(c.x,c.y,r,0,2*Math.PI);}
+      ctx.fillStyle='rgba(255,90,0,.22)';ctx.fill();ctx.strokeStyle='#ff5a00';ctx.lineWidth=2.5*S;ctx.stroke();
+      var q=px(n.lat,n.lng);lbl.push({x:Math.max(16*S,Math.min(MW-16*S,q.x)),y:Math.max(16*S,Math.min(MH-16*S,q.y)),t:String(i+1)});
+    });
+    function line(r,col,w,dash){
+      if(r.length<2)return;ctx.beginPath();r.forEach(function(p,i){var q=px(p.lat,p.lng);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});
+      ctx.setLineDash(dash||[]);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();ctx.setLineDash([]);
+    }
+    line(R.alt,'#1f5fff',4*S,[14*S,10*S]);line(R.main,'#e01010',5*S);
+    function names(r,col){r.forEach(function(p){
+      var q=px(p.lat,p.lng),nm=p.name||'';
+      ctx.fillStyle='#fff';ctx.strokeStyle=col;ctx.lineWidth=2*S;ctx.beginPath();ctx.arc(q.x,q.y,5*S,0,2*Math.PI);ctx.fill();ctx.stroke();
+      if(!nm)return;ctx.font='600 '+Math.round(17*S)+'px '+FONT;ctx.textBaseline='middle';ctx.textAlign='left';
+      var lx=q.x+10*S,tw=ctx.measureText(nm).width;if(lx+tw>MW-6*S)lx=q.x-10*S-tw;
+      ctx.lineWidth=4*S;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(nm,lx,q.y-10*S);ctx.fillStyle='#fff';ctx.fillText(nm,lx,q.y-10*S);
+    });}
+    names(R.alt,'#1f5fff');names(R.main,'#e01010');
+    lbl.forEach(function(l){
+      ctx.fillStyle='#ff5a00';ctx.strokeStyle='#fff';ctx.lineWidth=2*S;ctx.beginPath();ctx.arc(l.x,l.y,13*S,0,2*Math.PI);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='700 '+Math.round(16*S)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(l.t,l.x,l.y+1*S);
+    });
+    /* legend */
+    var lx=12*S,ly=MH-96*S;ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(lx,ly,250*S,84*S);ctx.strokeStyle='#888';ctx.lineWidth=1*S;ctx.strokeRect(lx,ly,250*S,84*S);
+    ctx.font='500 '+Math.round(19*S)+'px '+FONT;ctx.textAlign='left';ctx.textBaseline='middle';
+    [['เส้นทางหลัก','#e01010',[]],['เส้นทางสำรอง','#1f5fff',[10*S,7*S]],['พื้นที่ NOTAM','#ff5a00',null]].forEach(function(r,i){
+      var yy=ly+16*S+i*26*S;
+      if(r[2]){ctx.setLineDash(r[2]);ctx.strokeStyle=r[1];ctx.lineWidth=4*S;ctx.beginPath();ctx.moveTo(lx+12*S,yy);ctx.lineTo(lx+62*S,yy);ctx.stroke();ctx.setLineDash([]);}
+      else{ctx.fillStyle='rgba(255,90,0,.3)';ctx.fillRect(lx+12*S,yy-8*S,50*S,16*S);ctx.strokeStyle=r[1];ctx.lineWidth=2*S;ctx.strokeRect(lx+12*S,yy-8*S,50*S,16*S);}
+      ctx.fillStyle='#111';ctx.fillText(r[0],lx+74*S,yy+1*S);
+    });
+    return cv;
+  });
+}
+/* build everything: {slides (layout), full canvases, bare canvases for PPT} */
+function nsBuild(f){
+  var FONT='"TH SarabunPSK","TH Sarabun New","Sarabun",Tahoma,sans-serif';
+  var psk=(function(){try{var c=document.createElement('canvas').getContext('2d'),t='กขคงabcWM 123';c.font='40px monospace';var w0=c.measureText(t).width;c.font='40px "TH SarabunPSK",monospace';return Math.abs(c.measureText(t).width-w0)>1;}catch(e){return false;}})();
+  var FS=psk?1.3:1,list=nsMatch(f).filter(function(x){return f.off.indexOf(x.n.id)<0;}),bg=null,mapCv=null;
+  var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun','Aก่ำ'),document.fonts.load('700 36px Sarabun','Aก่ำ')]).catch(function(){}):Promise.resolve();
+  return fontsReady.then(function(){return mmLoadImg('icons/slide-bg.jpg',5000);}).then(function(im){bg=im;return nsMap(list);}).then(function(m){
+    mapCv=m;var slides=nsLayout(f,list,FS,FONT);
+    return {slides:slides,list:list,
+      full:slides.map(function(s,i){return nsDraw(s,i,slides.length,f,list,bg,mapCv,false,FS,FONT);}),
+      bare:function(){return slides.map(function(s,i){return nsDraw(s,i,slides.length,f,list,bg,mapCv,true,FS,FONT);});}};
+  });
+}
+function nsPdfBlob(r){return mmPdfBlob(r.full.map(function(c){return {url:c.toDataURL('image/jpeg',0.9),w:c.width,h:c.height};}),960,540);}
+/* PowerPoint 16:9, one slide per page: background picture (template, header, map) + every text box editable (TH SarabunPSK) */
+function nsPptxBlob(r){
+  if(typeof JSZip==='undefined')return Promise.reject(new Error('JSZip unavailable'));
+  var CX=12192000,CY=6858000,K=CX/1600,FN='TH SarabunPSK',N=r.slides.length,bare=r.bare();
+  var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  var NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+  var RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+  function xe(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function rels(list){return X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+list.map(function(q,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RL+q[0]+'" Target="'+q[1]+'"/>';}).join('')+'</Relationships>';}
+  function E(v){return Math.round(v*K);}
+  var tree='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
+  function shape(s,id){
+    var paras=[];s.lines.forEach(function(l){if(l.cont&&paras.length)paras[paras.length-1].t+=(/\s$/.test(paras[paras.length-1].t)?'':' ')+l.t;else paras.push({t:l.t,l:l});});
+    var body=paras.map(function(p){var l=p.l;
+      return '<a:p><a:pPr algn="'+(l.al==='ctr'?'ctr':'l')+'"><a:lnSpc><a:spcPts val="'+Math.round(s.lh*0.6*100)+'"/></a:lnSpc></a:pPr><a:r><a:rPr lang="th-TH" sz="'+Math.round(l.sz*0.8)*100+'"'+(l.b?' b="1"':'')+' dirty="0"><a:solidFill><a:srgbClr val="'+(l.col||'111111')+'"/></a:solidFill><a:latin typeface="'+FN+'"/><a:cs typeface="'+FN+'"/></a:rPr><a:t>'+xe(p.t)+'</a:t></a:r></a:p>';}).join('')||'<a:p><a:endParaRPr lang="th-TH"/></a:p>';
+    return '<p:sp><p:nvSpPr><p:cNvPr id="'+id+'" name="Text '+id+'"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(s.x)+'" y="'+E(s.y)+'"/><a:ext cx="'+E(s.w)+'" cy="'+E(s.h)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'+
+      (s.fill?'<a:solidFill><a:srgbClr val="'+s.fill+'"/></a:solidFill>':'<a:noFill/>')+(s.line?'<a:ln w="'+E(2)+'"><a:solidFill><a:srgbClr val="'+s.line+'"/></a:solidFill></a:ln>':'<a:ln><a:noFill/></a:ln>')+'</p:spPr>'+
+      '<p:txBody><a:bodyPr wrap="square" lIns="'+E(s.pad)+'" rIns="'+E(s.pad)+'" tIns="'+E(s.va==='ctr'?0:8)+'" bIns="0" anchor="'+(s.va==='ctr'?'ctr':'t')+'"><a:normAutofit/></a:bodyPr><a:lstStyle/>'+body+'</p:txBody></p:sp>';
+  }
+  var z=new JSZip(),ov='',sl='',prl=[['slideMaster','slideMasters/slideMaster1.xml'],['theme','theme/theme1.xml']];
+  r.slides.forEach(function(s,i){
+    var k=i+1,id=10;
+    ov+='<Override PartName="/ppt/slides/slide'+k+'.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+    sl+='<p:sldId id="'+(255+k)+'" r:id="rId'+(k+2)+'"/>';prl.push(['slide','slides/slide'+k+'.xml']);
+    var pic='<p:pic><p:nvPicPr><p:cNvPr id="2" name="Background"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'+
+      '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+CX+'" cy="'+CY+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+    z.file('ppt/slides/slide'+k+'.xml',X+'<p:sld '+NS+'><p:cSld><p:spTree>'+tree+pic+s.shapes.map(function(q){return shape(q,id++);}).join('')+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
+    z.file('ppt/slides/_rels/slide'+k+'.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['image','../media/image'+k+'.jpg']]));
+    z.file('ppt/media/image'+k+'.jpg',bare[i].toDataURL('image/jpeg',0.9).split(',')[1],{base64:true});
+  });
+  z.file('[Content_Types].xml',X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/>'+
+    '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'+
+    '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>'+
+    '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>'+ov+
+    '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/></Types>');
+  z.file('_rels/.rels',rels([['officeDocument','ppt/presentation.xml']]));
+  z.file('ppt/presentation.xml',X+'<p:presentation '+NS+'><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>'+sl+'</p:sldIdLst><p:sldSz cx="'+CX+'" cy="'+CY+'"/><p:notesSz cx="'+CY+'" cy="'+CX+'"/><p:defaultTextStyle/></p:presentation>');
+  z.file('ppt/_rels/presentation.xml.rels',rels(prl));
+  z.file('ppt/slideMasters/slideMaster1.xml',X+'<p:sldMaster '+NS+'><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>'+tree+'</p:spTree></p:cSld>'+
+    '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>'+
+    '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>');
+  z.file('ppt/slideMasters/_rels/slideMaster1.xml.rels',rels([['slideLayout','../slideLayouts/slideLayout1.xml'],['theme','../theme/theme1.xml']]));
+  z.file('ppt/slideLayouts/slideLayout1.xml',X+'<p:sldLayout '+NS+' type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>'+tree+'</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>');
+  z.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels',rels([['slideMaster','../slideMasters/slideMaster1.xml']]));
+  var C=function(n,v){return '<a:'+n+'><a:srgbClr val="'+v+'"/></a:'+n+'>';},FT='<a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/>';
+  var fill='<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',ln='<a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>';
+  z.file('ppt/theme/theme1.xml',X+'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="AirNavFlow"><a:themeElements>'+
+    '<a:clrScheme name="AirNavFlow"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>'+
+    C('dk2','44546A')+C('lt2','E7E6E6')+C('accent1','1F3461')+C('accent2','B88A1C')+C('accent3','A5A5A5')+C('accent4','FFC000')+C('accent5','5B9BD5')+C('accent6','70AD47')+C('hlink','0563C1')+C('folHlink','954F72')+'</a:clrScheme>'+
+    '<a:fontScheme name="AirNavFlow"><a:majorFont>'+FT+'</a:majorFont><a:minorFont>'+FT+'</a:minorFont></a:fontScheme>'+
+    '<a:fmtScheme name="AirNavFlow"><a:fillStyleLst>'+fill+fill+fill+'</a:fillStyleLst><a:lnStyleLst>'+ln+ln+ln+'</a:lnStyleLst>'+
+    '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>'+
+    '<a:bgFillStyleLst>'+fill+fill+fill+'</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>');
+  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});
+}
+function openNotamSlide(){
+  var R=nsRoutes();
+  if(R.main.length<2&&R.alt.length<2){alert('ต้องมีเส้นทางหลักหรือสำรองอย่างน้อย 2 จุดก่อนทำ NOTAM');return;}
+  var old=document.getElementById('nsModal');if(old)old.remove();
+  var f=nsLoad(),res=null,blobs={},seq=0;f.at=nsLocalIso(Date.now());   /* time is not remembered: opens at now */
+  var r0=R.main.length?R.main:R.alt,fbase='NOTAM_'+String(r0[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_')+'_'+String(r0[r0.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
+  var d=document.createElement('div');d.id='nsModal';
+  d.innerHTML='<div class="mm-card"><div class="mm-bar" style="justify-content:flex-start"><span style="flex:1;min-width:0">'+
+    '<button type="button" id="nsMake">อัปเดต</button> <button type="button" id="nsPdf">PDF</button> <button type="button" id="nsPpt" title="PowerPoint 16:9: ข้อความแก้ไขได้">PPT</button> '+
+    '<button type="button" id="nsShare">แชร์</button> <button type="button" id="nsClose">✕</button></span></div>'+
+    '<div class="mm-sharebox" id="nsShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="nsShareSt"></span></div>'+
+    '<details class="fl-form" open><summary>ตั้งค่า</summary><div class="fl-grid">'+
+    '<label style="grid-column:1/-1">หัวข้อ<input data-ns="title" type="text" placeholder="NOTAM ตามเส้นทางบิน" value="'+esc(f.title||'')+'"></label>'+
+    '<label>NOTAM active ณ<input data-ns="at" type="datetime-local" value="'+esc(f.at)+'"></label>'+
+    '<label>ระยะจากเส้นทาง (NM)<input data-ns="buf" type="text" inputmode="decimal" value="'+esc(f.buf)+'"></label>'+
+    '<label style="flex-direction:row;align-items:center;gap:6px;grid-column:span 2"><input type="checkbox" id="nsFir" style="width:auto"'+(f.fir?' checked':'')+'> รวม NOTAM ทั้ง FIR</label>'+
+    '</div></details>'+
+    '<details class="fl-form" id="nsSel"><summary>NOTAM</summary><div class="fl-grid" id="nsSelList"></div></details>'+
+    '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
+    '<p class="mm-note">16:9 · NOTAM จาก Imported NOTAM ที่ active ณ เวลาที่เลือก (B) ถึง C), ไม่ดูช่วงเวลาใน D)) · รวม NOTAM สนามบิน (A)) ในระยะที่ตั้ง · ขอบพื้นที่ห่างจากเส้นทางหลักหรือสำรองไม่เกินระยะที่ตั้ง · สไลด์แรก = แผนที่ + รายการ ถัดไป = ข้อความเต็ม</p></div>';
+  document.body.appendChild(d);
+  var imgBox=d.querySelector('.mm-img');
+  function read(){
+    d.querySelectorAll('[data-ns]').forEach(function(i){f[i.getAttribute('data-ns')]=i.value.trim();});
+    if(!(parseFloat(f.buf)>=0))f.buf='20';f.fir=d.querySelector('#nsFir').checked;var s=Object.assign({},f);delete s.at;nsSave(s);
+  }
+  function selList(){   /* untick a NOTAM to leave it out (remembered on this device) */
+    var all=nsMatch(f),box=d.querySelector('#nsSelList'),sum=d.querySelector('#nsSel summary');
+    var on=all.filter(function(x){return f.off.indexOf(x.n.id)<0;}).length;
+    sum.textContent='NOTAM ในสไลด์ ('+on+'/'+all.length+')';
+    if(!all.length){box.innerHTML='<span class="mm-note" style="padding:0">'+(NOTAM_DB.length?'ไม่พบ NOTAM ตามเส้นทาง':'ยังไม่มี NOTAM ในแอพ (Imported NOTAM)')+'</span>';return;}
+    box.innerHTML=all.map(function(x,i){return '<label style="flex-direction:row;align-items:center;gap:6px;grid-column:1/-1"><input type="checkbox" data-ni="'+i+'" style="width:auto"'+(f.off.indexOf(x.n.id)<0?' checked':'')+'> <b>'+esc(x.n.id)+'</b> '+esc(nsDistTxt(x))+' · '+esc(x.n.title||'')+'</label>';}).join('');
+    box.querySelectorAll('input[data-ni]').forEach(function(cb){cb.onchange=function(){
+      var id=all[+cb.getAttribute('data-ni')].n.id;f.off=f.off.filter(function(k){return k!==id;});if(!cb.checked)f.off.push(id);nsSave(f);make();
+    };});
+  }
+  function make(){
+    read();selList();var my=++seq;res=null;blobs={};
+    imgBox.innerHTML='<p class="mm-note">กำลังสร้าง…</p>';
+    return nsBuild(f).then(function(r){
+      if(my!==seq)return;res=r;imgBox.innerHTML='';
+      r.full.forEach(function(c,i){var im=document.createElement('img');im.alt='NOTAM slide '+(i+1);im.src=c.toDataURL('image/jpeg',0.85);im.style.borderBottom='4px solid #444';imgBox.appendChild(im);});
+    }).catch(function(err){imgBox.innerHTML='<p class="mm-note">สร้างไม่สำเร็จ ('+esc(err&&err.message||err)+')</p>';});
+  }
+  var ready=make();
+  function file(t){   /* built once per update; iOS share needs a second tap after the file is ready */
+    return ready.then(function(){
+      if(!res)throw new Error('ยังไม่มีสไลด์');
+      if(blobs[t])return blobs[t];
+      return (t==='pdf'?Promise.resolve(nsPdfBlob(res)):nsPptxBlob(res)).then(function(bl){
+        blobs[t]=new File([bl],fbase+(t==='pdf'?'.pdf':'.pptx'),{type:t==='pdf'?'application/pdf':'application/vnd.openxmlformats-officedocument.presentationml.presentation'});return blobs[t];
+      });
+    });
+  }
+  function download(fl){var a=document.createElement('a'),u=URL.createObjectURL(fl);a.href=u;a.download=fl.name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},30000);}
+  document.getElementById('nsMake').onclick=function(){ready=make();};
+  d.querySelector('#nsFir').onchange=function(){ready=make();};
+  d.querySelector('[data-ns="at"]').onchange=function(){ready=make();};
+  ['nsPdf','nsPpt'].forEach(function(id){var b=document.getElementById(id);b.onclick=function(){
+    b.disabled=true;file(id==='nsPdf'?'pdf':'ppt').then(download).catch(function(err){alert('สร้างไฟล์ไม่สำเร็จ ('+(err&&err.message||err)+')');}).then(function(){b.disabled=false;});
+  };});
+  var shb=document.getElementById('nsShareBox'),shs=document.getElementById('nsShareSt');
+  document.getElementById('nsShare').onclick=function(){shb.style.display=shb.style.display==='none'?'':'none';shs.innerHTML='';};
+  [].slice.call(shb.querySelectorAll('button[data-t]')).forEach(function(b){b.onclick=function(){
+    var t=b.getAttribute('data-t');shs.textContent='กำลังสร้างไฟล์ '+t.toUpperCase()+'...';
+    file(t).then(function(fl){
+      var can=navigator.canShare&&navigator.canShare({files:[fl]});
+      shs.innerHTML='';var go=document.createElement('button');go.type='button';
+      go.textContent=can?'📤 ส่ง '+t.toUpperCase():'⬇ บันทึก '+t.toUpperCase();
+      go.onclick=function(){if(can)navigator.share({files:[fl]}).catch(function(){});else download(fl);};
+      shs.appendChild(go);if(!can)shs.appendChild(document.createTextNode(' อุปกรณ์นี้แชร์ไฟล์ไม่ได้'));
+    }).catch(function(err){shs.textContent='สร้างไฟล์ไม่สำเร็จ ('+(err&&err.message||err)+')';});
+  };});
+  function close(){read();d.remove();}
+  document.getElementById('nsClose').onclick=close;
+  d.addEventListener('click',function(e){if(e.target===d)close();});
+}
+
 /* ---- FLIGHT LOG: Pilot Mission Data Card (PNG), layout after the squadron's paper card.
    Auto-filled: date, route, airport info (AIRPORT DB + DataBase/CoWork/AD.txt + RWY.txt), FROM/DEST, IAS, swing radials,
    nav aid morse, route NOTAM ids, fuel management (lat/long, CRS true, dist, ETE, burn/remaining).
@@ -10114,35 +10450,6 @@ function routeMidpoint(){
   }
   return null;
 }
-function openWindy(mode){
-  if(typeof mode!=='string')mode='mid';
-  var p=null;
-  if(pts.length)p=mode==='dep'?pts[0]:mode==='dest'?pts[pts.length-1]:routeMidpoint();
-  var c=p?{lat:p.lat,lng:p.lng}:map.getCenter().wrap();
-  ['wDep','wSync','wDest'].forEach(function(id,i){
-    document.getElementById(id).classList.toggle('on',['dep','mid','dest'][i]===mode);
-  });
-  var z=Math.max(5,Math.min(map.getZoom(),9));
-
-  document.getElementById('wFrame').src=
-    'https://embed.windy.com/embed2.html?lat='+c.lat.toFixed(4)+
-    '&lon='+c.lng.toFixed(4)+
-    '&detailLat='+c.lat.toFixed(4)+
-    '&detailLon='+c.lng.toFixed(4)+
-    '&width=650&height=450&zoom='+z+
-    '&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now';
-
-  document.getElementById('windy').classList.add('on');
-}
-document.getElementById('wBtn').onclick=openWindy;
-document.getElementById('wSync').onclick=function(){openWindy('mid');};
-document.getElementById('wDep').onclick=function(){openWindy('dep');};
-document.getElementById('wDest').onclick=function(){openWindy('dest');};
-document.getElementById('wClose').onclick=function(){
-  document.getElementById('windy').classList.remove('on');
-  document.getElementById('wFrame').removeAttribute('src');
-};
-
 document.getElementById('navTrackBtn').onclick=function(){
   setGpsTrack(gpsTrackTimer===null);
 };
@@ -11559,6 +11866,7 @@ document.getElementById('importKmzFile').onchange=function(){
 document.getElementById('exportMiniMap').onclick=exportMiniMap;
 document.getElementById('flightLogBtn').onclick=openFlightLog;
 document.getElementById('slideBtn').onclick=openSlide;
+document.getElementById('notamSlideBtn').onclick=openNotamSlide;
 
 document.getElementById('rtMain').onclick=function(){switchRoute('main');};
 document.getElementById('rtAlt').onclick=function(){switchRoute('alt');};
