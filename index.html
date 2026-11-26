@@ -9705,8 +9705,10 @@ function nsDraw(sl,idx,total,f,list,bg,mapCv,noText,FS,FONT){
     ctx.fillStyle='#eceef1';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d3d6da';ctx.fillRect(0,0,W,108*S);
     ctx.fillStyle='#b88a1c';ctx.fillRect(0,H-46*S,W,46*S);
   }
-  ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=F('500',46);
-  ctx.fillText(sl.head||'NOTAM',W/2,57*S,900*S);
+  /* title centred by measuring (Safari/iPad draws textAlign center + maxWidth off-centre, SPD 26 NOV) */
+  ctx.fillStyle='#111';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.font=F('500',46);
+  var ht=sl.head||'NOTAM',hw=ctx.measureText(ht).width,hk=Math.min(1,900*S/Math.max(1,hw)),ha=ctx.measureText('Hก').actualBoundingBoxAscent||46*FS*S*0.7;
+  ctx.save();ctx.translate(W/2-hw*hk/2,57*S+ha/2);ctx.scale(hk,1);ctx.fillText(ht,0,0);ctx.restore();
   if(mapCv){
     var MX=30*S,MY=128*S;ctx.drawImage(mapCv,MX,MY);ctx.strokeStyle='#9aa0a8';ctx.lineWidth=1*S;ctx.strokeRect(MX,MY,mapCv.width,mapCv.height);
   }
