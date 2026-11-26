@@ -9580,10 +9580,16 @@ function nsDist(n,r){   /* NM from the NOTAM centre to the nearest leg of route 
   if(r.length===1)return dist(n,r[0]);
   var m=Infinity;for(var i=1;i<r.length;i++)m=Math.min(m,pDistToSegment(n,r[i-1],r[i]));return m;
 }
+function nsAt(f){var t=f.at?new Date(f.at).getTime():NaN;return isFinite(t)?t:Date.now();}   /* chosen time (device local), blank = now */
+function nsLocalIso(ms){var d=new Date(ms),p=function(v){return String(v).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
+function nsActive(n,t){   /* SPD: only NOTAMs active at that time: B) <= t <= C) (PERM / missing = open end); D) schedule not checked */
+  var b=n.startMs;if(b===undefined)b=n.startMs=notamEndMs(notamField(n.text||'','B','C|D|E|F|G|Q|A'));
+  return (!b||b<=t)&&(!n.endMs||t<=n.endMs);
+}
 function nsMatch(f){
-  var buf=Math.max(0,parseFloat(f.buf)),R=nsRoutes(),out=[];if(!isFinite(buf))buf=10;
+  var buf=Math.max(0,parseFloat(f.buf)),R=nsRoutes(),out=[],at=nsAt(f);if(!isFinite(buf))buf=10;
   (typeof NOTAM_DB!=='undefined'?NOTAM_DB:[]).forEach(function(n){
-    if(notamExpired(n)||!isFinite(n.lat)||!isFinite(n.lng))return;
+    if(!nsActive(n,at)||!isFinite(n.lat)||!isFinite(n.lng))return;
     if(n.listOnly){if(f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>0,dm:0,da:0,d:0});return;}
     var r=n.radiusNM||0,dm=Math.max(0,nsDist(n,R.main)-r),da=Math.max(0,nsDist(n,R.alt)-r);
     var m=R.main.length>0&&dm<=buf,a=R.alt.length>0&&da<=buf;
@@ -9626,7 +9632,7 @@ function nsLayout(f,list,FS,FONT){
   s1.push({x:TX,y:y,w:TW,h:58,fill:NAVY,line:'0D1A33',pad:14,va:'ctr',lh:40,lines:[{t:f.title||'NOTAM ตามเส้นทางบิน',sz:30,col:'FFFFFF',al:'ctr'}]});
   y+=64;
   var info=[['เส้นทางหลัก',R.main.length?nsRouteTxt(R.main):'-'],['เส้นทางสำรอง',R.alt.length?nsRouteTxt(R.alt):'-'],
-    ['ระยะค้นหา','±'+(parseFloat(f.buf)||0)+' NM จากเส้นทาง'+(f.fir?' + NOTAM ทั้ง FIR':'')],['จัดทำ',stamp],['พบ NOTAM',list.length+' รายการ']];
+    ['ระยะค้นหา','±'+(parseFloat(f.buf)||0)+' NM จากเส้นทาง'+(f.fir?' + NOTAM ทั้ง FIR':'')],['NOTAM active ณ',(function(){var a=new Date(nsAt(f));return a.getDate()+' '+MON[a.getMonth()]+' '+String(a.getFullYear()).slice(2)+' '+String(a.getHours()).padStart(2,'0')+':'+String(a.getMinutes()).padStart(2,'0');})()],['จัดทำ',stamp],['พบ NOTAM',list.length+' รายการ']];
   var il=[];info.forEach(function(r){wrap(r[0]+' : '+r[1],21,0,TW-28).forEach(function(l){il.push({t:l.t,cont:l.cont,sz:21,col:'FFFFFF'});});});
   var ih=Math.min(il.length,9)*30+18;il=il.slice(0,9);
   s1.push({x:TX,y:y,w:TW,h:ih,fill:NAVY,line:'0D1A33',pad:14,va:'ctr',lh:30,lines:il});
@@ -9827,7 +9833,7 @@ function openNotamSlide(){
   var R=nsRoutes();
   if(R.main.length<2&&R.alt.length<2){alert('ต้องมีเส้นทางหลักหรือสำรองอย่างน้อย 2 จุดก่อนทำ NOTAM');return;}
   var old=document.getElementById('nsModal');if(old)old.remove();
-  var f=nsLoad(),res=null,blobs={},seq=0;
+  var f=nsLoad(),res=null,blobs={},seq=0;f.at=nsLocalIso(Date.now());   /* time is not remembered: opens at now */
   var r0=R.main.length?R.main:R.alt,fbase='NOTAM_'+String(r0[0].name||'START').replace(/[^A-Za-z0-9_-]+/g,'_')+'_'+String(r0[r0.length-1].name||'END').replace(/[^A-Za-z0-9_-]+/g,'_');
   var d=document.createElement('div');d.id='nsModal';
   d.innerHTML='<div class="mm-card"><div class="mm-bar" style="justify-content:flex-start"><span style="flex:1;min-width:0">'+
@@ -9836,17 +9842,18 @@ function openNotamSlide(){
     '<div class="mm-sharebox" id="nsShareBox" style="display:none">ส่งไฟล์แบบ: <button type="button" data-t="pdf">PDF</button> <button type="button" data-t="ppt">PPT</button> <span id="nsShareSt"></span></div>'+
     '<details class="fl-form" open><summary>ตั้งค่า</summary><div class="fl-grid">'+
     '<label style="grid-column:1/-1">หัวข้อ<input data-ns="title" type="text" placeholder="NOTAM ตามเส้นทางบิน" value="'+esc(f.title||'')+'"></label>'+
+    '<label>NOTAM active ณ<input data-ns="at" type="datetime-local" value="'+esc(f.at)+'"></label>'+
     '<label>ระยะจากเส้นทาง (NM)<input data-ns="buf" type="text" inputmode="decimal" value="'+esc(f.buf)+'"></label>'+
     '<label style="flex-direction:row;align-items:center;gap:6px;grid-column:span 2"><input type="checkbox" id="nsFir" style="width:auto"'+(f.fir?' checked':'')+'> รวม NOTAM ทั้ง FIR</label>'+
     '</div></details>'+
     '<details class="fl-form" id="nsSel"><summary>NOTAM</summary><div class="fl-grid" id="nsSelList"></div></details>'+
     '<div class="mm-img"><p class="mm-note">กำลังสร้าง…</p></div>'+
-    '<p class="mm-note">16:9 · NOTAM จาก Imported NOTAM ที่ยังไม่หมดอายุ · ขอบพื้นที่ห่างจากเส้นทางหลักหรือสำรองไม่เกินระยะที่ตั้ง · สไลด์แรก = แผนที่ + รายการ ถัดไป = ข้อความเต็ม</p></div>';
+    '<p class="mm-note">16:9 · NOTAM จาก Imported NOTAM ที่ active ณ เวลาที่เลือก (B) ถึง C), ไม่ดูช่วงเวลาใน D)) · ขอบพื้นที่ห่างจากเส้นทางหลักหรือสำรองไม่เกินระยะที่ตั้ง · สไลด์แรก = แผนที่ + รายการ ถัดไป = ข้อความเต็ม</p></div>';
   document.body.appendChild(d);
   var imgBox=d.querySelector('.mm-img');
   function read(){
     d.querySelectorAll('[data-ns]').forEach(function(i){f[i.getAttribute('data-ns')]=i.value.trim();});
-    if(!(parseFloat(f.buf)>=0))f.buf='10';f.fir=d.querySelector('#nsFir').checked;nsSave(f);
+    if(!(parseFloat(f.buf)>=0))f.buf='10';f.fir=d.querySelector('#nsFir').checked;var s=Object.assign({},f);delete s.at;nsSave(s);
   }
   function selList(){   /* untick a NOTAM to leave it out (remembered on this device) */
     var all=nsMatch(f),box=d.querySelector('#nsSelList'),sum=d.querySelector('#nsSel summary');
@@ -9879,6 +9886,7 @@ function openNotamSlide(){
   function download(fl){var a=document.createElement('a'),u=URL.createObjectURL(fl);a.href=u;a.download=fl.name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},30000);}
   document.getElementById('nsMake').onclick=function(){ready=make();};
   d.querySelector('#nsFir').onchange=function(){ready=make();};
+  d.querySelector('[data-ns="at"]').onchange=function(){ready=make();};
   ['nsPdf','nsPpt'].forEach(function(id){var b=document.getElementById(id);b.onclick=function(){
     b.disabled=true;file(id==='nsPdf'?'pdf':'ppt').then(download).catch(function(err){alert('สร้างไฟล์ไม่สำเร็จ ('+(err&&err.message||err)+')');}).then(function(){b.disabled=false;});
   };});
