@@ -47,10 +47,10 @@ self.addEventListener('fetch',function(e){
       e.respondWith(fetch(req).then(function(res){
         if(res.ok&&/(\/|index\.html)$/.test(url.pathname)){   /* never store an error page (404 / 5xx) as the offline app shell */
           var copy=res.clone();
-          caches.open(APP_CACHE).then(function(c){c.put('./',copy);});
+          caches.open(APP_CACHE).then(function(c){c.put('./',copy);if(/index\.html$/.test(url.pathname))c.put(req,res.clone());});
         }
         return res;
-      }).catch(function(){return caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||caches.match('./');});}));
+      }).catch(function(){return caches.match('./').then(function(hit){return hit||caches.match(req,{ignoreSearch:true});});}));
       return;
     }
     e.respondWith(caches.match(req,{ignoreSearch:true}).then(function(hit){return hit||fetch(req);}));
