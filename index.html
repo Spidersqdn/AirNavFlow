@@ -7507,7 +7507,7 @@ function importRouteKmz(file){
   readKmzFile(file).then(function(xml){
     r=parseImportText(xml,file.name);
     if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return 'cancel';}
-    return (pts.length&&r.route.length)?askImportMode(r):'replace';
+    return !r.route.length?'off':pts.length?askImportMode(r):'replace';
   }).then(function(mode){
     if(mode==='cancel')return;
     if(mode==='off'){r.off=r.route.concat(r.off);r.route=[];}
@@ -7524,7 +7524,7 @@ function importRouteKmz(file){
     r.off=r.off.filter(function(p){ /* skip off-route points already on the map */
       return !offRoutePts.some(function(q){return dist(p,q)<0.05&&(q.name||'')===(p.name||'');});
     });
-    if(r.off.length){offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
+    if(r.off.length){if(!map.hasLayer(offRouteLayer))offRouteLayer.addTo(map);offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
     refresh();
     var all=pts.concat(r.off);
     if(all.length)map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
