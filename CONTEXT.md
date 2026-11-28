@@ -125,6 +125,31 @@ KM/                   knowledge notes; start at KM/README.md
 - **Startup defaults:** DEP/ARR charts empty + HIDE ENROUTE ticked, OFF-ROUTE Wpt layer off.
 - **Hide-menu bar:** ◀/▶ left edge (landscape) or ▼/▲ bottom (portrait), remembered.
 
+### Key code areas in `index.html` (search by function / ID)
+| Area | Functions / Globals / IDs |
+|---|---|
+| HTML / CSS / Vendor | CSS (`<style>` ~L21-1838), UI (`<aside id="panel">` ~L1840-2126), embedded Leaflet/JSZip/PMTiles/protomaps (~L2128-3916) |
+| Embedded AIP & Airspace | `AP`, `APX`, `AIRSPACES_DB`, `VTBD_LIGHT_REPORTING_POINTS`, `VTBD_HELI_REPORTING_POINTS`, `addReportingPointLayer` |
+| NOTAM parse & layer | `NOTAM_DB`, `parseOneNotam`, `splitNotams`, `renderAllNotams`, `addNotamShape`, `updateRouteNotams`, `loadAutoNotam` |
+| Route & Waypoints | `pts`, `otherPts`, `routeActive`, `addPt`, `addBackTrack`, `switchRoute`, `swapRoutes`, `clearAltRoute`, `openWaypointEditor`, `drawLines`, `drawMarkers`, `refresh`, `saveRoute`, `loadRoute` |
+| Off-route W.Pt | `offRoutePts`, `addOffRoutePt`, `openOffRouteEditor`, `drawOffRouteMarkers`, `saveOffRoute`, `loadOffRoute` |
+| Terrain / Contour / Profile | `elevTile`, `elevAt`, `contourStep`, `contourGrid`, `setElevSource`, `loadElev`, `renderElevationProfile` |
+| Weather radar & Layers | `radarLoad`, `radarPlay`, `layerCtl`, `fitLayerCtl` |
+| NAVIGATION TRACKING | `setGpsTrack`, `navTrackStart`, `navTrackStop`, `navTrackAddFix`, `navTrackRender`, `navPresentPosition`, `navTrackReset`, `navTrackExport`, `buildTrackImage`, `showTrackImage` |
+| RULER | `setMeasureMode`, `handleMeasureClick`, `updateMeasurementGraphics`, `clearMeasurement` |
+| EXPORT / IMPORT route | `exportRouteKmz`, `askKmzOffRoute`, `buildRouteKml`, `buildRouteGpx`, `buildRouteCsv`, `importRouteKmz`, `parseKmlRoute`, `parseGpxRoute`, `parseCsvRoute`, `askImportMode` |
+| CoWork / Shared data | `AD_INFO`, `loadAdInfoFile`, `RWY_INFO`, `loadRwyFile`, `fetchDataTxt`, `loadMtbFile`, `loadRtaAirfields`, `loadRtafPoc` |
+| MINI MAP | `exportMiniMap`, `buildMiniMap`, `showMiniMap`, `mmBuildSheet`, `mmTblDefault`, `mmTblEditor`, `mmTableSheets`, `mmPdfBlob`, `mmPptxBlob` |
+| SLIDE (16:9) | `openSlide`, `buildSlide`, `slPptxBlob`, `slLoad`, `slSave` |
+| NOTAM slides (16:9) | `openNotamSlide`, `nsMatch`, `nsGroups`, `nsBuild`, `nsDraw`, `nsPdfBlob`, `nsPptxBlob` |
+| MSN CARD | `openFlightLog`, `buildFlightLog`, `flLoad`, `flSave` |
+| On MAP & coords | `setOnMapMode`, `showMapPointInfo`, `latLngToMgrs`, `mgrsToLatLng`, `ddmShort` |
+| MAP & ENROUTE | `userMaps`, `importUserMap`, `umapBuiltinInit`, `umapRender`, `umapShow`, `cbMapRender`, `umapImgGeo` |
+| CHART & Chart bar | `charts`, `chartAddFiles`, `chartSelect`, `chartRender`, `chartLoadPdfJs`, `openChartViewer`, `chartDbLoadIndex`, `chartDbOffline`, `cbSlots`, `cbRender`, `cbApply` |
+| CHART login | `chartLocked`, `chartLogin`, `chartLoginOpen`, `chartLoginPw`, `chartBio`, `chartPk` |
+| Search & Place index | `searchOnline`, `searchOffline`, `findAirportByQuery`, `loadPlaces`, `searchPlaces` |
+| OFFLINE DATA | `downloadOfflineMap`, `deleteOfflineMap`, `renderOfflineInfo`, `downloadElev`, `deleteElev`, `renderElevInfo`, `umapEnrBtn`, `chartDbOfflineState` |
+
 ## 7. Parked / future
 - Support bot knowledge: `KM/BOT_GUIDE.md`, `USER_GUIDE.md`, `FAQ.md`, `FEEDBACK.md`.
   Docs are prepared first; bot channel and feedback storage integration are not selected yet.
