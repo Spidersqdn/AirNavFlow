@@ -7507,7 +7507,7 @@ function importRouteKmz(file){
   readKmzFile(file).then(function(xml){
     r=parseImportText(xml,file.name);
     if(!r.route.length&&!r.off.length){alert('ไม่พบ Waypoint หรือเส้นทางในไฟล์');return 'cancel';}
-    return (pts.length&&r.route.length)?askImportMode(r):'replace';
+    return !r.route.length?'off':pts.length?askImportMode(r):'replace';
   }).then(function(mode){
     if(mode==='cancel')return;
     if(mode==='off'){r.off=r.route.concat(r.off);r.route=[];}
@@ -7524,7 +7524,7 @@ function importRouteKmz(file){
     r.off=r.off.filter(function(p){ /* skip off-route points already on the map */
       return !offRoutePts.some(function(q){return dist(p,q)<0.05&&(q.name||'')===(p.name||'');});
     });
-    if(r.off.length){offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
+    if(r.off.length){if(!map.hasLayer(offRouteLayer))offRouteLayer.addTo(map);offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
     refresh();
     var all=pts.concat(r.off);
     if(all.length)map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
@@ -9576,8 +9576,7 @@ function nsRoutes(){
   return {main:m.filter(ok),alt:a.filter(ok)};
 }
 function nsDist(n,r){   /* NM from the NOTAM centre to the nearest leg of route r */
-  if(!r.length)return Infinity;
-  if(r.length===1)return dist(n,r[0]);
+  if(r.length<2)return Infinity;
   var m=Infinity;for(var i=1;i<r.length;i++)m=Math.min(m,pDistToSegment(n,r[i-1],r[i]));return m;
 }
 function nsAt(f){var t=f.at?new Date(f.at).getTime():NaN;return isFinite(t)?t:Date.now();}   /* chosen time (device local), blank = now */
@@ -9595,9 +9594,9 @@ function nsMatch(f){
     ads.forEach(function(id){var q={lat:APX[id][4],lng:APX[id][5]},x=nsDist(q,R.main),y=nsDist(q,R.alt);if(Math.min(x,y)<Math.min(adm,ada))adId=id;adm=Math.min(adm,x);ada=Math.min(ada,y);});
     var r=n.radiusNM||0,dm=n.listOnly?Infinity:Math.max(0,nsDist(n,R.main)-r),da=n.listOnly?Infinity:Math.max(0,nsDist(n,R.alt)-r);
     dm=Math.min(dm,adm);da=Math.min(da,ada);
-    var m=R.main.length>0&&dm<=buf,a=R.alt.length>0&&da<=buf;
+    var m=R.main.length>=2&&dm<=buf,a=R.alt.length>=2&&da<=buf;
     if(m||a){out.push({n:n,ads:ads,m:m,a:a,dm:dm,da:da,ad:(adm<=buf||ada<=buf)?adId:'',d:Math.min(m?dm:Infinity,a?da:Infinity)});return;}
-    if(n.listOnly&&f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>0,dm:0,da:0,d:0});
+    if(n.listOnly&&f.fir)out.push({n:n,fir:1,m:1,a:R.alt.length>=2,dm:0,da:0,d:0});
   });
   out.sort(function(x,y){return (x.fir||0)-(y.fir||0)||x.d-y.d;});
   return out;
@@ -9651,7 +9650,7 @@ function nsLayout(f,G,FS,FONT){
   var total=G.reduce(function(t,g){return t+g.items.length;},0),y=HD,s1=[];
   s1.push({x:TX,y:y,w:TW,h:58,fill:NAVY,line:'0D1A33',pad:14,va:'ctr',lh:40,lines:[{t:f.title||'NOTAM ตามเส้นทางบิน',sz:30,col:'FFFFFF',al:'ctr'}]});
   y+=64;
-  var info=[['เส้นทางหลัก',R.main.length?nsRouteTxt(R.main):'-'],['เส้นทางสำรอง',R.alt.length?nsRouteTxt(R.alt):'-'],
+  var info=[['เส้นทางหลัก',R.main.length>=2?nsRouteTxt(R.main):'-'],['เส้นทางสำรอง',R.alt.length>=2?nsRouteTxt(R.alt):'-'],
     ['ระยะค้นหา','±'+(parseFloat(f.buf)||0)+' NM จากเส้นทาง + สนามบิน'+(f.fir?' + NOTAM ทั้ง FIR':'')],['NOTAM active ณ',dt(new Date(nsAt(f)))],['จัดทำ',dt(now)],['พบ NOTAM',total+' รายการ']];
   var il=[];info.forEach(function(r){wrap(r[0]+' : '+r[1],21,0,TW-28).forEach(function(l){il.push({t:l.t,cont:l.cont,sz:21,col:'FFFFFF'});});});
   il=il.slice(0,10);var ih=il.length*30+18;
@@ -9728,7 +9727,7 @@ function nsDraw(sl,idx,total,f,list,bg,mapCv,noText,FS,FONT){
 }
 /* map picture (900 x 712): fit = points to frame; draw = NOTAMs to outline (with their numbers); both routes on top */
 function nsMapAt(fit,draw,note){
-  var S=2,MW=900*S,MH=712*S,R=nsRoutes();
+  var S=2,MW=900*S,MH=712*S,R=nsRoutes(),rM=R.main.length>=2?R.main:[],rA=R.alt.length>=2?R.alt:[];
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   fit.forEach(function(p){var q=mmWorld(p.lat,p.lng,0);minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);});
   var z=Math.log2(Math.min(MW*0.8/Math.max(maxX-minX,1e-4),MH*0.8/Math.max(maxY-minY,1e-4)));z=Math.max(5,Math.min(z,13));
@@ -9754,7 +9753,7 @@ function nsMapAt(fit,draw,note){
       if(r.length<2)return;ctx.beginPath();r.forEach(function(p,i){var q=px(p.lat,p.lng);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});
       ctx.setLineDash(dash||[]);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();ctx.setLineDash([]);
     }
-    line(R.alt,'#1f5fff',4*S,[14*S,10*S]);line(R.main,'#e01010',5*S);
+    line(rA,'#1f5fff',4*S,[14*S,10*S]);line(rM,'#e01010',5*S);
     function names(r,col){r.forEach(function(p){
       var q=px(p.lat,p.lng),nm=p.name||'';if(q.x<-50||q.y<-50||q.x>MW+50||q.y>MH+50)return;
       ctx.fillStyle='#fff';ctx.strokeStyle=col;ctx.lineWidth=2*S;ctx.beginPath();ctx.arc(q.x,q.y,5*S,0,2*Math.PI);ctx.fill();ctx.stroke();
@@ -9762,7 +9761,7 @@ function nsMapAt(fit,draw,note){
       var lx=q.x+10*S,tw=ctx.measureText(nm).width;if(lx+tw>MW-6*S)lx=q.x-10*S-tw;
       ctx.lineWidth=4*S;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(nm,lx,q.y-10*S);ctx.fillStyle='#fff';ctx.fillText(nm,lx,q.y-10*S);
     });}
-    names(R.alt,'#1f5fff');names(R.main,'#e01010');
+    names(rA,'#1f5fff');names(rM,'#e01010');
     lbl.forEach(function(l){
       ctx.fillStyle='#ff5a00';ctx.strokeStyle='#fff';ctx.lineWidth=2*S;ctx.beginPath();ctx.arc(l.x,l.y,15*S,0,2*Math.PI);ctx.fill();ctx.stroke();
       ctx.fillStyle='#fff';ctx.font='700 '+Math.round(17*S)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(l.t,l.x,l.y+1*S);
@@ -9782,7 +9781,7 @@ function nsMapAt(fit,draw,note){
 /* frame for one NOTAM: its area (poly or circle), at least 5 NM around the centre so the route nearby shows */
 function nsFit(x){
   var n=x.n,R=nsRoutes(),pts2=[];
-  if(n.listOnly)return R.main.concat(R.alt);
+  if(n.listOnly)return (R.main.length>=2?R.main:[]).concat(R.alt.length>=2?R.alt:[]);
   var r=Math.max(5,(n.poly?0:(n.radiusNM||0))*1.15),dl=r/60,dg=dl/Math.max(.2,Math.cos(n.lat*rad));
   pts2.push({lat:n.lat-dl,lng:n.lng-dg},{lat:n.lat+dl,lng:n.lng+dg});
   if(n.poly)n.poly.forEach(function(p){pts2.push({lat:p[0],lng:p[1]});});
@@ -9795,11 +9794,11 @@ function nsBuild(f,prog){
   var FS=psk?1.3:1,list=nsMatch(f).filter(function(x){return f.off.indexOf(x.n.id)<0;}),G=nsGroups(list),bg=null,slides,out={full:[],bare:[]};
   var fontsReady=(document.fonts&&document.fonts.load)?Promise.all([document.fonts.load('400 36px Sarabun','Aก่ำ'),document.fonts.load('700 36px Sarabun','Aก่ำ')]).catch(function(){}):Promise.resolve();
   return fontsReady.then(function(){return mmLoadImg('icons/slide-bg.jpg',5000);}).then(function(im){
-    bg=im;slides=nsLayout(f,G,FS,FONT);var R=nsRoutes(),p=Promise.resolve();
+    bg=im;slides=nsLayout(f,G,FS,FONT);var R=nsRoutes(),rAll=(R.main.length>=2?R.main:[]).concat(R.alt.length>=2?R.alt:[]),p=Promise.resolve();
     slides.forEach(function(s,i){p=p.then(function(){
       if(prog)prog(i+1,slides.length);
       var v=s.view;
-      return (v.ov?nsMapAt(R.main.concat(R.alt),list,''):nsMapAt(nsFit(v.x),[v.x],v.x.n.listOnly?'ครอบคลุมทั้ง FIR':'')).then(function(m){
+      return (v.ov?nsMapAt(rAll,list,''):nsMapAt(nsFit(v.x),[v.x],v.x.n.listOnly?'ครอบคลุมทั้ง FIR':'')).then(function(m){
         s.mapCv=m;
         var c=nsDraw(s,i,slides.length,f,list,bg,m,false,FS,FONT);out.full.push(c.toDataURL('image/jpeg',0.88));
         c=nsDraw(s,i,slides.length,f,list,bg,m,true,FS,FONT);out.bare.push(c.toDataURL('image/jpeg',0.88));
@@ -11495,8 +11494,12 @@ document.getElementById('chartResetBtn').onclick=function(){
   chartFhPend=null;
   Object.keys(chartMeta.items).forEach(function(k){if(k.indexOf('db:')!==0)delete chartMeta.items[k];});
   if(chartMeta.sel.indexOf('db:')!==0)chartMeta.sel='';
+  if(typeof cbSlots!=='undefined'&&cbSlots){
+    ['dep','arr'].forEach(function(k){var sl=cbSlots[k];if(sl.key&&sl.key.indexOf('db:')!==0){cbClear(k);sl.key='';sl.page=1;sl.show=false;}});
+    cbSave();
+  }
   chartMetaSave();document.getElementById('importChartFile').value='';
-  chartSetList([]);chartRender('ลบชาร์ตที่ import แล้ว');
+  chartSetList([]);chartRender('ลบชาร์ตที่ import แล้ว');if(typeof cbRender==='function')cbRender();
 };
 document.getElementById('importChartBtn').onclick=function(){
   if(chartFhPend){ /* remembered files: one tap to grant read access again */
@@ -11548,7 +11551,7 @@ function chartNtsSet(c){
   else{
     ax=w/2;ay=h/2;var icao=String(c.db||'').slice(0,4).toUpperCase(),rw=(RWY_INFO[icao]||[]).filter(function(r){return r[0].lat!=null&&r[1].lat!=null;})[0];
     if(rw)ll=[(rw[0].lat+rw[1].lat)/2,(rw[0].lng+rw[1].lng)/2];
-    else if(typeof APX!=='undefined'&&APX[icao])ll=[APX[icao].lat,APX[icao].lng];
+    else if(typeof APX!=='undefined'&&APX[icao])ll=[APX[icao][4],APX[icao][5]];
   }
   if(!ll||isNaN(ll[0])){c.gcp=[];c.gcpAuto=false;c.nts=false;return;}
   if(!c.ntsK){var lb=(c.labels&&c.labels[(c.page||1)-1]||'').toUpperCase();
@@ -12520,8 +12523,8 @@ function initElev(){
 }
 document.getElementById('elevDl').onclick=downloadElev;
 document.getElementById('elevDel').onclick=deleteElev;
-window.addEventListener('online',function(){renderElevInfo();});
-window.addEventListener('offline',function(){renderElevInfo();});
+window.addEventListener('online',function(){renderElevInfo();umapRender();if(!chartDbIdx)chartDbLoadIndex();else chartDbOfflineState();});
+window.addEventListener('offline',function(){renderElevInfo();umapRender();chartDbOfflineState();});
 
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').catch(function(){});
