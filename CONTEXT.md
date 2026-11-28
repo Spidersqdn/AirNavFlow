@@ -121,8 +121,8 @@ KM/                   knowledge notes; start at KM/README.md
   Phone portrait is full screen: map under status bar, height --app-h (screen height in iOS Home Screen app).
 - **Desktop menu width:** drag #panelResizer (menu/map edge), saved fp-panel-w-v1; double-click = 390px.
 - **Layers:** มทบ., VFR BKK A/C & Helicopter Wpt, RTAF POC (CSAR + ผบ.ฝูง), สนามบิน ทบ., airspace,
-  reporting points, Imported NOTAM, rain radar. NOTAM list in side panel hidden by default.
-- **Startup defaults:** DEP/ARR charts empty + HIDE ENROUTE ticked, OFF-ROUTE Wpt layer off.
+  reporting points, Imported ROUTE, Imported NOTAM, rain radar. NOTAM list in side panel hidden by default.
+- **Startup defaults:** DEP/ARR charts empty + HIDE ENROUTE ticked, OFF-ROUTE Wpt & Imported ROUTE layers off.
 - **Hide-menu bar:** ◀/▶ left edge (landscape) or ▼/▲ bottom (portrait), remembered.
 
 ### Key code areas in `index.html` (search by function / ID)
@@ -137,7 +137,7 @@ KM/                   knowledge notes; start at KM/README.md
 | Weather radar & Layers | `radarLoad`, `radarPlay`, `layerCtl`, `fitLayerCtl` |
 | NAVIGATION TRACKING | `setGpsTrack`, `navTrackStart`, `navTrackStop`, `navTrackAddFix`, `navTrackRender`, `navPresentPosition`, `navTrackReset`, `navTrackExport`, `buildTrackImage`, `showTrackImage` |
 | RULER | `setMeasureMode`, `handleMeasureClick`, `updateMeasurementGraphics`, `clearMeasurement` |
-| EXPORT / IMPORT route | `exportRouteKmz`, `askKmzOffRoute`, `buildRouteKml`, `buildRouteGpx`, `buildRouteCsv`, `importRouteKmz`, `parseKmlRoute`, `parseGpxRoute`, `parseCsvRoute`, `askImportMode` |
+| EXPORT / IMPORT route | `exportRouteKmz`, `askKmzOffRoute`, `buildRouteKml`, `buildRouteGpx`, `buildRouteCsv`, `importRouteKmz`, `parseKmlRoute`, `parseGpxRoute`, `parseCsvRoute`, `askImportMode`, `importedRouteLayer`, `importedRoutePts`, `drawImportedRouteMarkers`, `openImportedRoutePopup` |
 | CoWork / Shared data | `AD_INFO`, `loadAdInfoFile`, `RWY_INFO`, `loadRwyFile`, `fetchDataTxt`, `loadMtbFile`, `loadRtaAirfields`, `loadRtafPoc` |
 | MINI MAP | `exportMiniMap`, `buildMiniMap`, `showMiniMap`, `mmBuildSheet`, `mmTblDefault`, `mmTblEditor`, `mmTableSheets`, `mmPdfBlob`, `mmPptxBlob` |
 | SLIDE (16:9) | `openSlide`, `buildSlide`, `slPptxBlob`, `slLoad`, `slSave` |

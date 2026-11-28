@@ -1496,6 +1496,10 @@ td .wp-delete{
   border:1px solid #8a9199;
   font:600 10px var(--mono);
 }
+.imp-route-pin{
+  background:#1f5e78;
+  border-color:#5cd0e6;
+}
 
 /* Compact insert control beside previous waypoint name */
 .insert-wp-mini{
@@ -4212,6 +4216,7 @@ var heliRptLayer=L.layerGroup();
 var lineLayer=L.layerGroup().addTo(map);
 var markerLayer=L.layerGroup().addTo(map);
 var offRouteLayer=L.layerGroup(); /* SPD 14 NOV: hidden when the app opens (Layer menu OFF-ROUTE Wpt shows it) */
+var importedRouteLayer=L.layerGroup(); /* Imported ROUTE: holds off-route points from imported KMZ/KML/GPX/CSV */
 var elevHoverLayer=L.layerGroup().addTo(map);
 var gpsLayer=L.layerGroup().addTo(map);
 var measureLayer=L.layerGroup().addTo(map);
@@ -5707,6 +5712,7 @@ var layerCtl=L.control.layers(
    'เส้นชั้นความสูง (Contour ft)':contourLayer,
    '<span style="color:#4fa3ff;font-weight:600">เรดาร์ฝน (Rain Radar)</span>':radarLayer,
    '<span style="color:#d9dde2;font-weight:600">OFF-ROUTE Wpt</span>':offRouteLayer,
+   '<span style="color:#5cd0e6;font-weight:600">Imported ROUTE</span>':importedRouteLayer,
    'เส้นจังหวัด':provLayer,
    'มทบ.':mtbLayer,
    '<span style="color:#3fa9f5;font-weight:600">RTAF POC</span>':rtafLayer,
@@ -7479,8 +7485,75 @@ function readKmzFile(file){
     return new TextDecoder('utf-8').decode(buf);
   });
 }
+var IMPROUTE_KEY='fp-imported-route-v1',importedRoutePts=[];
+function saveImportedRoute(){
+  try{localStorage.setItem(IMPROUTE_KEY,JSON.stringify(importedRoutePts.map(function(p){
+    return {lat:p.lat,lng:p.lng,name:p.name||'',remark:p.remark||'',place:p.place||'',refIcao:(p.refIcao||'').toUpperCase()};
+  })));}catch(e){}
+}
+function loadImportedRoute(){
+  try{
+    var d=JSON.parse(localStorage.getItem(IMPROUTE_KEY)||'[]');if(!Array.isArray(d))return;
+    importedRoutePts=d.filter(function(p){return p&&isFinite(p.lat)&&isFinite(p.lng);}).map(function(p){p.refIcao=(p.refIcao||'').toUpperCase();return p;});
+    drawImportedRouteMarkers();
+  }catch(e){}
+}
+function geocodeImportedRoute(p){
+  if(!navigator.onLine)return;
+  fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+p.lat+'&lon='+p.lng+'&zoom=12&accept-language=th')
+  .then(function(r){return r.json()}).then(function(j){
+    var a=j.address||{};p.place=[a.city||a.town||a.county||a.municipality||a.suburb||a.village,a.state].filter(Boolean).join(', ')||(j.name||'');
+    saveImportedRoute();drawImportedRouteMarkers();
+  }).catch(function(){});
+}
+function openImportedRoutePopup(marker,p,index){
+  var ap=(p.refIcao&&APX[p.refIcao])?APX[p.refIcao]:nearestAirportForPoint(p),rd='—',icao=ap?ap[0]:'';
+  if(ap){var ref={lat:ap[4],lng:ap[5]},r=Math.round(course(ref,p))%360;rd=esc(ap[0])+' R'+String(r).padStart(3,'0')+'°T / '+dist(ref,p).toFixed(1)+' NM';}
+  var label=p.name||('IMP '+(index+1));
+  var html='<div class="wp-editor"><h4>Imported ROUTE · '+esc(label)+'</h4>'+wpCoordHtml(p)+
+    (p.place?'<div style="font-size:11px;color:var(--mute);margin-bottom:4px">'+esc(p.place)+'</div>':'')+
+    '<div style="font-size:11px;color:var(--cyan);margin-bottom:6px">Radial/DME: '+rd+'</div>'+
+    '<label>Name<input id="impEditName" type="text" value="'+esc(p.name||'')+'"></label>'+
+    '<label>หมายเหตุ / Remark<input id="impEditRemark" type="text" maxlength="60" value="'+esc(p.remark||'')+'"></label>'+
+    '<div class="wp-editor-actions offroute-edit-actions" style="margin-top:8px">'+
+      '<button type="button" class="offroute-addroute" id="impAddMain">+ เส้นทางหลัก</button>'+
+      '<button type="button" class="offroute-addroute" id="impAddAlt" style="background:#3b82f6!important;border-color:#3b82f6!important;color:#fff!important">+ เส้นทางสำรอง</button>'+
+    '</div>'+
+    '<div class="wp-editor-actions offroute-edit-actions" style="margin-top:6px">'+
+      '<button type="button" class="offroute-save" id="impAddOff">Add Off-ROUTE W.Pt</button>'+
+      '<button type="button" class="offroute-delete" id="impDelete" style="flex:0 0 auto;padding:0 10px">Delete</button>'+
+      '<button type="button" class="offroute-delete" id="impClearAll" style="flex:0 0 auto;padding:0 10px" title="ล้างจุดทั้งหมดใน Imported ROUTE">Clear All</button>'+
+    '</div></div>';
+  marker.unbindPopup();marker.bindPopup(html,{closeButton:true});
+  marker.once('popupopen',function(e){
+    var root=e.popup.getElement();if(!root)return;
+    function sync(){
+      var nm=root.querySelector('#impEditName').value.trim(),rm=root.querySelector('#impEditRemark').value.trim();
+      if(nm!==p.name||rm!==p.remark){p.name=nm;p.remark=rm;saveImportedRoute();drawImportedRouteMarkers();}
+      return {nm:nm||label,rm:rm};
+    }
+    root.querySelector('#impAddMain').onclick=function(){var v=sync();addPtToRoute('main',p.lat,p.lng,v.nm,icao,v.rm);map.closePopup();st.textContent='เพิ่ม '+v.nm+' เข้าเส้นทางหลักแล้ว';};
+    root.querySelector('#impAddAlt').onclick=function(){var v=sync();addPtToRoute('alt',p.lat,p.lng,v.nm,icao,v.rm);map.closePopup();st.textContent='เพิ่ม '+v.nm+' เข้าเส้นทางสำรองแล้ว';};
+    root.querySelector('#impAddOff').onclick=function(){var v=sync();addOffRoutePt(p.lat,p.lng,v.nm,icao,v.rm);map.closePopup();st.textContent='เพิ่ม '+v.nm+' เข้า OFF-ROUTE Wpt แล้ว';};
+    root.querySelector('#impDelete').onclick=function(){importedRoutePts.splice(index,1);saveImportedRoute();map.closePopup();drawImportedRouteMarkers();};
+    root.querySelector('#impClearAll').onclick=function(){if(!confirm('ลบจุดทั้งหมดใน Imported ROUTE ('+importedRoutePts.length+' จุด)?'))return;importedRoutePts=[];saveImportedRoute();map.closePopup();drawImportedRouteMarkers();};
+  });
+  marker.openPopup();
+}
+function drawImportedRouteMarkers(){
+  importedRouteLayer.clearLayers();
+  importedRoutePts.forEach(function(p,i){
+    var label=p.name||('IMP '+(i+1));
+    var m=L.marker([p.lat,p.lng],{
+      icon:L.divIcon({className:'',html:'<div class="offroute-pin imp-route-pin">'+esc(label)+'</div>',iconSize:null,iconAnchor:[15,12]})
+    });
+    m.bindTooltip('<span class="offroute-tooltip">Imported ROUTE: '+esc(label)+(p.remark?'<br>'+esc(p.remark):'')+wpCoordHtml(p)+'</span>',{direction:'top',offset:[0,-10]});
+    m.on('click',function(){openImportedRoutePopup(m,p,i);});
+    m.addTo(importedRouteLayer);
+  });
+}
 function askImportMode(r){
-  /* route already set: let the user keep it (append / off-route) or replace it */
+  /* route already set: let the user keep it (append / Imported ROUTE) or replace it */
   return new Promise(function(res){
     var bg=document.createElement('div');
     bg.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
@@ -7488,9 +7561,9 @@ function askImportMode(r){
     box.style.cssText='background:#3a3f46;color:#fff;border:1px solid #666d76;border-radius:10px;padding:16px;max-width:340px;width:100%;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';
     var t=document.createElement('div');
     t.style.cssText='margin-bottom:12px';
-    t.textContent='ไฟล์มี '+r.route.length+' route waypoint'+(r.off.length?' + '+r.off.length+' off-route':'')+' / route ปัจจุบันมี '+pts.length+' จุด';
+    t.textContent='ไฟล์มี '+r.route.length+' route waypoint'+(r.off.length?' + '+r.off.length+' off-route (ลง Imported ROUTE)':'')+' / route ปัจจุบันมี '+pts.length+' จุด';
     box.appendChild(t);
-    [['append','ต่อท้าย route เดิม'],['off','เก็บ route เดิม (ใส่เป็น Off-Route ทั้งหมด)'],['replace','แทนที่ route เดิม'],['cancel','ยกเลิก']].forEach(function(o){
+    [['append','ต่อท้าย route เดิม'],['off','เก็บ route เดิม (ใส่ใน Imported ROUTE ทั้งหมด)'],['replace','แทนที่ route เดิม'],['cancel','ยกเลิก']].forEach(function(o){
       var b=document.createElement('button');
       b.type='button';b.textContent=o[1];
       b.style.cssText='display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid #666d76;background:'+(o[0]==='cancel'?'transparent':'#4a5058')+';color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer';
@@ -7520,19 +7593,19 @@ function importRouteKmz(file){
     }
     pendingInsertIndex=null;routeMapEditIndex=null;routeMapEditDraft=null;
     updateInsertModeBanner();
-    offRoutePts=offRoutePts||[];
-    r.off=r.off.filter(function(p){ /* skip off-route points already on the map */
-      return !offRoutePts.some(function(q){return dist(p,q)<0.05&&(q.name||'')===(p.name||'');});
+    importedRoutePts=importedRoutePts||[];
+    r.off=r.off.filter(function(p){ /* skip points already in Imported ROUTE */
+      return !importedRoutePts.some(function(q){return dist(p,q)<0.05&&(q.name||'')===(p.name||'');});
     });
-    if(r.off.length){if(!map.hasLayer(offRouteLayer))offRouteLayer.addTo(map);offRoutePts=offRoutePts.concat(r.off);saveOffRoute();drawOffRouteMarkers();}
+    if(r.off.length){if(!map.hasLayer(importedRouteLayer))importedRouteLayer.addTo(map);importedRoutePts=importedRoutePts.concat(r.off);saveImportedRoute();drawImportedRouteMarkers();}
     refresh();
     var all=pts.concat(r.off);
     if(all.length)map.fitBounds(L.latLngBounds(all.map(function(p){return [p.lat,p.lng];})).pad(.2),{maxZoom:11});
     if(navigator.onLine&&r.route.length+r.off.length<=40){ /* fill district/province names, 1 request/s */
       r.route.forEach(function(p,i){setTimeout(function(){geocode(p);},i*1100);});
-      r.off.forEach(function(p,i){setTimeout(function(){geocodeOffRoute(p);},(r.route.length+i)*1100);});
+      r.off.forEach(function(p,i){setTimeout(function(){geocodeImportedRoute(p);},(r.route.length+i)*1100);});
     }
-    if(st)st.textContent='นำเข้า '+file.name+': route +'+r.route.length+' จุด'+(r.off.length?', off-route +'+r.off.length+' จุด':'');
+    if(st)st.textContent='นำเข้า '+file.name+': route +'+r.route.length+' จุด'+(r.off.length?', Imported ROUTE +'+r.off.length+' จุด':'');
   }).catch(function(e){
     alert('นำเข้าไฟล์ไม่สำเร็จ: '+(e&&e.message?e.message:e));
   });
@@ -12747,6 +12820,7 @@ function loadAutoNotam(){
 
 loadRoute();
 loadOffRoute();
+loadImportedRoute();
 initOfflineMap();
 initElev();
 loadAutoNotam();
